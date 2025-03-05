@@ -1,0 +1,34 @@
+{
+  "github_url": "https://github.paypal.com/GADS-Consumer-ML/ql-store-recommendation-prod.git",
+  "input_files": [
+    "research/pipeline/00_driver.ipynb",
+    "research/pipeline/01_bq_feat.ipynb",
+    "research/pipeline/01_varmart_feat.ipynb",
+    "research/pipeline/02_combine.ipynb",
+    "research/pipeline/03_prepare_training_data.ipynb",
+    "research/pipeline/04_prepare_oot_data.ipynb",
+    "research/pipeline/04_training.ipynb",
+    "research/pipeline/05_scoring_oot.ipynb",
+    "research/pipeline/06_evaluation.ipynb"
+  ],
+  "repo_name": "ql-store-recommendation-prod",
+  "local_repo_path": "repos/ql-store-recommendation-prod",
+  "files": [
+    "repos/ql-store-recommendation-prod/research/pipeline/00_driver.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/01_bq_feat.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/01_varmart_feat.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/02_combine.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/03_prepare_training_data.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/04_prepare_oot_data.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/04_training.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/06_evaluation.py"
+  ],
+  "all_nodes": [],
+  "consolidated_nodes": [],
+  "edges": [],
+  "dag_yaml": "",
+  "verified_dag": {},
+  "config": {},
+  "notebooks": []
+}
