@@ -63,14 +63,27 @@ class TokenManager:
             return self._token
 
         # Token doesn't exist or is expired, get new one
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Cookie': 'fpc=AlGJE26qB45Lt9QvUL18hP4oYQGpAwAAAMZzLN8OAAAA; stsservicecookie=estsfd; x-ms-gateway-slice=estsfd'
+        }
         data = {
             "client_id": os.getenv("AZURE_CLIENT_ID"),
             "client_secret": os.getenv("AZURE_CLIENT_SECRET"),
             "scope": os.getenv("AZURE_SCOPE"),
             "grant_type": "client_credentials"
         }
+        #print('data for getting token:', data)
+        if not data['client_id']:
+            raise ValueError("AZURE_CLIENT_ID not found in environment variables")
+        if not data['client_secret']:
+            raise ValueError("AZURE_CLIENT_SECRET not found in environment variables")
+        if not data['scope']:
+            raise ValueError("AZURE_SCOPE not found in environment variables")
         
         res = requests.post(self.url, data=data, verify=False)
+        #print("Requested access token:", res)
+        #print(res.text)
         self._token = res.json()["access_token"]
         self._token_lifetime = res.json()["expires_in"]
         self._token_expiry = current_time + self._token_lifetime
@@ -288,7 +301,7 @@ class LLMClient:
             kwargs['messages'] = messages
 
         if input_tokens == 0:
-            input_tokens: int = litellm.utils.token_counter(messages=messages, model=model_name) # defaults to tiktoken general token counter if that model name does not match
+            input_tokens: int = litellm.utils.token_counter(messages=messages, model=self.model_name) # defaults to tiktoken general token counter if that model name does not match
             
         # Create request components
         payload = self.handler.create_payload(**kwargs)
@@ -372,3 +385,6 @@ if __name__ == "__main__":
         input_tokens=input_tokens
     )
     print(response)
+    choices: litellm.types.utils.Choices = response.choices
+    response_text = choices[0].message.content or ""
+    print(response_text)

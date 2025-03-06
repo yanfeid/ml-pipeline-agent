@@ -1,1 +1,2 @@
 from .clean_code import preprocess_python_file
+from .json_str_to_dict import convert_to_dict

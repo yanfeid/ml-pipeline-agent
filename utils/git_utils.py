@@ -234,7 +234,7 @@ if __name__ == '__main__':
 '''
 
 
-def clone_repo(github_url: str, local_base_dir: str = "repos") -> tuple[str, str]:
+def clone_repo(github_url: str, local_base_dir: str = "repos") -> str:
     """Clone a GitHub repo and checkout a new branch 'rmr_agent'.
     
     Args:
@@ -242,7 +242,7 @@ def clone_repo(github_url: str, local_base_dir: str = "repos") -> tuple[str, str
         local_base_dir: Base directory to store cloned repos.
     
     Returns:
-        Tuple of (repo_name, local_repo_path).
+        str: local_repo_path
     """
     # extract repo owner and repo name from url
     repo_owner, repo_name = parse_github_url(github_url)
@@ -256,10 +256,12 @@ def clone_repo(github_url: str, local_base_dir: str = "repos") -> tuple[str, str
         shutil.rmtree(local_repo_path)
 
     # clone repo to local directory. This also authenticates with git and safely caches credentials for 24H
+    print(f"Changing working directory to {local_base_dir} to clone the repo")
     with temporary_working_directory(local_base_dir):
         gh = GitHub(repo_owner=repo_owner, repo_name=repo_name, account='matjacobs', token=token) # hard coding to my username and PAT for now
         gh.run_command(["git", "checkout", "-b", "rmr_agent"])
+    print(f"Changing working directory back to {os.getcwd()}")
     
-    return repo_name, local_repo_path
+    return local_repo_path
 
 
