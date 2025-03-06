@@ -1,8 +1,7 @@
 import os
-import json
-from llms import call_codepal_gpt
 import litellm
 from llms import LLMClient
+    
 
 
 def component_identification_agent(python_file_path, full_file_list, code_summary, model="gpt-4o", temperature=0, max_tokens=2048, 
@@ -76,98 +75,7 @@ CURRENT FILE'S CODE SUMMARY:
         top_p=0.3,
     )
     choices: litellm.types.utils.Choices = response.choices
-    classification = choices[0].message.content or ""
-    print("Components identified:")
-    print(classification)
-    return classification
-
-
-def parse_component_identification(response_text):
-    """
-    Parse component identification response, extracting components with their line ranges,
-    evidence, and why_separate sections.
-    
-    Args:
-        response_text (str): The raw LLM response text
-        
-    Returns:
-        dict: A dictionary where:
-            - keys are component names
-            - values are dictionaries with:
-                - 'line_range' (str): The full line range text
-                - 'evidence' (list): List of evidence items
-                - 'why_separate' (str or None): Explanation of why this component is separate
-        
-    Raises:
-        ValueError: If no components are identified or if the response format is invalid
-    """
-
-    parse_prompt = f"""Parse the following component identification response and return a JSON object with the following structure:
-{{
-    "Component Name": {{
-        "line_range": "The exact line range as specified (e.g., 'Lines 258-287, 300-311')",
-        "evidence": [
-            "Full evidence item text including the quoted part and description",
-            "Another evidence item text"
-        ],
-        "why_separate": "The explanation of why this component is separate (or null if not present)"
-    }}
-}}
-
-Make sure to:
-1. Keep the line range exactly as specified in the text
-2. Extract all evidence items with their descriptions
-3. Include the "why_separate" section if present, otherwise set to null
-4. Ignore any additional text that appears after the last component
-
-Here's the content to parse:
-
-{response_text}
-"""
-
-    result = call_codepal_gpt(
-        prompt=parse_prompt,
-        temperature=0  
-    )
-    parsed_text = result['generated_text']
-    print("Parsed classification response:")
-    print(parsed_text)
-    return parsed_text
-
-
-
-def convert_to_dict(json_str):
-    """
-    Convert the LLM-generated JSON string to a Python dictionary.
-    
-    Args:
-        json_str (str): The raw text response from the LLM
-        
-    Returns:
-        dict: The parsed dictionary with component information
-    """
-    try:
-        # First, try to find JSON content by looking for opening and closing braces
-        json_start = json_str.find('{')
-        json_end = json_str.rfind('}') + 1
-        
-        if json_start == -1 or json_end == 0:
-            raise ValueError("No JSON object found in the LLM response")
-        
-        # Extract the JSON part
-        json_content = json_str[json_start:json_end]
-        
-        # Parse the JSON into a Python dictionary
-        result = json.loads(json_content)
-        
-        return result
-    
-    except json.JSONDecodeError as e:
-        # Handle malformed JSON
-        print(f"Error parsing JSON: {e}")
-        print(f"JSON content attempted to parse: {json_content[:100]}...")
-        return {"error": f"Failed to parse JSON: {str(e)}"}
-    
-    except Exception as e:
-        # Handle other errors
-        return {"error": f"Unexpected error: {str(e)}"}
+    component_identification = choices[0].message.content or ""
+    #print("Components identified:")
+    #print(classification)
+    return component_identification

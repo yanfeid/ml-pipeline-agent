@@ -36,6 +36,8 @@ Output Format (for each major code block):
     )
     choices: litellm.types.utils.Choices = response.choices
     summary = choices[0].message.content or ""
+    if not summary:
+        raise ValueError(f"Summary for {file_name} is empty")
     return summary
 
     
