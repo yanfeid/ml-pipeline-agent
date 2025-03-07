@@ -38,7 +38,7 @@ CLASSIFICATION RULES:
     - (If multiple components are listed) Why This Is Separate: Explain why this one merits splitting into a distinct ML workflow node, and provide verification there is no overlap with other identified components' line ranges. 
 4. Identified components should be UNIQUE. Do not repeat a component category multiple times. 
 5. If you are uncertain about any classification, DO NOT include it.
-6. If none of these components can be confidently identified from the code summary, state: “Could not identify any major ML components.”
+6. If none of these components can be confidently identified from the code summary, leave component name as "Undetermined", line range as "None", and give evidence why this does not fit any category.
 
 RESPONSE FORMAT:
 MAJOR COMPONENTS IDENTIFIED: [list of components identified]

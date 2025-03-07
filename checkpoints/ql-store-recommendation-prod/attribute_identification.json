@@ -59,9 +59,250 @@
     "MAJOR COMPONENTS IDENTIFIED: [Model Scoring]\n\nDETAILS FOR EACH:\n[Model Scoring]:\n    - Line Range: Lines 26-104\n    - Evidence:\n        - \"Defines a function `oot_data_eval` to evaluate out-of-time (OOT) data.\" \u2013 This indicates the primary function of the code is to score the OOT data using a pre-trained model.\n        - \"Scores the OOT data using the loaded models.\" \u2013 This confirms that the function is performing model scoring.\n        - \"Configures and submits a Spark job to Google Cloud Platform (GCP) to run the `oot_data_eval` function.\" \u2013 This shows that the scoring function is executed as a Spark job on GCP, which is a typical setup for large-scale model scoring tasks.\n        - \"Creates or replaces an external table in BigQuery using the scored data stored in GCP.\" \u2013 This step involves saving the scored data, which is a part of the model scoring process.\n\nThe entire code summary revolves around the process of scoring the OOT data, from defining the scoring function to executing it and saving the results. There are no distinct separable components that fit into other categories based on the provided summary.",
     "MAJOR COMPONENTS IDENTIFIED: [Model Evaluation]\n\nDETAILS FOR EACH:\n[Model Evaluation]:\n    - Line Range: Lines 375-731\n    - Evidence:\n        - \"Constructs a SQL query to calculate recall metrics at different ranks for various models, grouping by model type.\" \u2013 This indicates the calculation of performance metrics, which is a key part of model evaluation.\n        - \"Saves the performance metrics to a CSV file. Plots the performance metrics using seaborn and matplotlib, saving the plot as an image.\" \u2013 This shows the process of saving and visualizing the evaluation results, which is essential for model evaluation.\n        - \"Constructs a SQL query to calculate recall metrics for first-time users, grouping by model type.\" \u2013 This further supports the evaluation of model performance for a specific user group.\n        - \"Constructs a SQL query to calculate recall metrics excluding specific merchants, grouping by model type.\" \u2013 This indicates the evaluation of model performance under different conditions.\n        - \"Constructs a SQL query to calculate recall metrics for recent data (last 7 days), grouping by model type.\" \u2013 This shows the evaluation of model performance on recent data, which is crucial for understanding model behavior over time.\n\nThe above evidence collectively supports that the primary focus of the code from lines 375 to 731 is on evaluating the model's performance through various metrics and conditions, which aligns with the \"Model Evaluation\" component category."
   ],
-  "component_parsing": [],
-  "verified_components": [],
-  "attribute_identification": [],
+  "component_parsing": [
+    {
+      "Driver Creation": {
+        "line_range": "Lines 4-512",
+        "evidence": [
+          "\"Create table for eligible merchants (Lines 18-52): Drops and creates a table for live unique merchants with specific attributes. Joins multiple tables to gather necessary merchant information.\" \u2013 This indicates the initial step of creating a foundational dataset.",
+          "\"Create initial driver table (Lines 54-83): Drops and creates a table with customer and merchant interaction data. Filters data based on specific conditions like event date and customer ID.\" \u2013 This step is crucial for forming the primary dataset used in subsequent steps.",
+          "\"Create positive samples for training (Lines 124-168): Drops and creates a table for positive training samples attributed to transactions. Applies sampling ratios and splits data into training and validation sets.\" \u2013 This involves creating labeled data, a key part of the driver dataset.",
+          "\"Create development dataset (Lines 410-445): Drops and creates a table combining positive and negative samples for model development. Includes both hard and uniform negative samples.\" \u2013 This final step consolidates the driver dataset for model development."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/00_driver.ipynb"
+      }
+    },
+    {
+      "Driver Creation": {
+        "line_range": "Lines 17-817",
+        "evidence": [
+          "\"Create driver_simu_txn_365d table (Lines 17-40)\" \u2013 This indicates the creation of a driver dataset by joining transaction data with payment data.",
+          "\"Create driver_consumer_base table (Lines 58-66)\" \u2013 This shows the creation of a base table with customer IDs and run dates, which is a fundamental part of the driver dataset.",
+          "\"Create driver_merchant_base table (Lines 468-476)\" \u2013 This involves creating a base table with receiver IDs and run dates, another essential part of the driver dataset.",
+          "\"Create driver_consumer_base_gender table (Lines 796-817)\" \u2013 This involves joining consumer base data with gender prediction data, which is part of the initial data loading and extraction process."
+        ],
+        "why_separate": "The entire file is focused on creating various tables that form the driver dataset, which includes basic rows and metadata necessary for the subsequent steps in the ML pipeline. The operations described involve loading data, joining tables, and creating base tables, all of which are characteristic of the Driver Creation component. There is no strong justification to split these operations into separate components as they all contribute to the creation of the driver dataset.",
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/01_bq_feat.ipynb"
+      }
+    },
+    {
+      "Data Pulling": {
+        "line_range": "Lines 34-73",
+        "evidence": [
+          "\"Creates and configures a Fetcher object with various settings including job name, group name, model name, owner, description, and manager.\" \u2013 This indicates the setup of a tool specifically designed to pull data.",
+          "\"Specifies the variables to be fetched and the data split ratio.\" \u2013 This further supports the configuration of data pulling.",
+          "\"Executes the Fetcher to fetch the data.\" \u2013 This confirms the action of pulling data from a source.",
+          "\"Creates or replaces an external table in BigQuery using the fetched data stored in Google Cloud Storage.\" \u2013 This shows the final step of storing the pulled data into a usable format for further processing."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/01_varmart_feat.ipynb"
+      }
+    },
+    {
+      "Feature Consolidation": {
+        "line_range": "Lines 4-639",
+        "evidence": [
+          "\"Create driver_dev_features table\" (Lines 17-216) \u2013 This section constructs a SQL query to create a new table by joining multiple tables and selecting various features, which is indicative of merging datasets into a unified feature set.",
+          "\"Create driver_oot_features table\" (Lines 219-418) \u2013 Similar to the previous block, this section constructs a SQL query to create another table by joining multiple tables and selecting features, further supporting the merging of datasets.",
+          "\"Expand sequence features in driver_oot_features_expand_seq table\" (Lines 421-625) \u2013 This section constructs a SQL query to create a new table by expanding sequence features, which involves merging and transforming data.",
+          "\"Export data to Google Cloud Storage\" (Lines 630-639) \u2013 This section exports the consolidated feature set to Google Cloud Storage, indicating the completion of the feature consolidation process."
+        ],
+        "why_separate": "The entire file is focused on merging multiple datasets into unified feature sets for modeling, which aligns with the Feature Consolidation category. There is no distinct line of separation that justifies splitting this into multiple components, as all sections contribute to the overall goal of consolidating features.",
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/02_combine.ipynb"
+      }
+    },
+    {
+      "Data Preprocessing": {
+        "line_range": "Lines 21-175",
+        "evidence": [
+          "\"Load and concatenate data\" (Lines 21-30) \u2013 This step involves loading and combining data, which is a preliminary step in data preprocessing.",
+          "\"Map state names to abbreviations\" (Lines 31-94) \u2013 Cleaning and transforming state names is a part of data preprocessing.",
+          "\"Encode categorical features\" (Lines 95-112) \u2013 Encoding categorical features is a common data preprocessing task.",
+          "\"Scale numerical features\" (Lines 113-134) \u2013 Scaling numerical features is a standard preprocessing step.",
+          "\"Process sequence features\" (Lines 135-153) \u2013 Handling missing values and tokenizing sequences are preprocessing activities.",
+          "\"Save processed data in chunks\" (Lines 154-166) \u2013 Saving the processed data is part of the preprocessing workflow.",
+          "\"Save feature transformers\" (Lines 167-175) \u2013 Saving the transformers used in preprocessing ensures consistency in future data transformations."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/03_prepare_training_data.ipynb"
+      }
+    },
+    {
+      "Model Training": {
+        "line_range": "Lines 140-169",
+        "evidence": [
+          "\"Define and compile the model\" \u2013 This indicates the setup of the model architecture and compilation, which are essential steps in model training.",
+          "\"Train the model using the training and validation datasets, with early stopping\" \u2013 This clearly describes the process of fitting the model to the training data, which is the core of model training."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/04_training.ipynb"
+      },
+      "Model Packaging": {
+        "line_range": "Lines 171-185",
+        "evidence": [
+          "\"Save the trained model in both H5 and TensorFlow SavedModel formats\" \u2013 This step involves saving the trained model in formats suitable for deployment, which is a key aspect of model packaging.",
+          "\"Convert the trained TensorFlow model to ONNX format and save the ONNX specification\" \u2013 Converting the model to ONNX format is part of preparing the model for deployment, further supporting this as model packaging."
+        ],
+        "why_separate": "The process of saving and converting the model into deployment-ready formats is distinct from the training process. The training process involves fitting the model to data, while packaging involves preparing the trained model for deployment. There is no overlap with the model training lines (140-169), ensuring clear separation.",
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/04_training.ipynb"
+      }
+    },
+    {
+      "Model Scoring": {
+        "line_range": "Lines 26-104",
+        "evidence": [
+          "\"Defines a function `oot_data_eval` to evaluate out-of-time (OOT) data.\" \u2013 This indicates the primary function of the code is to score the OOT data using a pre-trained model.",
+          "\"Scores the OOT data using the loaded models.\" \u2013 This confirms that the function is performing model scoring.",
+          "\"Configures and submits a Spark job to Google Cloud Platform (GCP) to run the `oot_data_eval` function.\" \u2013 This shows that the scoring function is executed as a Spark job on GCP, which is a typical setup for large-scale model scoring tasks.",
+          "\"Creates or replaces an external table in BigQuery using the scored data stored in GCP.\" \u2013 This step involves saving the scored data, which is a part of the model scoring process."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.ipynb"
+      }
+    },
+    {
+      "Model Evaluation": {
+        "line_range": "Lines 375-731",
+        "evidence": [
+          "\"Constructs a SQL query to calculate recall metrics at different ranks for various models, grouping by model type.\" \u2013 This indicates the calculation of performance metrics, which is a key part of model evaluation.",
+          "\"Saves the performance metrics to a CSV file. Plots the performance metrics using seaborn and matplotlib, saving the plot as an image.\" \u2013 This shows the process of saving and visualizing the evaluation results, which is essential for model evaluation.",
+          "\"Constructs a SQL query to calculate recall metrics for first-time users, grouping by model type.\" \u2013 This further supports the evaluation of model performance for a specific user group.",
+          "\"Constructs a SQL query to calculate recall metrics excluding specific merchants, grouping by model type.\" \u2013 This indicates the evaluation of model performance under different conditions.",
+          "\"Constructs a SQL query to calculate recall metrics for recent data (last 7 days), grouping by model type.\" \u2013 This shows the evaluation of model performance on recent data, which is crucial for understanding model behavior over time."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/06_evaluation.ipynb"
+      }
+    }
+  ],
+  "verified_components": [
+    {
+      "Driver Creation": {
+        "line_range": "Lines 4-512",
+        "evidence": [
+          "\"Create table for eligible merchants (Lines 18-52): Drops and creates a table for live unique merchants with specific attributes. Joins multiple tables to gather necessary merchant information.\" \u2013 This indicates the initial step of creating a foundational dataset.",
+          "\"Create initial driver table (Lines 54-83): Drops and creates a table with customer and merchant interaction data. Filters data based on specific conditions like event date and customer ID.\" \u2013 This step is crucial for forming the primary dataset used in subsequent steps.",
+          "\"Create positive samples for training (Lines 124-168): Drops and creates a table for positive training samples attributed to transactions. Applies sampling ratios and splits data into training and validation sets.\" \u2013 This involves creating labeled data, a key part of the driver dataset.",
+          "\"Create development dataset (Lines 410-445): Drops and creates a table combining positive and negative samples for model development. Includes both hard and uniform negative samples.\" \u2013 This final step consolidates the driver dataset for model development."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/00_driver.ipynb"
+      }
+    },
+    {
+      "Feature Engineering": {
+        "line_range": "Lines 17-817",
+        "evidence": [
+          "\"Create driver_simu_txn_365d table (Lines 17-40)\" \u2013 This indicates the creation of a driver dataset by joining transaction data with payment data.",
+          "\"Create driver_consumer_base table (Lines 58-66)\" \u2013 This shows the creation of a base table with customer IDs and run dates, which is a fundamental part of the driver dataset.",
+          "\"Create driver_merchant_base table (Lines 468-476)\" \u2013 This involves creating a base table with receiver IDs and run dates, another essential part of the driver dataset.",
+          "\"Create driver_consumer_base_gender table (Lines 796-817)\" \u2013 This involves joining consumer base data with gender prediction data, which is part of the initial data loading and extraction process."
+        ],
+        "why_separate": "The entire file is focused on creating various tables that form the driver dataset, which includes basic rows and metadata necessary for the subsequent steps in the ML pipeline. The operations described involve loading data, joining tables, and creating base tables, all of which are characteristic of the Driver Creation component. There is no strong justification to split these operations into separate components as they all contribute to the creation of the driver dataset.",
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/01_bq_feat.ipynb"
+      }
+    },
+    {
+      "Data Pulling": {
+        "line_range": "Lines 34-73",
+        "evidence": [
+          "\"Creates and configures a Fetcher object with various settings including job name, group name, model name, owner, description, and manager.\" \u2013 This indicates the setup of a tool specifically designed to pull data.",
+          "\"Specifies the variables to be fetched and the data split ratio.\" \u2013 This further supports the configuration of data pulling.",
+          "\"Executes the Fetcher to fetch the data.\" \u2013 This confirms the action of pulling data from a source.",
+          "\"Creates or replaces an external table in BigQuery using the fetched data stored in Google Cloud Storage.\" \u2013 This shows the final step of storing the pulled data into a usable format for further processing."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/01_varmart_feat.ipynb"
+      }
+    },
+    {
+      "Feature Consolidation": {
+        "line_range": "Lines 4-639",
+        "evidence": [
+          "\"Create driver_dev_features table\" (Lines 17-216) \u2013 This section constructs a SQL query to create a new table by joining multiple tables and selecting various features, which is indicative of merging datasets into a unified feature set.",
+          "\"Create driver_oot_features table\" (Lines 219-418) \u2013 Similar to the previous block, this section constructs a SQL query to create another table by joining multiple tables and selecting features, further supporting the merging of datasets.",
+          "\"Expand sequence features in driver_oot_features_expand_seq table\" (Lines 421-625) \u2013 This section constructs a SQL query to create a new table by expanding sequence features, which involves merging and transforming data.",
+          "\"Export data to Google Cloud Storage\" (Lines 630-639) \u2013 This section exports the consolidated feature set to Google Cloud Storage, indicating the completion of the feature consolidation process."
+        ],
+        "why_separate": "The entire file is focused on merging multiple datasets into unified feature sets for modeling, which aligns with the Feature Consolidation category. There is no distinct line of separation that justifies splitting this into multiple components, as all sections contribute to the overall goal of consolidating features.",
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/02_combine.ipynb"
+      }
+    },
+    {
+      "Data Preprocessing": {
+        "line_range": "Lines 21-175",
+        "evidence": [
+          "\"Load and concatenate data\" (Lines 21-30) \u2013 This step involves loading and combining data, which is a preliminary step in data preprocessing.",
+          "\"Map state names to abbreviations\" (Lines 31-94) \u2013 Cleaning and transforming state names is a part of data preprocessing.",
+          "\"Encode categorical features\" (Lines 95-112) \u2013 Encoding categorical features is a common data preprocessing task.",
+          "\"Scale numerical features\" (Lines 113-134) \u2013 Scaling numerical features is a standard preprocessing step.",
+          "\"Process sequence features\" (Lines 135-153) \u2013 Handling missing values and tokenizing sequences are preprocessing activities.",
+          "\"Save processed data in chunks\" (Lines 154-166) \u2013 Saving the processed data is part of the preprocessing workflow.",
+          "\"Save feature transformers\" (Lines 167-175) \u2013 Saving the transformers used in preprocessing ensures consistency in future data transformations."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/03_prepare_training_data.ipynb"
+      }
+    },
+    {
+      "Model Training": {
+        "line_range": "Lines 140-169",
+        "evidence": [
+          "\"Define and compile the model\" \u2013 This indicates the setup of the model architecture and compilation, which are essential steps in model training.",
+          "\"Train the model using the training and validation datasets, with early stopping\" \u2013 This clearly describes the process of fitting the model to the training data, which is the core of model training."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/04_training.ipynb"
+      },
+      "Model Packaging": {
+        "line_range": "Lines 171-185",
+        "evidence": [
+          "\"Save the trained model in both H5 and TensorFlow SavedModel formats\" \u2013 This step involves saving the trained model in formats suitable for deployment, which is a key aspect of model packaging.",
+          "\"Convert the trained TensorFlow model to ONNX format and save the ONNX specification\" \u2013 Converting the model to ONNX format is part of preparing the model for deployment, further supporting this as model packaging."
+        ],
+        "why_separate": "The process of saving and converting the model into deployment-ready formats is distinct from the training process. The training process involves fitting the model to data, while packaging involves preparing the trained model for deployment. There is no overlap with the model training lines (140-169), ensuring clear separation.",
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/04_training.ipynb"
+      }
+    },
+    {
+      "Model Scoring": {
+        "line_range": "Lines 26-104",
+        "evidence": [
+          "\"Defines a function `oot_data_eval` to evaluate out-of-time (OOT) data.\" \u2013 This indicates the primary function of the code is to score the OOT data using a pre-trained model.",
+          "\"Scores the OOT data using the loaded models.\" \u2013 This confirms that the function is performing model scoring.",
+          "\"Configures and submits a Spark job to Google Cloud Platform (GCP) to run the `oot_data_eval` function.\" \u2013 This shows that the scoring function is executed as a Spark job on GCP, which is a typical setup for large-scale model scoring tasks.",
+          "\"Creates or replaces an external table in BigQuery using the scored data stored in GCP.\" \u2013 This step involves saving the scored data, which is a part of the model scoring process."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.ipynb"
+      }
+    },
+    {
+      "Model Evaluation": {
+        "line_range": "Lines 375-731",
+        "evidence": [
+          "\"Constructs a SQL query to calculate recall metrics at different ranks for various models, grouping by model type.\" \u2013 This indicates the calculation of performance metrics, which is a key part of model evaluation.",
+          "\"Saves the performance metrics to a CSV file. Plots the performance metrics using seaborn and matplotlib, saving the plot as an image.\" \u2013 This shows the process of saving and visualizing the evaluation results, which is essential for model evaluation.",
+          "\"Constructs a SQL query to calculate recall metrics for first-time users, grouping by model type.\" \u2013 This further supports the evaluation of model performance for a specific user group.",
+          "\"Constructs a SQL query to calculate recall metrics excluding specific merchants, grouping by model type.\" \u2013 This indicates the evaluation of model performance under different conditions.",
+          "\"Constructs a SQL query to calculate recall metrics for recent data (last 7 days), grouping by model type.\" \u2013 This shows the evaluation of model performance on recent data, which is crucial for understanding model behavior over time."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/06_evaluation.ipynb"
+      }
+    }
+  ],
+  "attribute_identification": [
+    "```yaml\nDriver Creation:\n    Inputs:\n        - file_path: \"../config/base_config.yaml\"\n        - bq_prefix: \"config['general_config']['bq_project_dataset_prefix']\"\n        - training_exclude_merch: \"config['driver_config']['training_exclude_merch']\"\n        - train_start_date: \"config['driver_config']['train_start_date']\"\n        - oot_start_date: \"config['driver_config']['oot_start_date']\"\n        - training_hot_positive_attributed_txn_sampling_alpha: \"config['driver_config']['training_hot_positive_attributed_txn_sampling_alpha']\"\n        - training_attributed_txn_upsampling_rate: \"config['driver_config']['training_attributed_txn_upsampling_rate']\"\n        - val_start_date: \"config['driver_config']['val_start_date']\"\n        - removing_highly_active_user_threshold: \"config['driver_config']['removing_highly_active_user_threshold']\"\n        - removing_highly_active_user_merchant_threshold: \"config['driver_config']['removing_highly_active_user_merchant_threshold']\"\n        - removing_highly_active_user_merchant_date_threshold: \"config['driver_config']['removing_highly_active_user_merchant_date_threshold']\"\n        - training_hot_positive_organic_txn_sampling_alpha: \"config['driver_config']['training_hot_positive_organic_txn_sampling_alpha']\"\n        - save_label_mixing_rate: \"config['driver_config']['save_label_mixing_rate']\"\n        - ratio_for_hard_negtive: \"config['driver_config']['ratio_for_hard_negtive']\"\n        - hard_negative_impression_time_window: \"config['driver_config']['hard_negative_impression_time_window']\"\n        - negative_sampling_avoid_delay_postive_feedback_window: \"config['driver_config']['negative_sampling_avoid_delay_postive_feedback_window']\"\n        - training_hot_negative_sampling_alpha: \"config['driver_config']['training_hot_negative_sampling_alpha']\"\n        - uniform_negative_postive_ratio: \"config['driver_config']['uniform_negative_postive_ratio']\"\n    Outputs:\n        - live_unique_merchants_train: \"{bq_prefix}live_unique_merchants_train\"\n        - driver_00: \"{bq_prefix}driver_00\"\n        - driver_0: \"{bq_prefix}driver_0\"\n        - driver_1: \"{bq_prefix}driver_1\"\n        - driver_positive_train_attributed: \"{bq_prefix}driver_positive_train_attributed\"\n        - driver_positive_train_organic_0: \"{bq_prefix}driver_positive_train_organic_0\"\n        - driver_positive_train_organic: \"{bq_prefix}driver_positive_train_organic\"\n        - driver_positive: \"{bq_prefix}driver_positive\"\n        - driver_positive_training_split_0: \"{bq_prefix}driver_positive_training_split_0\"\n        - driver_positive_training_split: \"{bq_prefix}driver_positive_training_split\"\n        - driver_training_hard_negative: \"{bq_prefix}driver_training_hard_negative\"\n        - driver_training_hard_negative_downsample: \"{bq_prefix}driver_training_hard_negative_downsample\"\n        - driver_training_uniform_negative: \"{bq_prefix}driver_training_uniform_negative\"\n        - driver_training_uniform_negative_remove_window_positive: \"{bq_prefix}driver_training_uniform_negative_remove_window_positive\"\n        - driver_training_uniform_negative_downsample_0: \"{bq_prefix}driver_training_uniform_negative_downsample_0\"\n        - driver_training_uniform_negative_downsample: \"{bq_prefix}driver_training_uniform_negative_downsample\"\n        - driver_dev: \"{bq_prefix}driver_dev\"\n        - driver_oot_uniform_negative_0: \"{bq_prefix}driver_oot_uniform_negative_0\"\n        - driver_oot_uniform_negative: \"{bq_prefix}driver_oot_uniform_negative\"\n        - driver_oot: \"{bq_prefix}driver_oot\"\n        - driver_simu: \"{bq_prefix}driver_simu\"\n        - driver_simu_consumer: \"{bq_prefix}driver_simu_consumer\"\n```",
+    "```yaml\nFeature Engineering:\n    Inputs:\n        - file_path: \"../config/base_config.yaml\"\n        - bq_prefix: \"config['general_config']['bq_project_dataset_prefix']\"\n        - train_start_date: \"config['driver_config']['train_start_date']\"\n    Outputs:\n        - driver_simu_txn_365d_table: \"{bq_prefix}driver_simu_txn_365d\"\n        - driver_simu_txn_365d_agg_table: \"{bq_prefix}driver_simu_txn_365d_agg\"\n        - driver_consumer_base_table: \"{bq_prefix}driver_consumer_base\"\n        - driver_consumer_base_txn_5k_merch_category_table: \"{bq_prefix}driver_consumer_base_txn_5k_merch_category\"\n        - driver_consumer_base_last_10_txn_table: \"{bq_prefix}driver_consumer_base_last_10_txn\"\n        - driver_consumer_base_all_history_array_0_table: \"{bq_prefix}driver_consumer_base_all_history_array_0\"\n        - driver_consumer_base_all_history_array_table: \"{bq_prefix}driver_consumer_base_all_history_array\"\n        - driver_combine_category_table: \"{bq_prefix}driver_combine_category\"\n        - driver_combine_category_agg_0_table: \"{bq_prefix}driver_combine_category_agg_0\"\n        - driver_combine_category_agg_1_table: \"{bq_prefix}driver_combine_category_agg_1\"\n        - driver_combine_category_agg_2_table: \"{bq_prefix}driver_combine_category_agg_2\"\n        - driver_combine_category_agg_3_table: \"{bq_prefix}driver_combine_category_agg_3\"\n        - driver_combine_category_agg_4_table: \"{bq_prefix}driver_combine_category_agg_4\"\n        - driver_combine_category_agg_5_table: \"{bq_prefix}driver_combine_category_agg_5\"\n        - driver_merchant_base_table: \"{bq_prefix}driver_merchant_base\"\n        - driver_merchant_base_txn_30d_table: \"{bq_prefix}driver_merchant_base_txn_30d\"\n        - driver_merchant_base_txn_30d_filter_sndr_table: \"{bq_prefix}driver_merchant_base_txn_30d_filter_sndr\"\n        - driver_merchant_base_price_agg_table: \"{bq_prefix}driver_merchant_base_price_agg\"\n        - driver_merchant_base_sales_agg_table: \"{bq_prefix}driver_merchant_base_sales_agg\"\n        - driver_elig_save_365d_category_table: \"{bq_prefix}driver_elig_save_365d_category\"\n        - driver_elig_save_agg_00_table: \"{bq_prefix}driver_elig_save_agg_00\"\n        - driver_elig_save_agg_0_table: \"{bq_prefix}driver_elig_save_agg_0\"\n        - driver_elig_save_agg_1_table: \"{bq_prefix}driver_elig_save_agg_1\"\n        - driver_elig_save_agg_2_table: \"{bq_prefix}driver_elig_save_agg_2\"\n        - driver_elig_save_agg_3_table: \"{bq_prefix}driver_elig_save_agg_3\"\n        - driver_merchant_base_click_save_table: \"{bq_prefix}driver_merchant_base_click_save\"\n        - driver_consumer_base_gender_table: \"{bq_prefix}driver_consumer_base_gender\"\n```",
+    "```yaml\nData Pulling:\n    Inputs:\n        - stage: \"training\"\n        - seq_num: \"20231010\"  # Example date\n        - is_prod: \"True\"\n        - job_name: \"ql_store_rmr\"\n        - group_name: \"mls_gads\"\n        - model_name: \"ql_store_rmr_datafetcher\"\n        - model_owner: \"chenzhao\"\n        - description: \"ranking_combined_datafetcher\"\n        - manager: \"Farhad\"\n        - on_gcp: True\n        - gcp_project_id: \"ccg24-hrzana-gds-pacman\"\n        - gcs_bucket_name: \"pypl-bkt-rsh-row-std-gds-pacman\"\n        - bq_materialization_project: \"pypl-bods\"\n        - bq_materialization_dataset: \"rsh_row_gds_pacman\"\n        - driver_loc: \"gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_simu_consumer\"\n        - variables: [\"prmry_addr_state\", \"days_on_file\", \"ebay_member_y_n\", \"consu_engagmnt_seg_key\", \"prmry_cc_type_code\", \"days_appweb_visit\", \"consu_age_band_key\", \"consu_income_band_key\", \"consu_dmgrphc_seg_key\"]\n        - split_ratio: {\"train\": 1.0}\n        - num_of_splits: 1\n    Outputs:\n        - data_loc: \"gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_simu_consumer_varmart\"\n        - external_table_uri: [\"gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_simu_consumer_varmart/all/parquet/part*\"]\n```",
+    "```yaml\nFeature Consolidation:\n    Inputs:\n        - config_file_path: \"../config/base_config.yaml\"\n        - bq_project_dataset_prefix: \"config['general_config']['bq_project_dataset_prefix']\"\n        - driver_dev_table: \"{bq_prefix}driver_dev\"\n        - driver_simu_txn_365d_agg_table: \"{bq_prefix}driver_simu_txn_365d_agg\"\n        - driver_consumer_base_last_10_txn_table: \"{bq_prefix}driver_consumer_base_last_10_txn\"\n        - driver_consumer_base_all_history_array_table: \"{bq_prefix}driver_consumer_base_all_history_array\"\n        - driver_combine_category_agg_3_table: \"{bq_prefix}driver_combine_category_agg_3\"\n        - driver_combine_category_agg_5_table: \"{bq_prefix}driver_combine_category_agg_5\"\n        - driver_merchant_base_price_agg_table: \"{bq_prefix}driver_merchant_base_price_agg\"\n        - driver_merchant_base_sales_agg_table: \"{bq_prefix}driver_merchant_base_sales_agg\"\n        - driver_elig_save_agg_00_table: \"{bq_prefix}driver_elig_save_agg_00\"\n        - driver_elig_save_agg_0_table: \"{bq_prefix}driver_elig_save_agg_0\"\n        - driver_elig_save_agg_3_table: \"{bq_prefix}driver_elig_save_agg_3\"\n        - driver_merchant_base_click_save_table: \"{bq_prefix}driver_merchant_base_click_save\"\n        - driver_consumer_base_gender_table: \"{bq_prefix}driver_consumer_base_gender\"\n        - ql_store_honey_merch_quality_scores_external_table: \"pypl-bods.gds_pacman_prod.ql_store_honey_merch_quality_scores_external\"\n        - driver_simu_consumer_varmart_external_table: \"{bq_prefix}driver_simu_consumer_varmart_external\"\n        - store_recommendation_kg_embedding_32_v2_table: \"pypl-bods.gds_pacman_prod.store_recommendation_kg_embedding_32_v2\"\n    Outputs:\n        - consolidated_feature_set_path: \"gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_dev_features/part*.parquet\"\n```",
+    "```yaml\nData Preprocessing:\n    Inputs:\n        - directory: \"../data/ql_store_rmr_driver_dev_features\"\n        - parquet_files: [list of parquet files in the directory]\n        - state_to_abbreviation: { 'ALABAMA': 'AL', 'ALASKA': 'AK', ... }\n        - categorical_features: ['sndr_consu_engagmnt_seg_key', 'sndr_ebay_member_y_n', 'gender', 'sndr_prmry_cc_type_code', 'sndr_consu_age_band_key', 'sndr_consu_dmgrphc_seg_key']\n        - numeric_features: [\"sndr_rcvr_txn_num_30d\", \"sndr_rcvr_txn_num_180d\", \"sndr_rcvr_txn_num_365d\", \"sndr_rcvr_txn_amt_30d\", \"sndr_rcvr_txn_amt_180d\", ...]\n        - sequence_feature: 'sndr_most_recent_100_merch_category'\n        - tokenizer_feature: 'sndr_most_recent_100_merch_list'\n        - chunk_size: 1000000\n        - output_dir: '../data/ql_store_rmr_driver_dev_features_transformed'\n        - exported_feature_transformer: os.path.join(model_version_base, 'exported_feature_transformer')\n    Outputs:\n        - processed_data_path: '../data/ql_store_rmr_driver_dev_features_transformed'\n        - feature_transformer_path: os.path.join(model_version_base, 'exported_feature_transformer')\n        - rcvr_id_tokenizer_path: os.path.join(exported_feature_transformer, 'rcvr_id_tokenizer')\n        - categorical_feature_encoders_path: os.path.join(exported_feature_transformer, 'categorical_feature_encoders')\n        - numerical_feature_scalars_path: os.path.join(exported_feature_transformer, 'numerical_feature_scalars')\n```",
+    "Here is the structured YAML-like format for the identified ML components, including the input and output attributes that should be configurable parameters in a production ML pipeline:\n\n```yaml\nModel Training:\n    Inputs:\n        - train_data_path: \"../data/ql_store_rmr_driver_dev_features_transformed\"\n        - numeric_names: [\"sndr_rcvr_txn_num_30d\", \"sndr_rcvr_txn_num_180d\", \"sndr_rcvr_txn_num_365d\", ...]\n        - rcvr_id_names: [\"rcvr_id\"]\n        - gpt_cate_names: [\"gpt_1st_category_l2_index\", \"sndr_1st_freq_merchant_category_30d\", ...]\n        - batch_size: config['training_config']['DIN']['batch_size']\n        - learning_rate: config['training_config']['DIN']['learning_rate']\n        - dnn_use_bn: config['training_config']['DIN']['dnn_use_bn']\n        - dnn_hidden_units: config['training_config']['DIN']['dnn_hidden_units']\n        - dnn_activation: config['training_config']['DIN']['dnn_activation']\n        - att_hidden_size: config['training_config']['DIN']['att_hidden_size']\n        - att_activation: config['training_config']['DIN']['att_activation']\n        - att_weight_normalization: config['training_config']['DIN']['att_weight_normalization']\n        - l2_reg_dnn: config['training_config']['DIN']['l2_reg_dnn']\n        - l2_reg_embedding: config['training_config']['DIN']['l2_reg_embedding']\n        - dnn_dropout: config['training_config']['DIN']['dnn_dropout']\n        - seed: config['training_config']['DIN']['seed']\n        - epochs: config['training_config']['DIN']['epochs']\n    Outputs:\n        - model_artifact_path: os.path.join(exported_model_base, 'din.h5')\n        - tf_model_path: os.path.join(exported_model_base, 'din_saved_model')\n\nModel Packaging:\n    Inputs:\n        - trained_model_path: os.path.join(exported_model_base, 'din_saved_model')\n        - input_mappings: {'hist_rcvr_id': [f'hist_rcvr_id_{i}' for i in range(1, 101)], 'hist_gpt_1st_category_l2_index': [f'hist_gpt_1st_category_{i}' for i in range(1, 101)]}\n        - output_mappings: {model.output.name[:-2]: 'out'}\n    Outputs:\n        - onnx_spec_path: exported_model_base\n        - oot_scoring_path: os.path.join(exported_model_base, 'oot_scoring')\n        - onnx_model_path: os.path.join(exported_model_base, 'tf_2_onnx_model.m')\n        - renamed_model_path: os.path.join(exported_model_base, 'oot_scoring/din_expand_seq.m')\n        - prod_model_path: exported_model_base\n        - test_data_output_path: './testdata/testdata.json'\n        - onnx_output_path: os.path.join(exported_model_base, 'din.onnx')\n```\n\nThis format captures the key configurable parameters for each component, ensuring that the pipeline can be rerun with different configurations as needed.",
+    "```yaml\nModel Scoring:\n    Inputs:\n        - working_path: \"/projects/gds-packman/apps/ql-store-recommendation-prod/research\"\n        - params_path: \"/projects/gds-packman/apps/ql-store-recommendation-prod/research/config\"\n        - model_version_path: \"/projects/gds-packman/apps/ql-store-recommendation-prod/research/_current_model_version\"\n        - exported_model_base: \"/projects/gds-packman/apps/ql-store-recommendation-prod/research/artifacts/{model_version}/exported_models\"\n        - m_local_folder: \"/projects/gds-packman/apps/ql-store-recommendation-prod/research/artifacts/din_20240708/18/exported_models/oot_scoring\"\n        - m_gcp_folder: \"gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/challenger/oot_scoring\"\n        - oot_data_path: \"gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_oot_transformed\"\n        - mo_name: config.get('general', 'mo_name')\n        - gcp_project: config.get('general', 'dataproc_project_name')\n        - dataproc_config: dataproc_config['large']\n    Outputs:\n        - eval_result_path: \"gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_oot_transformed_scored\"\n        - log_file: \"/projects/gds-packman/apps/ql-store-recommendation-prod/research/logs/{job_id}.log\"\n```",
+    "```yaml\nModel Evaluation:\n    Inputs:\n        - model_version_path: \"../_current_model_version\"\n        - model_version_base: \"../artifacts/{model_version}/18\"\n        - config_file_path: \"../config/base_config.yaml\"\n        - bq_prefix: \"{config['general_config']['bq_project_dataset_prefix']}\"\n        - oot_start_date: \"{config['driver_config']['oot_start_date']}\"\n        - remove_list: \"'1365556366671835703','2254348706417584521','1581565211190403045','1157330454984142772','1339933886421356550','1812170125034785903','6053464759929799123','1587111025150613712','1672368731209095395','1365556366671835703','6085552794250364378','1954349237309389875'\"\n    Outputs:\n        - exported_eval_readout_base: \"../artifacts/{model_version}/18/exported_eval_readouts\"\n        - performance_metrics_csv: \"../artifacts/{model_version}/18/exported_eval_readouts/performane_all.csv\"\n        - performance_metrics_plot: \"../artifacts/{model_version}/18/exported_eval_readouts/performane_all.png\"\n        - performance_ftu_csv: \"../artifacts/{model_version}/18/exported_eval_readouts/performane_ftu.csv\"\n        - performance_ftu_plot: \"../artifacts/{model_version}/18/exported_eval_readouts/performane_ftu.png\"\n        - performance_wo_ebay_csv: \"../artifacts/{model_version}/18/exported_eval_readouts/performane_wo_ebay.csv\"\n        - performance_wo_ebay_plot: \"../artifacts/{model_version}/18/exported_eval_readouts/performane_wo_ebay.png\"\n```"
+  ],
   "attribute_parsing": [],
   "node_aggregator": [],
   "edges": [],

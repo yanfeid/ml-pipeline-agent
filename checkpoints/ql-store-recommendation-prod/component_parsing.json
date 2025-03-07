@@ -59,7 +59,123 @@
     "MAJOR COMPONENTS IDENTIFIED: [Model Scoring]\n\nDETAILS FOR EACH:\n[Model Scoring]:\n    - Line Range: Lines 26-104\n    - Evidence:\n        - \"Defines a function `oot_data_eval` to evaluate out-of-time (OOT) data.\" \u2013 This indicates the primary function of the code is to score the OOT data using a pre-trained model.\n        - \"Scores the OOT data using the loaded models.\" \u2013 This confirms that the function is performing model scoring.\n        - \"Configures and submits a Spark job to Google Cloud Platform (GCP) to run the `oot_data_eval` function.\" \u2013 This shows that the scoring function is executed as a Spark job on GCP, which is a typical setup for large-scale model scoring tasks.\n        - \"Creates or replaces an external table in BigQuery using the scored data stored in GCP.\" \u2013 This step involves saving the scored data, which is a part of the model scoring process.\n\nThe entire code summary revolves around the process of scoring the OOT data, from defining the scoring function to executing it and saving the results. There are no distinct separable components that fit into other categories based on the provided summary.",
     "MAJOR COMPONENTS IDENTIFIED: [Model Evaluation]\n\nDETAILS FOR EACH:\n[Model Evaluation]:\n    - Line Range: Lines 375-731\n    - Evidence:\n        - \"Constructs a SQL query to calculate recall metrics at different ranks for various models, grouping by model type.\" \u2013 This indicates the calculation of performance metrics, which is a key part of model evaluation.\n        - \"Saves the performance metrics to a CSV file. Plots the performance metrics using seaborn and matplotlib, saving the plot as an image.\" \u2013 This shows the process of saving and visualizing the evaluation results, which is essential for model evaluation.\n        - \"Constructs a SQL query to calculate recall metrics for first-time users, grouping by model type.\" \u2013 This further supports the evaluation of model performance for a specific user group.\n        - \"Constructs a SQL query to calculate recall metrics excluding specific merchants, grouping by model type.\" \u2013 This indicates the evaluation of model performance under different conditions.\n        - \"Constructs a SQL query to calculate recall metrics for recent data (last 7 days), grouping by model type.\" \u2013 This shows the evaluation of model performance on recent data, which is crucial for understanding model behavior over time.\n\nThe above evidence collectively supports that the primary focus of the code from lines 375 to 731 is on evaluating the model's performance through various metrics and conditions, which aligns with the \"Model Evaluation\" component category."
   ],
-  "component_parsing": [],
+  "component_parsing": [
+    {
+      "Driver Creation": {
+        "line_range": "Lines 4-512",
+        "evidence": [
+          "\"Create table for eligible merchants (Lines 18-52): Drops and creates a table for live unique merchants with specific attributes. Joins multiple tables to gather necessary merchant information.\" \u2013 This indicates the initial step of creating a foundational dataset.",
+          "\"Create initial driver table (Lines 54-83): Drops and creates a table with customer and merchant interaction data. Filters data based on specific conditions like event date and customer ID.\" \u2013 This step is crucial for forming the primary dataset used in subsequent steps.",
+          "\"Create positive samples for training (Lines 124-168): Drops and creates a table for positive training samples attributed to transactions. Applies sampling ratios and splits data into training and validation sets.\" \u2013 This involves creating labeled data, a key part of the driver dataset.",
+          "\"Create development dataset (Lines 410-445): Drops and creates a table combining positive and negative samples for model development. Includes both hard and uniform negative samples.\" \u2013 This final step consolidates the driver dataset for model development."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/00_driver.ipynb"
+      }
+    },
+    {
+      "Driver Creation": {
+        "line_range": "Lines 17-817",
+        "evidence": [
+          "\"Create driver_simu_txn_365d table (Lines 17-40)\" \u2013 This indicates the creation of a driver dataset by joining transaction data with payment data.",
+          "\"Create driver_consumer_base table (Lines 58-66)\" \u2013 This shows the creation of a base table with customer IDs and run dates, which is a fundamental part of the driver dataset.",
+          "\"Create driver_merchant_base table (Lines 468-476)\" \u2013 This involves creating a base table with receiver IDs and run dates, another essential part of the driver dataset.",
+          "\"Create driver_consumer_base_gender table (Lines 796-817)\" \u2013 This involves joining consumer base data with gender prediction data, which is part of the initial data loading and extraction process."
+        ],
+        "why_separate": "The entire file is focused on creating various tables that form the driver dataset, which includes basic rows and metadata necessary for the subsequent steps in the ML pipeline. The operations described involve loading data, joining tables, and creating base tables, all of which are characteristic of the Driver Creation component. There is no strong justification to split these operations into separate components as they all contribute to the creation of the driver dataset.",
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/01_bq_feat.ipynb"
+      }
+    },
+    {
+      "Data Pulling": {
+        "line_range": "Lines 34-73",
+        "evidence": [
+          "\"Creates and configures a Fetcher object with various settings including job name, group name, model name, owner, description, and manager.\" \u2013 This indicates the setup of a tool specifically designed to pull data.",
+          "\"Specifies the variables to be fetched and the data split ratio.\" \u2013 This further supports the configuration of data pulling.",
+          "\"Executes the Fetcher to fetch the data.\" \u2013 This confirms the action of pulling data from a source.",
+          "\"Creates or replaces an external table in BigQuery using the fetched data stored in Google Cloud Storage.\" \u2013 This shows the final step of storing the pulled data into a usable format for further processing."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/01_varmart_feat.ipynb"
+      }
+    },
+    {
+      "Feature Consolidation": {
+        "line_range": "Lines 4-639",
+        "evidence": [
+          "\"Create driver_dev_features table\" (Lines 17-216) \u2013 This section constructs a SQL query to create a new table by joining multiple tables and selecting various features, which is indicative of merging datasets into a unified feature set.",
+          "\"Create driver_oot_features table\" (Lines 219-418) \u2013 Similar to the previous block, this section constructs a SQL query to create another table by joining multiple tables and selecting features, further supporting the merging of datasets.",
+          "\"Expand sequence features in driver_oot_features_expand_seq table\" (Lines 421-625) \u2013 This section constructs a SQL query to create a new table by expanding sequence features, which involves merging and transforming data.",
+          "\"Export data to Google Cloud Storage\" (Lines 630-639) \u2013 This section exports the consolidated feature set to Google Cloud Storage, indicating the completion of the feature consolidation process."
+        ],
+        "why_separate": "The entire file is focused on merging multiple datasets into unified feature sets for modeling, which aligns with the Feature Consolidation category. There is no distinct line of separation that justifies splitting this into multiple components, as all sections contribute to the overall goal of consolidating features.",
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/02_combine.ipynb"
+      }
+    },
+    {
+      "Data Preprocessing": {
+        "line_range": "Lines 21-175",
+        "evidence": [
+          "\"Load and concatenate data\" (Lines 21-30) \u2013 This step involves loading and combining data, which is a preliminary step in data preprocessing.",
+          "\"Map state names to abbreviations\" (Lines 31-94) \u2013 Cleaning and transforming state names is a part of data preprocessing.",
+          "\"Encode categorical features\" (Lines 95-112) \u2013 Encoding categorical features is a common data preprocessing task.",
+          "\"Scale numerical features\" (Lines 113-134) \u2013 Scaling numerical features is a standard preprocessing step.",
+          "\"Process sequence features\" (Lines 135-153) \u2013 Handling missing values and tokenizing sequences are preprocessing activities.",
+          "\"Save processed data in chunks\" (Lines 154-166) \u2013 Saving the processed data is part of the preprocessing workflow.",
+          "\"Save feature transformers\" (Lines 167-175) \u2013 Saving the transformers used in preprocessing ensures consistency in future data transformations."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/03_prepare_training_data.ipynb"
+      }
+    },
+    {
+      "Model Training": {
+        "line_range": "Lines 140-169",
+        "evidence": [
+          "\"Define and compile the model\" \u2013 This indicates the setup of the model architecture and compilation, which are essential steps in model training.",
+          "\"Train the model using the training and validation datasets, with early stopping\" \u2013 This clearly describes the process of fitting the model to the training data, which is the core of model training."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/04_training.ipynb"
+      },
+      "Model Packaging": {
+        "line_range": "Lines 171-185",
+        "evidence": [
+          "\"Save the trained model in both H5 and TensorFlow SavedModel formats\" \u2013 This step involves saving the trained model in formats suitable for deployment, which is a key aspect of model packaging.",
+          "\"Convert the trained TensorFlow model to ONNX format and save the ONNX specification\" \u2013 Converting the model to ONNX format is part of preparing the model for deployment, further supporting this as model packaging."
+        ],
+        "why_separate": "The process of saving and converting the model into deployment-ready formats is distinct from the training process. The training process involves fitting the model to data, while packaging involves preparing the trained model for deployment. There is no overlap with the model training lines (140-169), ensuring clear separation.",
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/04_training.ipynb"
+      }
+    },
+    {
+      "Model Scoring": {
+        "line_range": "Lines 26-104",
+        "evidence": [
+          "\"Defines a function `oot_data_eval` to evaluate out-of-time (OOT) data.\" \u2013 This indicates the primary function of the code is to score the OOT data using a pre-trained model.",
+          "\"Scores the OOT data using the loaded models.\" \u2013 This confirms that the function is performing model scoring.",
+          "\"Configures and submits a Spark job to Google Cloud Platform (GCP) to run the `oot_data_eval` function.\" \u2013 This shows that the scoring function is executed as a Spark job on GCP, which is a typical setup for large-scale model scoring tasks.",
+          "\"Creates or replaces an external table in BigQuery using the scored data stored in GCP.\" \u2013 This step involves saving the scored data, which is a part of the model scoring process."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.ipynb"
+      }
+    },
+    {
+      "Model Evaluation": {
+        "line_range": "Lines 375-731",
+        "evidence": [
+          "\"Constructs a SQL query to calculate recall metrics at different ranks for various models, grouping by model type.\" \u2013 This indicates the calculation of performance metrics, which is a key part of model evaluation.",
+          "\"Saves the performance metrics to a CSV file. Plots the performance metrics using seaborn and matplotlib, saving the plot as an image.\" \u2013 This shows the process of saving and visualizing the evaluation results, which is essential for model evaluation.",
+          "\"Constructs a SQL query to calculate recall metrics for first-time users, grouping by model type.\" \u2013 This further supports the evaluation of model performance for a specific user group.",
+          "\"Constructs a SQL query to calculate recall metrics excluding specific merchants, grouping by model type.\" \u2013 This indicates the evaluation of model performance under different conditions.",
+          "\"Constructs a SQL query to calculate recall metrics for recent data (last 7 days), grouping by model type.\" \u2013 This shows the evaluation of model performance on recent data, which is crucial for understanding model behavior over time."
+        ],
+        "why_separate": null,
+        "location": "repos/ql-store-recommendation-prod/research/pipeline/06_evaluation.ipynb"
+      }
+    }
+  ],
   "verified_components": [],
   "attribute_identification": [],
   "attribute_parsing": [],

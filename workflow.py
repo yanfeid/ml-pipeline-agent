@@ -1,10 +1,13 @@
 from langgraph.graph import StateGraph, END
+#from langgraph.types import interrupt
 from typing import Dict, Any, List
 import yaml
 import json
 import os
 import requests
 import time
+import subprocess
+import tempfile
 from utils.git_utils import clone_repo, parse_github_url
 from utils.convert_ipynb_to_py import convert_notebooks
 import argparse
@@ -16,7 +19,7 @@ def load_step_state(repo_name: str, step: str) -> Dict[str, Any]:
     if os.path.exists(checkpoint_path):
         with open(checkpoint_path, "r") as f:
             state = json.load(f)
-        print(f"Loaded {step} state from {checkpoint_path}: {state}")
+        print(f"Loaded {step} state from {checkpoint_path}")
         return state
     return {}
 
@@ -28,7 +31,7 @@ def save_step_state(repo_name: str, step: str, state: Dict[str, Any]):
     print(f"Saved {step} state to {checkpoint_path}")
 
 def clone_and_prepare_repo(state: WorkflowState) -> Dict[str, Any]:
-    print(f"clone_and_prepare_repo state: {state}")
+    # print(f"clone_and_prepare_repo state: {state}")
     if "files" in state and state["files"]:
         print("Skipping clone_and_prepare_repo: 'files' already in state")
         return {}
@@ -40,7 +43,7 @@ def clone_and_prepare_repo(state: WorkflowState) -> Dict[str, Any]:
     }
 
 def summarize(state: WorkflowState) -> Dict[str, Any]:
-    print(f"Summarize state: {state}")
+    # print(f"Summarize state: {state}")
     if "summaries" in state and state["summaries"]:
         print("Skipping summarize: 'summaries' already in state")
         return {}
@@ -54,78 +57,126 @@ def summarize(state: WorkflowState) -> Dict[str, Any]:
     return {"summaries": summaries}
 
 def run_component_identification(state: WorkflowState) -> Dict[str, Any]:
-    print(f"run_component_identification state: {state}")
-    if "all_identified_components" in state and state["all_identified_components"]:
-        print("Skipping run_component_identification: 'all_identified_components' already in state")
+    # print(f"run_component_identification state: {state}")
+    if "component_identification" in state and state["component_identification"]:
+        print("Skipping run_component_identification: 'component_identification' already in state")
         return {}
     from agents.component_identification import component_identification_agent
     full_file_list = state["files"]
     summaries = state["summaries"]
-    all_identified_components = []
+    component_identification = []
     for file, summary_data in zip(full_file_list, summaries):
         nodes = component_identification_agent(file, full_file_list, code_summary=summary_data["summary"])
-        all_identified_components.append(nodes)
+        component_identification.append(nodes)
         print(f"Identified components for {file}")
-    return {"all_identified_components": all_identified_components}
+    return {"component_identification": component_identification}
 
 def run_component_parsing(state: WorkflowState) -> Dict[str, Any]:
-    print(f"run_component_parsing state: {state}")
-    if "all_parsed_component_identification_dicts" in state and state["all_parsed_component_identification_dicts"]:
-        print("Skipping run_component_parsing: 'all_parsed_component_identification_dicts' already in state")
+    # print(f"run_component_parsing state: {state}")
+    if "component_parsing" in state and state["component_parsing"]:
+        print("Skipping run_component_parsing: 'component_parsing' already in state")
         return {}
     from agents.component_parsing import parse_component_identification
     full_file_list = state["files"]
-    all_identified_components = state["identified_components"]
-    all_parsed_component_identification_dicts = []
-    for file, component_identification_text in zip(full_file_list, all_identified_components):
-        parsed_component_identification_text, parsed_component_identification_dict = parse_component_identification(component_identification_text)
-        all_parsed_component_identification_dicts.append(parsed_component_identification_dict)
+    component_identification = state["component_identification"]
+    component_parsing = []
+    for file, component_identification_text in zip(full_file_list, component_identification):
+        parsed_component_identification_text, parsed_component_identification_dict = parse_component_identification(component_identification_text, file)
+        component_parsing.append(parsed_component_identification_dict)
         print(f"Parsed the component identification response for {file}")
-    return {"all_parsed_component_identification_dicts": all_parsed_component_identification_dicts}
+    return {"component_parsing": component_parsing}
+
+def human_verification_of_components(state: WorkflowState) -> Dict[str, Any]:
+    # temporarily just edit in vim -> later move to user interface front end to verify the list of components identified for each python file
+    if "verified_components" in state and state["verified_components"]:
+        print("Skipping human_verification_of_components: 'verified_components' already in state")
+        return {}
+    components = state.get("component_parsing", [])
+    if not components:
+        raise ValueError("No components to verify")
+
+    with tempfile.NamedTemporaryFile(suffix='.json', mode='w', delete=False) as temp_file:
+        json_path = temp_file.name
+        # Add a "verified" field to each component 
+        editable_components = []
+        for component in components:
+            editable_component = component.copy()
+            editable_components.append(editable_component)
+
+        # Write to the temp file
+        json.dump(editable_components, temp_file, indent=2)
+    
+    # Determine which editor to use
+    editor = os.environ.get('EDITOR', 'vim')  # Default to vim if EDITOR not set
+
+    # Instructions for the user
+    print(f"\nTemporary file created at: {json_path}")
+    print("\nPlease review and edit the components in the editor that will open:")
+    print("- You can modify component details as needed")
+    print("- Save and close the editor when done\n")
+    
+    # Open the editor for the user to make changes
+    input("Press Enter to open the editor...")
+    subprocess.call([editor, json_path])
+
+    # Read the edited file
+    with open(json_path, 'r') as file:
+        try:
+            verified_components = json.load(file)
+            print("\nVerification complete!")
+        except json.JSONDecodeError:
+            print("\nError: The file was not saved as valid JSON.")
+            raise
+    
+    # Clean up the temp file
+    os.unlink(json_path)
+    
+    return {"verified_components": verified_components}
+
 
 def run_attribute_identification(state: WorkflowState) -> Dict[str, Any]:
-    print(f"run_attribute_identification state: {state}")
-    if 'components_with_attributes' in state and state['components_with_attributes']:
-        print("Skipping run_attribute_identification: 'components_with_attributes' already in state")
+    # print(f"run_attribute_identification state: {state}")
+    if 'attribute_identification' in state and state['attribute_identification']:
+        print("Skipping run_attribute_identification: 'attribute_identification' already in state")
         return {}
     from agents.attribute_identification import attribute_identification_agent
     full_file_list = state["files"]
-    all_parsed_component_identification_dicts = state['all_parsed_component_identification_dicts']
-    components_with_attributes = []
-    for file, parsed_component_identification_dict in zip(full_file_list, all_parsed_component_identification_dicts):
-        attribution_text = attribute_identification_agent(file, parsed_component_identification_dict)
-        components_with_attributes.append(attribution_text)
+    verified_components = state['verified_components']
+    attribute_identification = []
+    for file, component_dict in zip(full_file_list, verified_components):
+        attribution_text = attribute_identification_agent(file, component_dict)
+        attribute_identification.append(attribution_text)
         print(f"Identified attributes for components in {file}")
-    return {"components_with_attributes": components_with_attributes}
+    return {"attribute_identification": attribute_identification}
 
 def run_attribute_parsing(state: WorkflowState) -> Dict[str, Any]:
     # to do - add config values from existing config if applicable. Add conditional logic to check if that is the case, use LLM call to fill the values (easiest way) 
-    if 'all_final_components' in state and state['all_final_components']:
-        print("Skipping run_attribute_parsing: 'all_final_components' already in state")
+    if 'attribute_parsing' in state and state['attribute_parsing']:
+        print("Skipping run_attribute_parsing: 'attribute_parsing' already in state")
         return {}
     from agents.attribute_parsing import parse_attribute_identification
-    all_parsed_component_identification_dicts = state['all_parsed_component_identification_dicts']
-    nodes_with_attributes = state['nodes_with_attributes']
-    all_final_components = []
-    for component_identification_dict, attributes_text in zip(all_parsed_component_identification_dicts, nodes_with_attributes):
-        final_components_text, final_components_dict = parse_attribute_identification(component_identification_dict, attributes_text)
-        all_final_components.append(final_components_dict)
-    return {"all_final_components": all_final_components}
+    verified_components = state['verified_components']
+    attribute_identification = state['attribute_identification']
+    attribute_parsing = []
+    for component_identification_dict, attributes_text in zip(verified_components, attribute_identification):
+        parsed_attributes_text, parsed_attributes_dict = parse_attribute_identification(component_identification_dict, attributes_text)
+        attribute_parsing.append(parsed_attributes_dict)
+    return {"attribute_parsing": attribute_parsing}
 
 def run_node_aggregator(state: WorkflowState) -> Dict[str, Any]:
-    if "consolidated_nodes" in state and state["consolidated_nodes"]:
-        print("Skipping run_node_aggregator: 'consolidated_nodes' already in state")
+    if "node_aggregator" in state and state["node_aggregator"]:
+        print("Skipping run_node_aggregator: 'node_aggregator' already in state")
         return {}
     from agents.node_aggregator import node_aggregator_agent
-    consolidated_nodes = node_aggregator_agent(state["all_final_components"])
-    return {"consolidated_nodes": consolidated_nodes}
+    node_aggregator = node_aggregator_agent(state["attribute_parsing"])
+    return {"node_aggregator": node_aggregator}
 
 def run_edge_identification(state: WorkflowState) -> Dict[str, Any]:
     if "edges" in state and state["edges"]:
         print("Skipping run_edge_identification: 'edges' already in state")
         return {}
     from agents.edge_identification import edge_identification_agent
-    edges = edge_identification_agent(state["consolidated_nodes"])
+    edges = edge_identification_agent(state["node_aggregator"])
     return {"edges": edges}
 
 def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
@@ -136,7 +187,7 @@ def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
     dag_yaml = yaml.dump(dag, default_flow_style=False)
     return {"dag_yaml": dag_yaml}
 
-def human_verification(state: WorkflowState) -> Dict[str, Any]:
+def human_verification_of_dag(state: WorkflowState) -> Dict[str, Any]:
     if "verified_dag" in state and state["verified_dag"]:
         print("Skipping human_verification: 'verified_dag' already in state")
         return {}
@@ -171,24 +222,26 @@ def build_workflow():
     workflow.add_node("summarize", summarize)
     workflow.add_node("component_identification", run_component_identification)
     workflow.add_node("component_parsing", run_component_parsing)
+    workflow.add_node("human_verification_of_components", human_verification_of_components)
     workflow.add_node("attribute_identification", run_attribute_identification)
     workflow.add_node("attribute_parsing", run_attribute_parsing)
     workflow.add_node("node_aggregator", run_node_aggregator)
     workflow.add_node("edge_identification", run_edge_identification)
     workflow.add_node("generate_dag_yaml", generate_dag_yaml)
-    workflow.add_node("human_verification", human_verification)
+    workflow.add_node("human_verification_of_dag", human_verification_of_dag)
     workflow.add_node("config_agent", run_config_agent)
     workflow.add_node("notebook_agent", run_notebook_agent)
 
     workflow.add_edge("clone_and_prepare_repo", "summarize")
     workflow.add_edge("summarize", "component_identification")
     workflow.add_edge("component_identification", "component_parsing")
-    workflow.add_edge("component_parsing", "attribute_identification")
+    workflow.add_edge("component_parsing", "human_verification_of_components")
+    workflow.add_edge("human_verification_of_components", "attribute_identification")
     workflow.add_edge("attribute_identification", "node_aggregator")
     workflow.add_edge("node_aggregator", "edge_identification")
     workflow.add_edge("edge_identification", "generate_dag_yaml")
     workflow.add_edge("generate_dag_yaml", "human_verification")
-    workflow.add_edge("human_verification", "config_agent")
+    workflow.add_edge("human_verification_of_dag", "config_agent")
     workflow.add_edge("config_agent", "notebook_agent")
     workflow.add_edge("notebook_agent", END)
 
@@ -206,8 +259,12 @@ def run_workflow(github_url: str, input_files: List[str], start_from: str | None
         "existing_config_path": existing_config_path,
         "files": [],
         "summaries": [],
-        "all_nodes": [],
-        "consolidated_nodes": [],
+        "component_identification": [],
+        "component_parsing": [],
+        "verified_components": [],
+        "attribute_identification": [],
+        "attribute_parsing": [],
+        "node_aggregator": [],
         "edges": [],
         "dag_yaml": "",
         "verified_dag": {},
@@ -221,12 +278,13 @@ def run_workflow(github_url: str, input_files: List[str], start_from: str | None
         ("summarize", summarize),
         ("component_identification", run_component_identification),
         ("component_parsing", run_component_parsing),
+        ("human_verification_of_components", human_verification_of_components),
         ("attribute_identification", run_attribute_identification),
         ("attribute_parsing", run_attribute_parsing),
         ("node_aggregator", run_node_aggregator),
         ("edge_identification", run_edge_identification),
         ("generate_dag_yaml", generate_dag_yaml),
-        ("human_verification", human_verification),
+        ("human_verification_of_dag", human_verification_of_dag),
         ("config_agent", run_config_agent),
         ("notebook_agent", run_notebook_agent)
     ]
@@ -240,8 +298,8 @@ def run_workflow(github_url: str, input_files: List[str], start_from: str | None
 
     # Run from start_from onward
     for step_name, step_func in steps[start_idx:]:
-        step_state = load_step_state(repo_name, step_name) # could remove?
-        current_state.update(step_state) # could remove?
+        #step_state = load_step_state(repo_name, step_name) # could remove?
+        #current_state.update(step_state) # could remove?
         update = step_func(current_state)
         if update:
             current_state.update(update)
@@ -263,7 +321,7 @@ if __name__ == "__main__":
     result = run_workflow(
         github_url=args.github_url,
         input_files=args.input_files,
-        start_from=args.start_from
+        start_from=args.start_from,
         existing_config_path=args.existing_config_path
     )
     print("Final Config:", result["config"])

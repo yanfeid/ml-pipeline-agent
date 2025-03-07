@@ -1,10 +1,11 @@
 import litellm
+import json
 from llms import LLMClient
 from utils import convert_to_dict
 
     
 
-def parse_component_identification(response_text):
+def parse_component_identification(response_text, file):
     """
     Parse component identification response, extracting components with their line ranges,
     evidence, and why_separate sections.
@@ -56,7 +57,18 @@ Here's the content to parse:
     )
     choices: litellm.types.utils.Choices = response.choices
     parsed_text = choices[0].message.content or ""
+
+    with open('ml_components/component_definitions.json', 'r') as f:
+        component_definitions = json.load(f)
+    allowed_components = list(component_definitions.keys())
+
+    # Create dictionary with parsed data
     parsed_dict = convert_to_dict(parsed_text)
+    for component, metadata in parsed_dict.items():
+        if component not in allowed_components:
+            print(f'Found identified component outside of allowed set of components for {file}: "{component}"')
+            
+        metadata['location'] = file.replace('.py', '.ipynb') # maybe leave as .py? 
     return parsed_text, parsed_dict
 
 
