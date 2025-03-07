@@ -150,23 +150,20 @@ def convert_dict_to_yaml_format(component_dict):
 
 
 
-def attribute_identification_agent(python_file_path, classification_dict, component_specific_hints):
+def attribute_identification_agent(python_file_path, component_dict):
     base_name = os.path.basename(python_file_path)  
-    print(base_name)
     file_name = base_name.replace('.py', '.ipynb')
-    print(file_name)
 
-    cleaned_code = preprocess_python_file(code_file)
+    cleaned_code = preprocess_python_file(python_file_path)
     line_count = len(cleaned_code.splitlines())  
-    print("Number of lines:", line_count)
-    #print(cleaned_code)
     
-    identified_components = list(classification_dict.keys())
+    identified_components = list(component_dict.keys())
     formatted_component_hints = get_component_hints(identified_components, component_specific_hints)
 
     # bring json back to yaml string to place in prompt
-    classification_str = convert_dict_to_yaml_format(classification_dict)
- 
+    classification_str = convert_dict_to_yaml_format(component_dict)
+
+    print(f"Running attribute identification for {file_name} which has ~{line_count} lines of code, with identified components: {identified_components} ...")
 
     attribute_prompt = f"""SETTING:
 You are analyzing python code which comes from a jupyter notebook in a ML workflow. You will be provided with the code itself and a structured list of machine learning (ML) components that were previously identified in the code. Your task is to determine the input and output attributes for each component that would need to be configurable parameters in a production ML pipeline.

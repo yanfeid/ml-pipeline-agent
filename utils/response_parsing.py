@@ -1,4 +1,5 @@
 import json
+import yaml
 
 def convert_to_dict(json_str):
     """
@@ -35,3 +36,24 @@ def convert_to_dict(json_str):
     except Exception as e:
         # Handle other errors
         return {"error": f"Unexpected error: {str(e)}"}
+    
+
+
+def list_to_yaml_string(data_list):
+    """
+    Convert a list of dictionaries to a YAML-formatted string while preserving order.
+    
+    Args:
+        data_list (list): List of dictionaries to convert
+        
+    Returns:
+        str: YAML-formatted string representation of the list of dictionaries
+    """
+    try:
+        # Use yaml.safe_dump to convert Python objects to YAML string
+        # Set sort_keys=False to preserve the order of dictionary keys
+        yaml_string = yaml.safe_dump(data_list, sort_keys=False)
+        return yaml_string
+    except Exception as e:
+        print(f"Error converting to YAML string: {e}")
+        return ""

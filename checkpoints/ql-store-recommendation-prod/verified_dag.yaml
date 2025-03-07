@@ -1,0 +1,86 @@
+edges:
+- attributes:
+    driver_path: gs://my-bucket/data/driverset.parquet
+  from: driver_creation
+  to: feature_pull
+  type: data_dependency
+- attributes:
+    train_data_path: gs://my-bucket/data/train_data.parquet
+  from: feature_pull
+  to: feature_selection
+  type: data_dependency
+- attributes:
+    train_data_path: gs://my-bucket/data/train_data.parquet
+  from: feature_pull
+  to: data_normalization
+  type: data_dependency
+- attributes:
+    final_feature_list: final_features/selected_features.txt
+  from: feature_selection
+  to: data_normalization
+  type: data_dependency
+- attributes:
+    normalized_train_data_path: gs://my-bucket/data/processed/normalized_train_data.parquet
+  from: data_normalization
+  to: model_training
+  type: data_dependency
+- attributes:
+    model_path: gs://my-bucket/models/model.onnx
+  from: model_training
+  to: model_scoring
+  type: data_dependency
+- attributes:
+    test_data_path: gs://my-bucket/data/test_data.parquet
+  from: feature_pull
+  to: model_scoring
+  type: data_dependency
+- attributes:
+    scored_test_data_path: gs://my-bucket/data/scores/scored_test_data.parquet
+  from: model_scoring
+  to: model_evaluation
+  type: data_dependency
+nodes:
+- id: driver_creation
+  inputs: {}
+  location: data_pipeline.py:10-50
+  outputs:
+    driver_path: gs://my-bucket/data/driverset.parquet
+- id: feature_pull
+  inputs:
+    driver_path: gs://my-bucket/data/driverset.parquet
+    feature_list: columns/features.txt
+  location: data_pipeline.py:60-100
+  outputs:
+    test_data_path: gs://my-bucket/data/test_data.parquet
+    train_data_path: gs://my-bucket/data/train_data.parquet
+- id: feature_selection
+  inputs:
+    train_data_path: gs://my-bucket/data/train_data.parquet
+  location: feature_engineering.py:10-50
+  outputs:
+    final_feature_list: final_features/selected_features.txt
+- id: data_normalization
+  inputs:
+    final_feature_list: final_features/selected_features.txt
+  location: feature_engineering.py:35-70
+  outputs:
+    normalized_train_data_path: gs://my-bucket/data/processed/normalized_train_data.parquet
+- id: model_training
+  inputs:
+    normalized_train_data_path: gs://my-bucket/data/processed/normalized_train_data.parquet
+  location: train_model.py:20-80
+  outputs:
+    model_path: gs://my-bucket/models/model.onnx
+- id: model_scoring
+  inputs:
+    model_path: gs://my-bucket/models/model.onnx
+    test_data_path: gs://my-bucket/data/test_data.parquet
+  location: train_model.py:90-110
+  outputs:
+    scored_test_data_path: gs://my-bucket/data/scores/scored_test_data.parquet
+- id: model_evaluation
+  inputs:
+    scored_test_data_path: gs://my-bucket/data/scores/scored_test_data.parquet
+  location: train_model.py:120-150
+  outputs:
+    evaluation_results_path: gs://my-bucket/evaluation/model_performance.csv
