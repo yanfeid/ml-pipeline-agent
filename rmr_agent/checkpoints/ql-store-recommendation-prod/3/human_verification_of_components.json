@@ -1,0 +1,115 @@
+{
+  "verified_components": [
+    {
+      "Driver Creation": {
+        "line_range": "Lines 4-512",
+        "evidence": [
+          "\"Create live unique merchants training table\" \u2013 This indicates the creation of a foundational dataset by joining multiple tables and applying filters.",
+          "\"Create driver_00 table\" \u2013 This involves further joining and filtering to refine the dataset.",
+          "\"Create driver_positive_train_attributed table\" \u2013 This step creates a table with positive samples, indicating the preparation of labeled data.",
+          "\"Create driver_dev table\" \u2013 This combines multiple tables to create a final development table with both positive and negative samples.",
+          "\"Create driver_oot table\" \u2013 This combines multiple tables to create a final out-of-time (OOT) table with both positive and negative samples."
+        ],
+        "why_separate": "The entire code summary revolves around creating various driver tables by joining, filtering, and sampling data. These steps are integral to the Driver Creation component, as they establish the foundational dataset for subsequent ML processes. The operations described are consistent with the definition of Driver Creation, which involves initial data loading, extraction, and preparation of the driver dataset.",
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/00_driver.ipynb"
+      }
+    },
+    {
+      "Feature Engineering": {
+        "line_range": "TBD",
+        "evidence": [
+          "Added manually during verification"
+        ],
+        "why_separate": "Added manually during verification",
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_bq_feat.ipynb"
+      }
+    },
+    {
+      "Data Pulling": {
+        "line_range": "Lines 23-67",
+        "evidence": [
+          "\"Imports necessary modules and sets up a Fetcher object with various configurations such as stage, sequence number, job name, and other metadata.\" \u2013 This indicates the setup of a data fetching process, which is a key part of Data Pulling.",
+          "\"Specifies the variables to be fetched and sets the split ratio for training data.\" \u2013 This further supports the data fetching process by specifying what data to pull and how to split it.",
+          "\"Executes the fetcher to retrieve the specified data.\" \u2013 This confirms the action of pulling data, which is the core of the Data Pulling component."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_varmart_feat.ipynb"
+      }
+    },
+    {
+      "Feature Consolidation": {
+        "line_range": "Lines 17-625",
+        "evidence": [
+          "\"Create and populate driver_dev_features table\" \u2013 This involves merging multiple datasets into a unified feature set for modeling, which is a key aspect of feature consolidation.",
+          "\"Create and populate driver_oot_features table\" \u2013 Similar to the previous point, this also involves merging datasets to create a comprehensive feature set.",
+          "\"Expand sequence features in driver_oot_features_expand_seq table\" \u2013 This step further consolidates features by expanding sequence features, which is part of the feature consolidation process."
+        ],
+        "why_separate": "The above steps collectively represent the process of merging and consolidating various datasets into a unified feature set, which is essential for subsequent modeling tasks. This component is distinct and does not overlap with other components identified in the pipeline.",
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/02_combine.ipynb"
+      }
+    },
+    {
+      "Data Preprocessing": {
+        "line_range": "Lines 21-175",
+        "evidence": [
+          "Reads parquet files from a specified directory. Concatenates the data from these files into a single DataFrame. \u2013 This indicates the initial step of loading and combining data, which is a part of preprocessing.",
+          "Creates a dictionary to map state names to their abbreviations. Defines a function to clean state data by converting full state names to abbreviations or keeping abbreviations as is. Applies this function to the state column in the DataFrame. \u2013 This is a data cleaning step, which is a key part of preprocessing.",
+          "Encodes the state column using LabelEncoder and saves the encoder mappings. Encodes other specified categorical features and saves their encoder mappings. \u2013 Encoding categorical variables is a common preprocessing task.",
+          "Defines a list of numerical features to be scaled. Scales these features using StandardScaler and saves the scaling parameters. \u2013 Scaling numerical features is another common preprocessing task.",
+          "Cleans and processes sequence data for recent merchant categories and lists. Pads sequences to a fixed length and adds them to the DataFrame. Tokenizes merchant list data and adds the tokenized sequences to the DataFrame. Drops the original sequence columns from the DataFrame. \u2013 Processing sequence data and tokenizing are also preprocessing activities.",
+          "Defines a function to write DataFrame chunks to parquet files. Splits the DataFrame into chunks and writes each chunk to a specified directory. \u2013 Saving processed data is part of the preprocessing pipeline.",
+          "Saves the tokenizer, categorical feature encoders, and numerical feature scalers using pickle. \u2013 Exporting feature transformers is a final step in preprocessing to ensure the same transformations can be applied during model inference."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/03_prepare_training_data.ipynb"
+      }
+    },
+    {
+      "Model Training": {
+        "line_range": "Lines 2-170",
+        "evidence": [
+          "\"Imports essential libraries and modules for data processing, machine learning, and model training.\" \u2013 This indicates the setup for model training.",
+          "\"Configures a distributed training strategy for using multiple GPUs.\" \u2013 This is part of the model training process.",
+          "\"Trains the model using the training dataset and validates it using the validation dataset, with early stopping.\" \u2013 This is the core of the model training process."
+        ],
+        "why_separate": "The model training process involves setting up the environment, loading data, preparing it, and training the model. This is a distinct and substantial part of the ML workflow that can function independently.",
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/04_training.ipynb"
+      },
+      "Model Packaging": {
+        "line_range": "Lines 171-229",
+        "evidence": [
+          "\"Saves the trained model in both H5 and TensorFlow SavedModel formats.\" \u2013 This indicates the model packaging process.",
+          "\"Converts the TensorFlow model to ONNX format and saves the ONNX specification.\" \u2013 This is part of preparing the model for deployment.",
+          "\"Prepares the ONNX model with preprocessing layers and saves it to a specified path.\" \u2013 This further confirms the packaging of the model for deployment."
+        ],
+        "why_separate": "Model packaging involves saving the trained model in deployment-ready formats and ensuring it includes necessary preprocessing steps. This is a distinct step that follows model training and is crucial for deployment.",
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/04_training.ipynb"
+      }
+    },
+    {
+      "Model Scoring": {
+        "line_range": "Lines 25-94",
+        "evidence": [
+          "\"Define function for out-of-time (OOT) data evaluation\" (Lines 25-48) \u2013 This section defines a function `oot_data_eval` to evaluate OOT data using a model, which is a key part of the model scoring process.",
+          "\"Submit Spark job to GCP for scoring\" (Lines 70-86) \u2013 This section describes the creation and submission of a Spark job on GCP to run the `oot_data_eval` function, which is essential for scoring the model on the OOT dataset.",
+          "\"Check job status and save logs\" (Lines 87-94) \u2013 This section involves monitoring the Spark job's status and saving the logs, which are part of the model scoring workflow."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.ipynb"
+      }
+    },
+    {
+      "Model Evaluation": {
+        "line_range": "Lines 375-731",
+        "evidence": [
+          "Calculate recall metrics and save results (Lines 375-430): Calculate recall metrics for different models and save the results to a CSV file. Generate bar plots for the recall metrics and save the plots as an image. \u2013 This indicates the calculation of performance metrics, which is a key part of model evaluation.",
+          "Calculate recall metrics for specific category and save results (Lines 448-530): Calculate recall metrics for different models for a specific category and save the results to a CSV file. Generate bar plots for the recall metrics and save the plots as an image. \u2013 This further supports the evaluation of model performance, specifically for a category.",
+          "Calculate recall metrics excluding specific merchants and save results (Lines 532-607): Calculate recall metrics for different models excluding specific merchants and save the results to a CSV file. Generate bar plots for the recall metrics and save the plots as an image. \u2013 This shows the evaluation of model performance with certain exclusions.",
+          "Calculate recall metrics for recent data and save results (Lines 608-731): Calculate recall metrics for different models for recent data and save the results to a CSV file. Generate bar plots for the recall metrics and save the plots as an image. \u2013 This indicates the evaluation of model performance on recent data."
+        ],
+        "why_separate": "The evaluation of model performance is a distinct step in the ML workflow, focusing on assessing how well the model performs using various metrics. This step is separate from other components like data preprocessing or model training, as it specifically deals with the analysis and reporting of model results. The line range from 375 to 731 is dedicated to these evaluation tasks, with no overlap with other components' line ranges.",
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/06_evaluation.ipynb"
+      }
+    }
+  ]
+}
