@@ -1,0 +1,13 @@
+{
+  "local_repo_path": "repos/ql-store-recommendation-prod",
+  "files": [
+    "repos/ql-store-recommendation-prod/research/pipeline/00_driver.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/01_bq_feat.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/01_varmart_feat.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/02_combine.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/03_prepare_training_data.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/04_training.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.py",
+    "repos/ql-store-recommendation-prod/research/pipeline/06_evaluation.py"
+  ]
+}
