@@ -16,6 +16,9 @@ WorkflowState = Dict[str, Any]
 
 CHECKPOINT_BASE_PATH = "rmr_agent/checkpoints"
 
+def is_cancelled(state: WorkflowState) -> bool:
+    """Check if the workflow has been cancelled."""
+    return state.get("status") == "cancelled"
 
 def clone_and_prepare_repo(state: WorkflowState) -> Dict[str, Any]:
     if "files" in state and state["files"]:
@@ -36,11 +39,19 @@ def summarize(state: WorkflowState) -> Dict[str, Any]:
     from agents.summarization import summarize_code
     full_file_list = state["files"]
     summaries = {}
+    cleaned_code = {}
     for file in full_file_list:
-        summary_text = summarize_code(file, full_file_list)
+        if is_cancelled(state):
+            print("Workflow cancelled during code summarization")
+            return {}
+        clean_code, summary_text = summarize_code(file, full_file_list)
         summaries[file] = summary_text
+        cleaned_code[file] = clean_code
         print(f"Generated summary for {file}")
-    return {"summaries": summaries}
+    return {
+        "summaries": summaries, 
+        "cleaned_code": cleaned_code
+    }
 
 def run_component_identification(state: WorkflowState) -> Dict[str, Any]:
     if "component_identification" in state and state["component_identification"]:
@@ -51,6 +62,9 @@ def run_component_identification(state: WorkflowState) -> Dict[str, Any]:
     summaries = state["summaries"]
     component_identification = []
     for file in full_file_list:
+        if is_cancelled(state):
+            print("Workflow cancelled during component identification")
+            return {}
         nodes = component_identification_agent(file, full_file_list, code_summary=summaries[file])
         component_identification.append(nodes)
         print(f"Identified components for {file}")
@@ -65,6 +79,9 @@ def run_component_parsing(state: WorkflowState) -> Dict[str, Any]:
     component_identification = state["component_identification"]
     component_parsing = []
     for file, component_identification_text in zip(full_file_list, component_identification):
+        if is_cancelled(state):
+            print("Workflow cancelled during component parsing")
+            return {}
         parsed_component_identification_text, parsed_component_identification_dict = parse_component_identification(component_identification_text, file)
         component_parsing.append(parsed_component_identification_dict)
         print(f"Parsed the component identification response for {file}")
@@ -136,9 +153,13 @@ def run_attribute_identification(state: WorkflowState) -> Dict[str, Any]:
     from agents.attribute_identification import attribute_identification_agent
     full_file_list = state["files"]
     verified_components = state['verified_components']
+    cleaned_code = state['cleaned_code']
     attribute_identification = []
     for file, component_dict in zip(full_file_list, verified_components):
-        attribution_text = attribute_identification_agent(file, component_dict)
+        if is_cancelled(state):
+            print("Workflow cancelled during attribute identification")
+            return {}
+        attribution_text = attribute_identification_agent(file, component_dict, cleaned_code[file])
         attribute_identification.append(attribution_text)
         print(f"Identified attributes for components in {file}")
     return {"attribute_identification": attribute_identification}
@@ -153,6 +174,9 @@ def run_attribute_parsing(state: WorkflowState) -> Dict[str, Any]:
     attribute_identification = state['attribute_identification']
     attribute_parsing = []
     for component_dict, attributes_text in zip(verified_components, attribute_identification):
+        if is_cancelled(state):
+            print("Workflow cancelled during attribute parsing")
+            return {}
         parsed_attributes_text, parsed_attributes_dict = parse_attribute_identification(component_dict, attributes_text)
         attribute_parsing.append(parsed_attributes_dict)
     return {"attribute_parsing": attribute_parsing}
@@ -185,23 +209,16 @@ def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
     if "dag_yaml" in state and state["dag_yaml"]:
         print("Skipping generate_dag_yaml: 'dag_yaml' already in state")
         return {}
-    # Get nodes yaml string
-    nodes_yaml_str = "nodes:\n" + state["node_aggregator"].replace("```yaml", "").replace("```", "")
-    # Get edges yaml string
-    cleaned = state["edges"].replace("```yaml", "").replace("```", "").replace("edges:", "")
-    lines = cleaned.strip().split("\n")
-    non_empty_lines = filter(lambda line: line.strip(), lines)
-    edges_yaml_str = "edges:\n" + "\n".join(non_empty_lines)
-    # Full DAG yaml string
-    dag_yaml = nodes_yaml_str + edges_yaml_str
+    from agents.dag import generage_dag_yaml
+    dag_yaml_str = generage_dag_yaml(aggregated_nodes=state["node_aggregator"], edges=state["edges"])
     dag_yaml_path = f"{CHECKPOINT_BASE_PATH}/{state['repo_name']}/{state['run_id']}/dag.yaml"
     try:
         with open(dag_yaml_path, 'w') as yaml_file:
-            yaml_file.write(dag_yaml)
+            yaml_file.write(dag_yaml_str)
         print(f"DAG YAML successfully exported to {dag_yaml_path}")
     except Exception as e:
         print(f"Error exporting YAML to {dag_yaml_path}: {type(e).__name__}: {str(e)}")
-    return {"dag_yaml": dag_yaml}
+    return {"dag_yaml": dag_yaml_str}
 
 def human_verification_of_dag(state: WorkflowState) -> Dict[str, Any]:
     if "verified_dag" in state and state["verified_dag"]:
@@ -264,7 +281,7 @@ def build_workflow():
     workflow.set_entry_point("clone_and_prepare_repo")
     return workflow.compile()
 
-
+# For testing locally
 def run_workflow(github_url: str, input_files: List[str], run_id: str | None = None, start_from: str | None = None, existing_config_path: str | None = None):
     _, repo_name = parse_github_url(github_url)
     if not run_id:
@@ -278,7 +295,8 @@ def run_workflow(github_url: str, input_files: List[str], run_id: str | None = N
         "local_repo_path": "",
         "existing_config_path": existing_config_path,
         "files": [],
-        "summaries": [],
+        "summaries": {},
+        "cleaned_code": {},
         "component_identification": [],
         "component_parsing": [],
         "verified_components": [],

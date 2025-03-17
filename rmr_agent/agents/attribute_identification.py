@@ -1,20 +1,21 @@
 import os
+from typing import Dict, Any
 from llms import LLMClient
 import litellm
-from utils import preprocess_python_file
 
 
 component_specific_hints = {
     "Driver Creation": [
         "Focus on major inputs like raw data paths (e.g., BigQuery table paths) and SQL query parameters.",
         "Output should only be the very final driver table/dataset. It is often also saved to GCS (e.g. parquet, CSV).",
-        "The final driver dataset contains the all of the basic rows and metadata all in one table (e.g. class labels (0, 1), class weights, split category (train, val, test/OOT)).",
-        "If the different splits (train, validation, OOT (test)) are saved in separate tables/datasets, include those as output attributes."
         "Intermediate table results should NEVER be included (e.g. positive, negative, base tables etc.). Focus on the major inputs and FINAL output table(s) of the entire driver creation process.",
+        #"The final driver dataset contains the all of the basic rows and metadata all in one table (e.g. class labels (0, 1), class weights, split category (train, val, test/OOT)).",
+        "If the different splits (train, validation, OOT (test)) are saved in separate tables/datasets, include those as output attributes as well."
     ],
     "Feature Engineering": [
         "Inputs include driver dataset (BigQuery table or GCS path) and SQL query parameters for transformations",
-        "Outputs are engineered feature sets, often saved to BigQuery or GCS",
+        "Output should only be the very final table/dataset with engineered features, often saved to BigQuery or GCS",
+        "Intermediate table results should NEVER be included. Focus on the major inputs and FINAL output table(s) of the entire feature engineering process."
         "Look for aggregation or transformation parameters (e.g., window sizes, group-by keys)"
     ],
     "Data Pulling": [
@@ -149,12 +150,11 @@ def convert_dict_to_yaml_format(component_dict):
 
 
 
-def attribute_identification_agent(python_file_path, component_dict):
+def attribute_identification_agent(python_file_path: str, component_dict: Dict[str, Any], clean_code: str):
     base_name = os.path.basename(python_file_path)  
     file_name = base_name.replace('.py', '.ipynb')
 
-    cleaned_code = preprocess_python_file(python_file_path)
-    line_count = len(cleaned_code.splitlines())  
+    line_count = len(clean_code.splitlines())  
     
     identified_components = list(component_dict.keys())
     formatted_component_hints = get_component_hints(identified_components, component_specific_hints)
@@ -223,7 +223,7 @@ COMPONENT SPECIFIC HINTS FOR IDENTIFYING ATTRIBUTES:
 {formatted_component_hints}
         
 CURRENT FILE'S CODE:
-{cleaned_code}
+{clean_code}
 """
     #print(attribute_prompt)
     llm_client = LLMClient(model_name="gpt-4o")

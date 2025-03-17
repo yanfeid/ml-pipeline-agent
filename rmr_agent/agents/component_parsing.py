@@ -1,7 +1,8 @@
 import litellm
 import json
 from llms import LLMClient
-from utils import convert_to_dict
+from utils import convert_to_dict, preprocess_python_file
+
 
     
 
@@ -69,7 +70,16 @@ Here's the content to parse:
         if component not in allowed_components:
             print(f'Found identified component outside of allowed set of components for {file}: "{component}"')
             
-        metadata['file_name'] = file.replace('.py', '.ipynb') # maybe leave as .py? 
+        metadata['file_name'] = file
+
+        if len(parsed_dict) == 1:
+            # when only one component identified in the file, just take all of the lines in the file for that component. 
+            cleaned_code = preprocess_python_file(file)
+            num_lines = len(cleaned_code.splitlines())
+            metadata['line_range'] = f"Lines 1-{num_lines}"
+
+    
+
     return parsed_text, parsed_dict
 
 

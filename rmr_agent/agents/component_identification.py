@@ -1,8 +1,15 @@
 import os
+import json
 import litellm
 from llms import LLMClient
     
-
+def get_component_definitions_str():
+    with open('rmr_agent/ml_components/component_definitions.json', 'r') as f:
+        component_definitions = json.load(f)
+    component_def_str = ""
+    for component_name, definition in component_definitions.items():
+        component_def_str += f"    - {component_name}: {definition}\n"
+    return component_def_str
 
 def component_identification_agent(python_file_path, full_file_list, code_summary, model="gpt-4o", temperature=0, max_tokens=2048, 
                  frequency_penalty=0, presence_penalty=0):
@@ -10,21 +17,13 @@ def component_identification_agent(python_file_path, full_file_list, code_summar
     file_name = base_name.replace('.py', '.ipynb')
     print(f"Running component identification for {file_name}")
 
+    # Get the component definitions as a string
+    component_definitions_str = get_component_definitions_str()
+
     classification_prompt = f"""Analyze the provided code summary to identify MAJOR ML components — substantial, primary elements that could function as independent ML workflow nodes. Use only the ML component categories defined below.
 
 ML COMPONENT CATEGORIES:
-    - Driver Creation: Typically the first step in the entire pipeline, it is the initial data loading and extraction (ETL) via SQL (often BigQuery) to create the “driver” dataset. This dataset contains the basic rows and metadata (e.g. class labels (0, 1), class weights, split category (train, val, test/OOT)). It can also sometimes include feature engineering and transformation in the SQL. The final driver dataset will typically be saved to GCS (e.g. parquet, PIG, CSV).
-    - Feature Engineering: Creating new features, typically using SQL (most often in BigQuery), for predictive modeling. This involves applying transformations, aggregations, and derivations to raw data. The engineered features are intended to be joined with the driver dataset to enrich the final feature set.
-    - Data Pulling: Enriching the driver dataset with additional data/features from a feature store/variable mart (typically with a proprietary API/SDK such as Data Fetcher, PyOFS, QPull, MadMen, PyDPU, mdlc.dataset).
-    - Feature Consolidation: Merging multiple datasets into a unified feature set for modeling (distinct from driver creation joins).
-    - Data Preprocessing: Cleaning/transforming data (e.g., imputation, handling outliers, encoding categorical variables, transforming to WOE, or normalization/scaling of features). Can include saving the preprocessors/transformers used (that is not a separate component). A commonly used proprietary library for preprocessing is Shifu.
-    - Feature Selection: Selecting key features for modeling. Common proprietary libraries include Shifu and model_automation. Jobs may be submitting for execution on GCP Dataproc. Final variable list is saved. 
-    - TFRecord Conversion: Converting data into TFRecord format. Typically a tfrecord convert function is submitted for execution on GCP Dataproc.
-    - Model Training: Fitting models on training data. Can include Hyperparameter Tuning. Libraries commonly used in our company are TensorFlow, LightGBM, PyTorch. A train function may be submitted for execution on GCP Dataproc or VertexAI. The model can be saved using library-specific formats (e.g., .h5 for TensorFlow, .model for LightGBM, .pt for PyTorch).
-    - Model Packaging: Saving trained models into deployment-ready formats (e.g. ONNX, UME, SavedModel, PMML, txt, etc.). This step may include bundling preprocessing/normalization logic (often from Shifu) with the model.
-    - Model Scoring: Inferencing the trained model on the unseen test/OOT dataset. The commonly used proprietary tool is PyScoring.
-    - Model Evaluation: Calculating performance metrics or running validation techniques.
-    - Model Deployment: Saving/serving models for online or offline inference.
+{component_definitions_str}
 
 CLASSIFICATION RULES:
 1. Use only the predefined ML component categories listed above. Do not invent new categories.
