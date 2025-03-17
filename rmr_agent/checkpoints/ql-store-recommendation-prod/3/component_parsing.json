@@ -11,7 +11,7 @@
           "\"Create driver_oot table\" \u2013 This combines multiple tables to create a final out-of-time (OOT) table with both positive and negative samples."
         ],
         "why_separate": "The entire code summary revolves around creating various driver tables by joining, filtering, and sampling data. These steps are integral to the Driver Creation component, as they establish the foundational dataset for subsequent ML processes. The operations described are consistent with the definition of Driver Creation, which involves initial data loading, extraction, and preparation of the driver dataset.",
-        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/00_driver.ipynb"
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/00_driver.py"
       }
     },
     {
@@ -24,7 +24,7 @@
           "\"Create driver_elig_save_365d_category table (Lines 569-616): Drops the existing table if it exists. Creates a new table with consumer save event data joined with merchant category data.\" \u2013 This shows the creation of a foundational dataset with save event data."
         ],
         "why_separate": "The entire file is dedicated to creating various driver tables, which are foundational datasets for the ML pipeline. Each table creation involves dropping existing tables and creating new ones with specific data joins and aggregations, fitting the definition of Driver Creation. There is no overlap with other components' line ranges as the entire file focuses on this task.",
-        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_bq_feat.ipynb"
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_bq_feat.py"
       }
     },
     {
@@ -36,7 +36,7 @@
           "\"Executes the fetcher to retrieve the specified data.\" \u2013 This confirms the action of pulling data, which is the core of the Data Pulling component."
         ],
         "why_separate": null,
-        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_varmart_feat.ipynb"
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_varmart_feat.py"
       }
     },
     {
@@ -48,7 +48,7 @@
           "\"Expand sequence features in driver_oot_features_expand_seq table\" \u2013 This step further consolidates features by expanding sequence features, which is part of the feature consolidation process."
         ],
         "why_separate": "The above steps collectively represent the process of merging and consolidating various datasets into a unified feature set, which is essential for subsequent modeling tasks. This component is distinct and does not overlap with other components identified in the pipeline.",
-        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/02_combine.ipynb"
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/02_combine.py"
       }
     },
     {
@@ -64,7 +64,7 @@
           "Saves the tokenizer, categorical feature encoders, and numerical feature scalers using pickle. \u2013 Exporting feature transformers is a final step in preprocessing to ensure the same transformations can be applied during model inference."
         ],
         "why_separate": null,
-        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/03_prepare_training_data.ipynb"
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/03_prepare_training_data.py"
       }
     },
     {
@@ -76,7 +76,7 @@
           "\"Trains the model using the training dataset and validates it using the validation dataset, with early stopping.\" \u2013 This is the core of the model training process."
         ],
         "why_separate": "The model training process involves setting up the environment, loading data, preparing it, and training the model. This is a distinct and substantial part of the ML workflow that can function independently.",
-        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/04_training.ipynb"
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/04_training.py"
       },
       "Model Packaging": {
         "line_range": "Lines 171-229",
@@ -86,7 +86,7 @@
           "\"Prepares the ONNX model with preprocessing layers and saves it to a specified path.\" \u2013 This further confirms the packaging of the model for deployment."
         ],
         "why_separate": "Model packaging involves saving the trained model in deployment-ready formats and ensuring it includes necessary preprocessing steps. This is a distinct step that follows model training and is crucial for deployment.",
-        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/04_training.ipynb"
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/04_training.py"
       }
     },
     {
@@ -98,7 +98,7 @@
           "\"Check job status and save logs\" (Lines 87-94) \u2013 This section involves monitoring the Spark job's status and saving the logs, which are part of the model scoring workflow."
         ],
         "why_separate": null,
-        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.ipynb"
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.py"
       }
     },
     {
@@ -111,7 +111,7 @@
           "Calculate recall metrics for recent data and save results (Lines 608-731): Calculate recall metrics for different models for recent data and save the results to a CSV file. Generate bar plots for the recall metrics and save the plots as an image. \u2013 This indicates the evaluation of model performance on recent data."
         ],
         "why_separate": "The evaluation of model performance is a distinct step in the ML workflow, focusing on assessing how well the model performs using various metrics. This step is separate from other components like data preprocessing or model training, as it specifically deals with the analysis and reporting of model results. The line range from 375 to 731 is dedicated to these evaluation tasks, with no overlap with other components' line ranges.",
-        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/06_evaluation.ipynb"
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/06_evaluation.py"
       }
     }
   ]
