@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 from utils.git_utils import clone_repo, parse_github_url
 from utils.convert_ipynb_to_py import convert_notebooks
+from utils.save_file import save_state, save_ini_file
 import argparse
 
 WorkflowState = Dict[str, Any]
@@ -170,7 +171,7 @@ def run_node_aggregator(state: WorkflowState) -> Dict[str, Any]:
     from agents.node_aggregator import node_aggregator_agent
     node_aggregator = node_aggregator_agent(state["attribute_parsing"])
     return {"node_aggregator": node_aggregator}
-
+    
 def run_edge_identification(state: WorkflowState) -> Dict[str, Any]:
     if "edges" in state and state["edges"]:
         print("Skipping run_edge_identification: 'edges' already in state")
@@ -206,7 +207,24 @@ def run_config_agent(state: WorkflowState) -> Dict[str, Any]:
         return {}
     from agents.ini_config import config_agent
     config = config_agent(state["verified_dag"])
-    return {"config": config}
+
+    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  
+    CHECKPOINT_SUBDIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod")
+    STATE_FILE = os.path.join(CHECKPOINT_SUBDIR, "ini_config.json")
+
+ 
+    os.makedirs(CHECKPOINT_SUBDIR, exist_ok=True)
+
+    print(f" Checkpoints will be stored in: {CHECKPOINT_SUBDIR}")
+    print(f" State file path: {STATE_FILE}")
+
+
+    save_state(config, STATE_FILE)
+    save_ini_file("environment.ini", config["environment_ini"], CHECKPOINT_SUBDIR)
+    save_ini_file("solution.ini", config["solution_ini"], CHECKPOINT_SUBDIR)
+
+    return {"config": config}  
+
 
 def run_notebook_agent(state: WorkflowState) -> Dict[str, Any]:
     if "notebooks" in state and state["notebooks"]:
