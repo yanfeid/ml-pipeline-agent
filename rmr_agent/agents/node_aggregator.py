@@ -41,13 +41,36 @@ def dict_list_to_yaml(components_list):
     """
     # Create a list to hold the reformatted data
     yaml_list = []
+
+    # Scan through identified components to identify duplicates
+    component_occurance_count = {}
+    for component_dict in components_list:
+        for component_name in component_dict.keys():
+            if component_name in component_occurance_count:
+                component_occurance_count[component_name] += 1
+            else:
+                component_occurance_count[component_name] = 1
+
+    # Keep track of how many times we've seen each component
+    component_counter = {}
     
     # Process each dictionary in the input list
     for component_dict in components_list:
         for component_name, component_data in component_dict.items():
+            # Initialize counter for this component if not already done
+            if component_name not in component_counter:
+                component_counter[component_name] = 0
+            # Increment counter for this component
+            component_counter[component_name] += 1
+
+            # Create a new component name, potentially with a number suffix
+            final_component_name = component_name
+            if component_occurance_count[component_name] > 1:
+                final_component_name = f"{component_name}_{component_counter[component_name]}"
+
             # Create a dictionary for this component
             yaml_component = {
-                component_name: {
+                final_component_name: {
                     'file_name': component_data['file_name'],
                     'line_range': component_data['line_range'],
                     'inputs': {},

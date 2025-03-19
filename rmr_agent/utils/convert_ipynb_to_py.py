@@ -15,7 +15,9 @@ def convert_notebooks(input_files: list[str], local_repo_path: str) -> list[str]
     for file_path in input_files:
         full_path = os.path.join(local_repo_path, file_path)
         if not file_path.endswith(".ipynb"):
-            raise ValueError(f"File {file_path} is not a Jupyter notebook (.ipynb)")
+            print(f"File {file_path} is not a Jupyter notebook (.ipynb)")
+            converted_files.append(full_path)
+            continue
         if not os.path.exists(full_path):
             raise FileNotFoundError(f"File {full_path} not found in cloned repo")
         

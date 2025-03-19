@@ -1,0 +1,77 @@
+{
+  "attribute_parsing": [
+    {
+      "Load Raw Data": {
+        "file_name": "research/driver_creation.ipynb",
+        "line_range": "Lines 258-311",
+        "inputs": [
+          "data_path: \"gs://my-bucket/data/customer_data.csv\""
+        ],
+        "outputs": [
+          "processed_data_path: \"gs://my-bucket/data/processed/customer_data_processed.parquet\""
+        ]
+      },
+      "Feature Selection": {
+        "file_name": "research/driver_creation.ipynb",
+        "line_range": "Lines 312-365",
+        "inputs": [
+          "processed_data_path: \"gs://my-bucket/data/processed/customer_data_processed.parquet\"",
+          "feature_list: [\"age\", \"income\", \"credit_score\", \"price_per_unit\"]"
+        ],
+        "outputs": [
+          "selected_features_data_path: \"gs://my-bucket/data/processed/customer_data_processed.parquet\""
+        ]
+      },
+      "Train-Test Split": {
+        "file_name": "research/driver_creation.ipynb",
+        "line_range": "Lines 366-419",
+        "inputs": [
+          "selected_features_data_path: \"gs://my-bucket/data/processed/customer_data_processed.parquet\"",
+          "test_size: 0.2",
+          "random_state: 42"
+        ],
+        "outputs": [
+          "train_data_path: \"gs://my-bucket/data/processed/train_data.parquet\"",
+          "test_data_path: \"gs://my-bucket/data/processed/test_data.parquet\""
+        ]
+      },
+      "Normalize Data": {
+        "file_name": "research/driver_creation.ipynb",
+        "line_range": "Lines 420-473",
+        "inputs": [
+          "train_data_path: \"gs://my-bucket/data/processed/train_data.parquet\"",
+          "feature_list: [\"age\", \"income\", \"credit_score\", \"price_per_unit\"]"
+        ],
+        "outputs": [
+          "normalized_train_data_path: \"gs://my-bucket/data/processed/normalized_train_data.parquet\"",
+          "scaler_path: \"/home/user/models/scaler.pkl\""
+        ]
+      },
+      "Train Model": {
+        "file_name": "research/driver_creation.ipynb",
+        "line_range": "Lines 474-527",
+        "inputs": [
+          "normalized_train_data_path: \"gs://my-bucket/data/processed/normalized_train_data.parquet\"",
+          "feature_list: [\"age\", \"income\", \"credit_score\", \"price_per_unit\"]",
+          "model_params: {\"n_estimators\": 100, \"random_state\": 42}"
+        ],
+        "outputs": [
+          "model_path: \"/home/user/models/random_forest.pkl\""
+        ]
+      },
+      "Model Evaluation": {
+        "file_name": "research/driver_creation.ipynb",
+        "line_range": "Lines 528-581",
+        "inputs": [
+          "model_path: \"/home/user/models/random_forest.pkl\"",
+          "scaler_path: \"/home/user/models/scaler.pkl\"",
+          "test_data_path: \"gs://my-bucket/data/processed/test_data.parquet\"",
+          "feature_list: [\"age\", \"income\", \"credit_score\", \"price_per_unit\"]"
+        ],
+        "outputs": [
+          "evaluation_results_path: \"/home/user/models/eval_results.txt\""
+        ]
+      }
+    }
+  ]
+}

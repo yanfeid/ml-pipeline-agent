@@ -1,0 +1,12 @@
+{
+  "github_url": "https://github.paypal.com/Compliance-RnP/PEP_PS-Model/tree/master",
+  "local_repo_path": "rmr_agent/repos/PEP_PS-Model",
+  "files": [
+    "rmr_agent/repos/PEP_PS-Model/modeling_script/01_raw_data_reading.py",
+    "rmr_agent/repos/PEP_PS-Model/modeling_script/02-modeling_pep.py",
+    "rmr_agent/repos/PEP_PS-Model/modeling_script/03-modeling_ps.py",
+    "rmr_agent/repos/PEP_PS-Model/modeling_script/04-model_evaluation.py",
+    "rmr_agent/repos/PEP_PS-Model/modeling_script/05-lgbm_feature_importance_PEP.py",
+    "rmr_agent/repos/PEP_PS-Model/modeling_script/06-lgbm_feature_importance_PS.py"
+  ]
+}

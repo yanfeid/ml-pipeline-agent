@@ -1,0 +1,91 @@
+{
+  "verified_components": [
+    {
+      "Driver Creation": {
+        "line_range": "1-1125",
+        "evidence": [
+          "Create and populate table with base transactions \u2013 This involves creating a new table with transactions, which is a fundamental part of the initial data loading and extraction process.",
+          "Create and populate table with primary retry transactions \u2013 This step involves creating a new table with detailed information about primary retry transactions, which is part of the initial data extraction and loading.",
+          "Create and populate table with FX info for amount in USD \u2013 This step involves creating a new table with foreign exchange information, which is part of the initial data extraction and loading.",
+          "Join with credit card details for additional features \u2013 This step involves creating a new table by joining retry transactions with credit card details, which is part of the initial data extraction and loading.",
+          "Rename features to match model variable names \u2013 This step involves creating a new table with renamed features, which is part of the initial data extraction and loading.",
+          "Join with bin and strategy RADD features \u2013 This step involves creating a new table by joining retry transactions with bin and strategy RADD features, which is part of the initial data extraction and loading.",
+          "Convert BIGNUMERIC to Numeric \u2013 This step involves creating a new table by casting a specific column to float64, which is part of the initial data extraction and loading.",
+          "Filter and deduplicate data \u2013 This step involves creating a new table by filtering out rows with null values and deduplicating based on primary transaction ID, which is part of the initial data extraction and loading.",
+          "Train-validation-test split \u2013 This step involves creating new tables for training, validation, and test datasets by splitting the data, which is part of the initial data extraction and loading.",
+          "Copy test dataset to scratch for QPull purposes \u2013 This step involves creating a new table in a different schema by copying the test dataset, which is part of the initial data extraction and loading."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/bt-retry-v2/etl/01_etl.py"
+      }
+    },
+    {
+      "Driver Creation": {
+        "line_range": "1-40",
+        "evidence": [
+          "\"Set Spark Configuration\" (Lines 12-16) \u2013 This section sets up the environment for data processing, which is a preliminary step for data extraction and loading.",
+          "\"Define Function to Create BigQuery Table\" (Lines 17-23) \u2013 This function reads data from a BigQuery table and writes it to another BigQuery table, indicating the extraction and transformation of data.",
+          "\"Define Function to Create GCS Table\" (Lines 24-29) \u2013 This function reads data from a BigQuery table and writes it to a Google Cloud Storage path in Parquet format, which is part of the data loading process.",
+          "\"Create GCS Table for Training Data\" (Lines 30-32), \"Create GCS Table for Validation Data\" (Lines 33-35), and \"Create GCS Table for Test Data\" (Lines 36-38) \u2013 These sections specify the source BigQuery tables and target GCS paths for training, validation, and test data, respectively, and call the function to create the GCS tables, completing the data loading process."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/bt-retry-v2/etl/02_bq_to_dataproc.py"
+      }
+    },
+    {
+      "Model Evaluation": {
+        "line_range": "1-383",
+        "evidence": [
+          "Define metric functions for model evaluation (Lines 61-107) \u2013 This section defines functions to calculate various evaluation metrics, which are essential for assessing model performance.",
+          "Define additional utility functions for model evaluation (Lines 143-148) \u2013 Additional functions to evaluate metrics on true and predicted values, further supporting model evaluation.",
+          "Define partial functions for specific metrics and set up paths and constants (Lines 153-172) \u2013 Setting up specific metric functions and paths for evaluation.",
+          "Load features and models, and evaluate metrics (Lines 256-287) \u2013 Loading models and features, predicting scores, and evaluating metrics.",
+          "Define and evaluate metrics by segment (Lines 290-308) \u2013 Evaluating metrics by different segments, which is part of model evaluation.",
+          "Plot precision-recall curves (Lines 309-377) \u2013 Plotting precision-recall curves to visualize model performance, a key part of model evaluation."
+        ],
+        "why_separate": "The \"Model Evaluation\" component involves defining and calculating various metrics, loading models, predicting scores, and plotting evaluation curves, which are distinct tasks focused on assessing model performance.",
+        "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py"
+      }
+    },
+    {
+      "Model Training": {
+        "line_range": "1-367",
+        "evidence": [
+          "Train a LightGBM model using the training data. \u2013 This indicates the process of fitting a model to the training data, which is a core part of model training.",
+          "Define best parameters for the model. \u2013 This suggests that the model's hyperparameters are being set, which is typically part of the training process.",
+          "Save the trained model and plot feature importance. \u2013 Saving the trained model is a key step in the model training process."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/train.py"
+      }
+    },
+    {
+      "Model Packaging": {
+        "line_range": "1-60",
+        "evidence": [
+          "\"Loads a LightGBM model from a specified text file.\" \u2013 This indicates the process of loading a pre-trained model, which is a precursor to packaging.",
+          "\"Dumps the model into a JSON format.\" \u2013 This step involves converting the model into a format suitable for deployment.",
+          "\"Adds categorical feature names to the JSON.\" \u2013 This step ensures that the model includes necessary metadata for deployment.",
+          "\"Writes the JSON model to a file.\" \u2013 This is part of the process of saving the model in a deployment-ready format.",
+          "\"Creates a transformer object using the JSON model file.\" \u2013 This step involves preparing the model for transformation into a specific deployment format.",
+          "\"Generates a binary specification for the model.\" \u2013 This indicates the creation of a deployment-ready binary format.",
+          "\"Saves the binary specification to a specified output path.\" \u2013 This final step completes the packaging process by saving the model in a format ready for deployment."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/bt-retry-v2/deployment/01_export_to_ume.py"
+      }
+    },
+    {},
+    {
+      "Model Scoring": {
+        "line_range": "1-140",
+        "evidence": [
+          "Load UME model and make predictions (Lines 122-126) \u2013 This step involves loading the trained model and making predictions on the validation sample, which is a core part of model scoring.",
+          "Filter predictions (Lines 127-128) \u2013 Filtering the predictions to remove rows with missing values is part of the model scoring process to ensure the quality of the predictions."
+        ],
+        "why_separate": "The data preprocessing steps (Lines 85-111) are distinct from the model scoring steps (Lines 122-128). The preprocessing prepares the data for scoring, while the scoring involves using the model to make predictions and filtering those predictions. There is no overlap in the line ranges, and each step serves a different purpose in the ML workflow.",
+        "file_name": "rmr_agent/repos/bt-retry-v2/deployment/02_pyscoring_validation.py"
+      }
+    }
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "component_parsing": [
+    {
+      "Driver Creation": {
+        "line_range": "Lines 1-513",
+        "evidence": [
+          "\"Create live unique merchants training table\" (Lines 18-52) \u2013 This section involves creating a new table with unique merchants by joining multiple tables and applying filters, which is part of the initial data loading and extraction process.",
+          "\"Create driver_00 table\" (Lines 54-82) \u2013 This section involves creating a new table with various customer and merchant attributes, applying specific filters and conditions, which is part of the initial data loading and extraction process.",
+          "\"Create driver_0 table\" (Lines 84-103) \u2013 This section involves creating a new table by filtering customers based on the number of distinct placements and specific conditions, which is part of the initial data loading and extraction process.",
+          "\"Create driver_1 table\" (Lines 105-121) \u2013 This section involves creating a new table with transaction details for specific customers and merchants, which is part of the initial data loading and extraction process.",
+          "\"Create driver_positive_train_attributed table\" (Lines 124-168) \u2013 This section involves creating a new table with positive samples for training, applying various sampling and filtering techniques, which is part of the initial data loading and extraction process.",
+          "\"Create driver_positive_train_organic_0 table\" (Lines 170-204) \u2013 This section involves creating a new table with organic positive samples, applying multiple filters to remove biases, which is part of the initial data loading and extraction process.",
+          "\"Create driver_positive_train_organic table\" (Lines 207-244) \u2013 This section involves creating a new table with sampled organic positive transactions, applying specific sampling ratios, which is part of the initial data loading and extraction process.",
+          "\"Create driver_positive table\" (Lines 247-277) \u2013 This section involves combining multiple positive sample tables into one, including attributed transactions, saves, and organic transactions, which is part of the initial data loading and extraction process.",
+          "\"Create driver_positive_training_split_0 table\" (Lines 281-308) \u2013 This section involves creating a new table with positive samples, marking them as hard or uniform negatives based on specific conditions, which is part of the initial data loading and extraction process.",
+          "\"Create driver_positive_training_split table\" (Lines 310-322) \u2013 This section involves adding a count of positive samples per day to the training split table, which is part of the initial data loading and extraction process.",
+          "\"Create driver_training_hard_negative table\" (Lines 324-336) \u2013 This section involves creating a new table with hard negative samples by joining with the driver_0 table, which is part of the initial data loading and extraction process.",
+          "\"Create driver_training_hard_negative_downsample table\" (Lines 339-349) \u2013 This section involves downsampling hard negative samples based on specific conditions, which is part of the initial data loading and extraction process.",
+          "\"Create driver_training_uniform_negative table\" (Lines 352-364) \u2013 This section involves creating a new table with uniform negative samples by joining with the live unique merchants table, which is part of the initial data loading and extraction process.",
+          "\"Create driver_training_uniform_negative_remove_window_positive table\" (Lines 367-376) \u2013 This section involves removing uniform negative samples that overlap with positive feedback within a specific time window, which is part of the initial data loading and extraction process.",
+          "\"Create driver_training_uniform_negative_downsample_0 table\" (Lines 379-401) \u2013 This section involves downsampling uniform negative samples based on merchant sampling probabilities, which is part of the initial data loading and extraction process.",
+          "\"Create driver_training_uniform_negative_downsample table\" (Lines 404-408) \u2013 This section involves further downsamples uniform negative samples based on a specified ratio, which is part of the initial data loading and extraction process.",
+          "\"Create driver_dev table\" (Lines 410-445) \u2013 This section involves combining positive and negative samples into a development table, marking targets and splits, which is part of the initial data loading and extraction process.",
+          "\"Create driver_oot_uniform_negative_0 table\" (Lines 449-469) \u2013 This section involves creating a new table with out-of-time (OOT) uniform negative samples, which is part of the initial data loading and extraction process.",
+          "\"Create driver_oot_uniform_negative table\" (Lines 472-478) \u2013 This section involves removing duplicate OOT uniform negative samples, which is part of the initial data loading and extraction process.",
+          "\"Create driver_oot table\" (Lines 481-495) \u2013 This section involves combining positive and negative OOT samples into one table, which is part of the initial data loading and extraction process.",
+          "\"Create driver_simu table\" (Lines 498-507) \u2013 This section involves combining distinct customer and receiver pairs from development and OOT tables, which is part of the initial data loading and extraction process.",
+          "\"Create driver_simu_consumer table\" (Lines 509-512) \u2013 This section involves creating a table with distinct customers and run dates from the simulation table, which is part of the initial data loading and extraction process."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/00_driver.py"
+      }
+    },
+    {
+      "Driver Creation": {
+        "line_range": "Lines 1-819",
+        "evidence": [
+          "**Load YAML configuration file (Lines 4-13):** \"Defines a function to load a YAML file. Loads a configuration file and assigns it to a variable.\" \u2013 This step is essential for setting up the environment and configurations needed for the subsequent data extraction and table creation processes.",
+          "**Extract BigQuery project dataset prefix (Lines 14-16):** \"Extracts the BigQuery project dataset prefix from the loaded configuration.\" \u2013 This step is crucial for identifying the correct dataset in BigQuery for the driver creation process.",
+          "**Create driver_simu_txn_365d table (Lines 17-40):** \"Creates a new table with transaction data joined with payment data, including various date intervals.\" \u2013 This is the first of many steps where tables are created by extracting and transforming data, which is a core part of the driver creation process.",
+          "**Create driver_simu_txn_365d_agg table (Lines 43-55):** \"Creates a new aggregated table with transaction counts and amounts over different time intervals.\" \u2013 Aggregating data is a common step in creating a comprehensive driver dataset.",
+          "**Create driver_consumer_base table (Lines 58-66):** \"Creates a new table with consumer base data including various date intervals.\" \u2013 This step involves creating a table with consumer data, which is part of the driver dataset.",
+          "**Create driver_consumer_base_txn_5k_merch_category table (Lines 69-93):** \"Creates a new table with consumer base transaction data joined with merchant category data.\" \u2013 This step involves joining consumer transaction data with merchant category data, enriching the driver dataset.",
+          "**Create driver_consumer_base_last_10_txn table (Lines 96-175):** \"Creates a new table with the last 10 transactions for each consumer, including average transaction amounts.\" \u2013 This step involves creating a table with detailed transaction history for consumers.",
+          "**Create driver_consumer_base_all_history_array_0 table (Lines 178-185):** \"Creates a new table with the most recent 100 transactions for each consumer.\" \u2013 This step involves creating a table with a comprehensive transaction history for consumers.",
+          "**Create driver_consumer_base_all_history_array table (Lines 188-194):** \"Creates a new table with aggregated lists of the most recent 100 merchants and categories for each consumer.\" \u2013 This step involves creating a table with aggregated transaction data.",
+          "**Create driver_combine_category table (Lines 198-203):** \"Creates a new table combining driver simulation data with merchant category data.\" \u2013 This step involves combining different datasets to create a comprehensive driver dataset.",
+          "**Create driver_combine_category_agg_0 table (Lines 206-219):** \"Creates a new table with aggregated transaction data by category over different time intervals.\" \u2013 This step involves creating aggregated tables, which are part of the driver dataset.",
+          "**Create driver_combine_category_agg_1 table (Lines 222-231):** \"Creates a new table with aggregated transaction counts over different time intervals.\" \u2013 This step involves creating aggregated tables, which are part of the driver dataset.",
+          "**Create driver_combine_category_agg_2 table (Lines 234-257):** \"Creates a new table with average transaction amounts by category over different time intervals.\" \u2013 This step involves creating aggregated tables, which are part of the driver dataset.",
+          "**Create driver_combine_category_agg_3 table (Lines 260-286):** \"Creates a new table combining consumer and category transaction data with aggregated category data.\" \u2013 This step involves creating aggregated tables, which are part of the driver dataset.",
+          "**Create driver_combine_category_agg_4 table (Lines 289-302):** \"Creates a new table with transaction frequency ranks by category over different time intervals.\" \u2013 This step involves creating aggregated tables, which are part of the driver dataset.",
+          "**Create driver_combine_category_agg_5 table (Lines 305-464):** \"Creates a new table with the top 3 frequent merchant categories over different time intervals.\" \u2013 This step involves creating aggregated tables, which are part of the driver dataset.",
+          "**Create driver_merchant_base table (Lines 468-476):** \"Creates a new table with merchant base data including a 30-day interval.\" \u2013 This step involves creating a table with merchant data, which is part of the driver dataset.",
+          "**Create driver_merchant_base_txn_30d table (Lines 479-506):** \"Creates a new table with merchant transaction data over the last 30 days.\" \u2013 This step involves creating a table with merchant transaction data, which is part of the driver dataset.",
+          "**Create driver_merchant_base_txn_30d_filter_sndr table (Lines 509-523):** \"Creates a new table filtering merchant transactions by sender account type.\" \u2013 This step involves creating a table with filtered merchant transaction data, which is part of the driver dataset.",
+          "**Create driver_merchant_base_price_agg table (Lines 526-551):** \"Creates a new table with aggregated price statistics for merchants over the last 30 days.\" \u2013 This step involves creating aggregated tables, which are part of the driver dataset.",
+          "**Create driver_merchant_base_sales_agg table (Lines 554-566):** \"Creates a new table with aggregated sales statistics for merchants over the last 30 days.\" \u2013 This step involves creating aggregated tables, which are part of the driver dataset.",
+          "**Create driver_elig_save_365d_category table (Lines 569-616):** \"Creates a new table with consumer save event data joined with merchant category data.\" \u2013 This step involves creating a table with consumer save event data, which is part of the driver dataset.",
+          "**Create driver_elig_save_agg_00 table (Lines 619-630):** \"Creates a new table with aggregated save counts over different time intervals.\" \u2013 This step involves creating aggregated tables, which are part of the driver dataset.",
+          "**Create driver_elig_save_agg_0 table (Lines 633-643):** \"Creates a new table with aggregated save counts for consumers over different time intervals.\" \u2013 This step involves creating aggregated tables, which are part of the driver dataset.",
+          "**Create driver_elig_save_agg_1 table (Lines 646-717):** \"Creates a new table with the last 5 save events for each consumer.\" \u2013 This step involves creating a table with detailed save event history for consumers.",
+          "**Create driver_elig_save_agg_2 table (Lines 720-731):** \"Creates a new table with aggregated save counts by category over different time intervals.\" \u2013 This step involves creating aggregated tables, which are part of the driver dataset.",
+          "**Create driver_elig_save_agg_3 table (Lines 734-751):** \"Creates a new table combining consumer and category save data with aggregated save data.\" \u2013 This step involves creating aggregated tables, which are part of the driver dataset.",
+          "**Create driver_merchant_base_click_save table (Lines 754-793):** \"Creates a new table with merchant save event statistics over the last 30 days.\" \u2013 This step involves creating a table with merchant save event data, which is part of the driver dataset.",
+          "**Create driver_consumer_base_gender table (Lines 796-817):** \"Creates a new table with consumer gender information based on first name predictions.\" \u2013 This step involves creating a table with consumer gender data, which is part of the driver dataset."
+        ],
+        "why_separate": "Verification of ZERO overlap with other components' line ranges: The entire code summary provided is focused on creating various tables that form the driver dataset. There is no indication of other ML components such as feature engineering, data pulling, or model training within this code summary. Justification for why this should be split from the other code: The creation of the driver dataset is a distinct and foundational step in the ML pipeline. It involves extracting, transforming, and loading data into a structured format that will be used in subsequent steps of the ML workflow. This process is separate from other components like feature engineering or model training, which build upon the driver dataset. Explanation for why this split results in one of the ML component categories defined above: The activities described in the code summary align with the \"Driver Creation\" category, as they involve the initial data loading and extraction to create the driver dataset, which includes various tables with transaction, consumer, merchant, and save event data.",
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_bq_feat.py"
+      }
+    },
+    {
+      "Data Pulling": {
+        "line_range": "Lines 1-73",
+        "evidence": [
+          "\"Initializes a Fetcher object with specific configurations for the job, including GCP settings, data locations, and variables to fetch.\" \u2013 This indicates the setup for pulling additional data/features from a feature store.",
+          "\"Executes the Fetcher to fetch the data based on the provided configurations.\" \u2013 This confirms the action of pulling data using the Fetcher object."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_varmart_feat.py"
+      }
+    },
+    {
+      "Feature Consolidation": {
+        "line_range": "Lines 1-642",
+        "evidence": [
+          "\"Create driver_dev_features table in BigQuery\" (Lines 17-216) \u2013 This section involves constructing a SQL query to create a new table by selecting features from multiple joined tables, which is a key aspect of feature consolidation.",
+          "\"Create driver_oot_features table in BigQuery\" (Lines 219-418) \u2013 Similar to the previous block, this section constructs a SQL query to create another table by selecting features from multiple joined tables, further supporting feature consolidation.",
+          "\"Expand sequence features in driver_oot_features_expand_seq table\" (Lines 421-624) \u2013 This section involves creating a new table by expanding sequence features, which is another form of consolidating features into a unified dataset."
+        ],
+        "why_separate": "There is no overlap with other components' line ranges. The identified lines are all part of the process of merging multiple datasets into unified feature sets for modeling. This should be split from other code because it specifically focuses on merging and consolidating features from various sources into new tables, which is distinct from other ML components like data pulling, preprocessing, or model training. This process results in a unified feature set, fitting the definition of Feature Consolidation.",
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/02_combine.py"
+      }
+    },
+    {
+      "Data Preprocessing": {
+        "line_range": "Lines 1-185",
+        "evidence": [
+          "\"Reads each parquet file into a DataFrame and concatenates them into a single DataFrame.\" \u2013 This indicates the initial step of loading data, which is part of preprocessing.",
+          "\"Creates a dictionary to map state names to their abbreviations.\" \u2013 This is a data cleaning step, which falls under preprocessing.",
+          "\"Encodes the 'sndr_prmry_addr_state' column using LabelEncoder and saves the encoder.\" \u2013 Encoding categorical variables is a common preprocessing task.",
+          "\"Scales each numerical feature using StandardScaler and saves the scaler parameters.\" \u2013 Scaling numerical features is another preprocessing task.",
+          "\"Processes 'sndr_most_recent_100_merch_category' and 'sndr_most_recent_100_merch_list' columns to create padded sequences.\" \u2013 Processing sequence features is part of data transformation, which is included in preprocessing.",
+          "\"Splits the DataFrame into chunks and writes each chunk to parquet files.\" \u2013 Saving the transformed data is the final step in preprocessing."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/03_prepare_training_data.py"
+      }
+    },
+    {
+      "Model Training": {
+        "line_range": "Lines 140-170",
+        "evidence": [
+          "Define and compile the model \u2013 This indicates the setup of the model architecture and compilation, which is a key part of model training.",
+          "Set up early stopping callback and train the model \u2013 This clearly describes the training process, including the use of callbacks to monitor training progress and prevent overfitting."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/04_training.py"
+      },
+      "Model Packaging": {
+        "line_range": "Lines 171-227",
+        "evidence": [
+          "Save the trained model in both H5 and TensorFlow SavedModel formats \u2013 This step involves saving the trained model, which is part of model packaging.",
+          "Convert TensorFlow model to ONNX format and save the ONNX specification \u2013 This indicates the conversion of the model to a deployment-ready format, which is a key aspect of model packaging.",
+          "Build an ONNX graph using the model and feature transformations, then save the final ONNX model \u2013 This further supports the packaging process by preparing the model for deployment."
+        ],
+        "why_separate": "Verification of ZERO overlap with other components' line ranges: The lines for model training (140-170) do not overlap with the lines for model packaging (171-227). Justification for why this should be split from the other code: Model training and model packaging are distinct steps in the ML workflow. Training involves fitting the model to the data, while packaging involves preparing the trained model for deployment. These steps are sequential but separate, warranting distinct workflow nodes.",
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/04_training.py"
+      },
+      "Model Scoring": {
+        "line_range": "Lines 230-268",
+        "evidence": [
+          "Prepare test data and make predictions using the final model \u2013 This indicates the use of the trained model to make predictions on test data, which is part of model scoring.",
+          "Run inference with ONNX model \u2013 This describes the process of using the ONNX model for inference, which is a key aspect of model scoring."
+        ],
+        "why_separate": "Verification of ZERO overlap with other components' line ranges: The lines for model scoring (230-268) do not overlap with the lines for model training (140-170) or model packaging (171-227). Justification for why this should be split from the other code: Model scoring is a distinct step that involves using the trained and packaged model to make predictions on new data. This step is separate from both training and packaging, as it focuses on the application of the model rather than its development or preparation for deployment.",
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/04_training.py"
+      }
+    },
+    {
+      "Model Scoring": {
+        "line_range": "Lines 1-104",
+        "evidence": [
+          "Define a function `oot_data_eval` to score OOT data using specified models. \u2013 This indicates the primary function of the code is to score out-of-time (OOT) data, which aligns with the Model Scoring category.",
+          "Initialize a model scorer and generate evaluation scores. \u2013 This further supports that the main task is scoring the data using a trained model.",
+          "Submit Spark job to Google Cloud Platform (GCP) \u2013 This shows the scoring process is executed on GCP, which is a typical setup for large-scale model scoring tasks.",
+          "Create or replace an external table in BigQuery to reference the scored OOT data stored in GCS. \u2013 This indicates the final step of storing the scored data, which is part of the scoring process."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.py"
+      }
+    },
+    {
+      "Model Evaluation": {
+        "line_range": "Lines 1-731",
+        "evidence": [
+          "\"Calculate recall metrics for all models (Lines 375-430)\" \u2013 This section involves calculating performance metrics, which is a key part of model evaluation.",
+          "\"Calculate recall metrics for first-time users (Lines 448-530)\" \u2013 This section also involves calculating performance metrics, specifically for a subset of users, which falls under model evaluation.",
+          "\"Calculate recall metrics excluding specific merchants (Lines 531-607)\" \u2013 This section calculates performance metrics excluding certain data points, which is part of model evaluation.",
+          "\"Calculate recall metrics for recent transactions (Lines 608-731)\" \u2013 This section calculates performance metrics for recent transactions, which is part of model evaluation."
+        ],
+        "why_separate": "There is no overlap with other components' line ranges. The sections from lines 375 to 731 are all focused on calculating and saving recall metrics, which are performance metrics used to evaluate the model. This is distinct from other tasks such as data preprocessing or feature engineering. This split results in the \"Model Evaluation\" category because it involves calculating and saving performance metrics, which is a primary task in evaluating the effectiveness of a machine learning model.",
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/06_evaluation.py"
+      }
+    }
+  ]
+}

@@ -1,0 +1,200 @@
+{
+  "component_parsing": [
+    {
+      "Driver Creation": {
+        "line_range": "Lines 33-70",
+        "evidence": [
+          "\"Defines `read_data` function to read data from different sources (local files or HDFS) based on `read_dict`.\" \u2013 This indicates the initial data loading and extraction process.",
+          "\"Calls `read_data` function with `read_dict` to read all data sources into `data_dict`.\" \u2013 This confirms the creation of the initial dataset, which is a key part of the driver creation process."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/01_raw_data_reading.py"
+      },
+      "Feature Consolidation": {
+        "line_range": "Lines 199-248",
+        "evidence": [
+          "\"Merges various datasets step-by-step: Merges account-based variables, Merges case-level variables, Merges alert-level variables, Merges hit-level variables, Manually merges the attack document data.\" \u2013 This describes the process of merging multiple datasets into a unified feature set.",
+          "\"Removes duplicated variables and fixes column names in the merged dataset.\" \u2013 This further supports the consolidation and cleaning of the merged dataset."
+        ],
+        "why_separate": "The process of merging datasets (Lines 199-248) is distinct from the initial data loading and extraction (Lines 33-70). The former involves combining multiple datasets into a single feature set, while the latter focuses on creating the initial driver dataset. There is no overlap between these line ranges, ensuring they are separate components.",
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/01_raw_data_reading.py"
+      }
+    },
+    {
+      "Data Preprocessing": {
+        "line_range": "Lines 25-191",
+        "evidence": [
+          "\"Read and filter dataset\" (Lines 25-36) \u2013 This involves loading and filtering the dataset, which is a part of data preprocessing.",
+          "\"Convert specific categorical columns to numerical\" (Lines 51-60) \u2013 Converting categorical columns to numerical is a common preprocessing step.",
+          "\"Clean dataset columns\" (Lines 85-92) \u2013 Identifying and removing columns with high missing values and zero standard deviation is part of data cleaning.",
+          "\"Impute missing values\" (Lines 136-138) \u2013 Filling missing values is a key data preprocessing task.",
+          "\"Build encoding dictionary and normalize numerical columns\" (Lines 139-167) \u2013 Creating label encoders and normalizing numerical columns are standard preprocessing steps.",
+          "\"Split development dataset into training and testing sets\" (Lines 170-183) \u2013 Splitting the dataset into training and testing sets is a part of data preparation for modeling.",
+          "\"Prepare data for modeling\" (Lines 190-191) \u2013 Creating data bundles for training and testing is the final step in data preprocessing."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/02-modeling_pep.py"
+      },
+      "Model Training": {
+        "line_range": "Lines 193-365",
+        "evidence": [
+          "\"Define model training function\" (Lines 193-313) \u2013 This section defines the function to train a multi-label model, which is a core part of model training.",
+          "\"Define objective function for hyperparameter tuning\" (Lines 314-335) \u2013 Defining an objective function for Optuna to optimize model training parameters is part of the model training process.",
+          "\"Run hyperparameter optimization with Optuna\" (Lines 353-365) \u2013 Setting up and running Optuna study to optimize model training parameters is a key step in model training."
+        ],
+        "why_separate": "The data preprocessing steps (Lines 25-191) involve cleaning, transforming, and preparing the dataset for modeling, which is distinct from the actual model training process. The model training steps (Lines 193-365) involve defining the model, training it, and optimizing hyperparameters, which are separate from data preprocessing tasks. There is no overlap between the line ranges of these two components, ensuring they are distinct workflow nodes.",
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/02-modeling_pep.py"
+      }
+    },
+    {
+      "Data Preprocessing": {
+        "line_range": "Lines 24-204",
+        "evidence": [
+          "Read and preprocess dataset (Lines 24-54) \u2013 This involves loading the dataset, filtering it, and removing specific entries, which are typical preprocessing steps.",
+          "Identify and handle duplicate columns (Lines 45-54) \u2013 Handling duplicate columns is part of data cleaning.",
+          "Define dataset columns (Lines 55-70) \u2013 Defining and handling columns, including separating numerical and categorical columns, is part of preprocessing.",
+          "Convert specific categorical columns to numerical (Lines 71-80) \u2013 Converting categorical columns to numerical is a common preprocessing task.",
+          "Convert remaining categorical columns to string (Lines 81-83) \u2013 Converting columns to the appropriate type is part of preprocessing.",
+          "Analyze dataset statistics (Lines 84-88) \u2013 Analyzing statistics helps in understanding the data and is part of preprocessing.",
+          "Define functions to identify columns with high missing values and zero standard deviation (Lines 89-104) \u2013 Identifying columns with high missing values and zero standard deviation is part of data cleaning.",
+          "Clean dataset by removing columns with high missing values and zero standard deviation (Lines 105-112) \u2013 Removing columns with high missing values and zero standard deviation is part of data cleaning.",
+          "Split dataset into development and out-of-time datasets (Lines 113-121) \u2013 Splitting the dataset is part of preparing the data for modeling.",
+          "Read and preprocess STAR dataset (Lines 122-136) \u2013 Reading and preprocessing another dataset is part of data preparation.",
+          "Save column names to a pickle file (Lines 140-141) \u2013 Saving column names is part of data management.",
+          "Redefine tagging to multi-label (Lines 142-150) \u2013 Creating new binary columns for multi-label classification is part of data transformation.",
+          "Impute missing values (Lines 151-153) \u2013 Imputing missing values is a common preprocessing step.",
+          "Build encoding dictionary and normalize numerical columns (Lines 154-182) \u2013 Creating label encoders and normalizing numerical columns are preprocessing tasks.",
+          "Dataset split for development dataset (Lines 185-198) \u2013 Splitting the dataset into training and testing sets is part of data preparation.",
+          "Prepare data for modeling (Lines 202-204) \u2013 Creating data bundles for training and testing is part of data preparation."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/03-modeling_ps.py"
+      },
+      "Model Training": {
+        "line_range": "Lines 206-341",
+        "evidence": [
+          "Define model training function (Lines 206-327) \u2013 Defining a function to train a multi-label model with specified parameters, including early stopping, loss calculation, and accuracy measurement, is part of model training.",
+          "Train model with best parameters (Lines 329-341) \u2013 Defining best parameters and training the model using the defined function is part of model training."
+        ],
+        "why_separate": "The preprocessing steps (Lines 24-204) involve various tasks such as data cleaning, transformation, and splitting, which are distinct from the model training steps (Lines 206-341) that involve defining and training the model. There is a clear separation between preparing the data and using it to train the model, with no overlap in the line ranges.",
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/03-modeling_ps.py"
+      }
+    },
+    {
+      "Model Evaluation": {
+        "line_range": "Lines 24-566",
+        "evidence": [
+          "\"Define eval_oot function\" \u2013 This function is designed to evaluate out-of-time (OOT) datasets using a multi-label model, which involves loading the model, preprocessing the dataset, making predictions, and generating evaluation metrics.",
+          "\"Define eval_oot_lgbm function\" \u2013 Similar to the eval_oot function but specifically for LightGBM models, indicating a focus on model evaluation.",
+          "\"Define eval_ds_auc function\" \u2013 This function evaluates datasets and calculates AUC scores, which are key metrics in model evaluation.",
+          "\"Define slice_by_cut function\" \u2013 This function slices data by a probability cutoff and calculates recall and automation metrics, which are part of model evaluation.",
+          "\"Define eval_train_val_oot function\" \u2013 This function evaluates training, validation, and OOT datasets, aggregating evaluation results and calculating AUC scores.",
+          "\"Define tvo_plot function\" \u2013 This function plots train-validation-OOT AUC scores over time, which is a visualization of model evaluation results.",
+          "\"Define gainChart function\" \u2013 This function creates a gain chart for model predictions, another form of model evaluation.",
+          "\"Define eval_model function\" \u2013 This function evaluates model precision and recall, which are essential metrics in model evaluation.",
+          "\"Define pt_roc_auc function\" \u2013 This function plots the ROC curve and calculates the AUC score, both of which are critical in model evaluation.",
+          "\"Define pr_line function\" \u2013 This function plots precision and recall lines, which are part of evaluating model performance.",
+          "\"Define eval_comb function\" \u2013 This function evaluates combined model results, generating ROC curve, precision-recall lines, and gain chart, all of which are part of model evaluation."
+        ],
+        "why_separate": "The functions defined from lines 24 to 566 are all focused on evaluating different aspects of the model's performance, including generating various metrics and visualizations. This is distinct from other components such as data preprocessing or model training, as it specifically deals with assessing the model's effectiveness.",
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/04-model_evaluation.py"
+      },
+      "Data Preprocessing": {
+        "line_range": "Lines 567-1572",
+        "evidence": [
+          "\"Load and preprocess datasets for PEP v23.1\" \u2013 This section involves loading column names, datasets, and preprocessing data, which includes splitting the dataset into training, validation, and OOT sets.",
+          "\"Load and preprocess datasets for PS v24.1\" \u2013 Similar to the previous section, it involves loading and preprocessing datasets, indicating a focus on preparing data for evaluation.",
+          "\"Load and preprocess datasets for PEP v23.2\" \u2013 This section continues the pattern of loading and preprocessing datasets for different versions.",
+          "\"Load and preprocess datasets for PEP v23.3\" \u2013 Again, this involves loading and preprocessing datasets, which is a key part of data preparation.",
+          "\"Load and preprocess datasets for PEP v23.4 LGBM\" \u2013 This section specifically mentions preprocessing data for LightGBM models.",
+          "\"Load and preprocess datasets for PEP v25.1\" \u2013 Continues the pattern of loading and preprocessing datasets.",
+          "\"Load and preprocess datasets for PEP v25.1 (2-layer)\" \u2013 Indicates preprocessing for a specific model version.",
+          "\"Load and preprocess datasets for PS v26.1\" \u2013 Involves loading and preprocessing datasets for another version.",
+          "\"Load and preprocess datasets for PS v26.2\" \u2013 Continues the pattern of loading and preprocessing datasets.",
+          "\"Load and preprocess datasets for PEP v25.3\" \u2013 Involves loading and preprocessing datasets.",
+          "\"Load and preprocess datasets for PEP v25.5\" \u2013 Continues the pattern of loading and preprocessing datasets.",
+          "\"Load and preprocess datasets for PEP v25.6\" \u2013 Involves loading and preprocessing datasets.",
+          "\"Load and preprocess datasets for PEP v25.6 with new dob\" \u2013 Indicates preprocessing for a specific dataset version with new date of birth information."
+        ],
+        "why_separate": "The sections from lines 567 to 1572 are focused on loading and preprocessing datasets for different model versions. This is a distinct step from model evaluation, as it involves preparing the data to be used in the evaluation process. The preprocessing includes splitting datasets into training, validation, and OOT sets, which is a crucial part of data preparation before any evaluation can take place.",
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/04-model_evaluation.py"
+      }
+    },
+    {
+      "Data Preprocessing": {
+        "line_range": "Lines 14-44",
+        "evidence": [
+          "Reads dataset from a pickle file. \u2013 This indicates the initial data loading step.",
+          "Filters dataset based on specific conditions. \u2013 This suggests data cleaning or transformation.",
+          "Loads categorical and numerical column names from a pickle file. \u2013 This is part of data preparation.",
+          "Converts categorical columns to object type and numerical columns to float type if necessary. \u2013 This is a data transformation step.",
+          "Converts 'discipline_id' column to string type. \u2013 Another data transformation step.",
+          "Splits dataset into development and out-of-time sets based on 'time_created' column. \u2013 This is part of data preparation for modeling.",
+          "Creates new binary columns in both sets based on specific conditions. \u2013 This indicates feature engineering or transformation.",
+          "Converts categorical columns in development and out-of-time sets to category type. \u2013 This is a data transformation step.",
+          "Saves the processed development and out-of-time datasets to pickle files. \u2013 This indicates the end of the preprocessing step."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/05-lgbm_feature_importance_PEP.py"
+      },
+      "Model Training": {
+        "line_range": "Lines 50-96",
+        "evidence": [
+          "Splits the filtered development dataset into training and testing sets. \u2013 This is part of the model training preparation.",
+          "Calculates and displays mean values of specific columns in training and testing sets. \u2013 This is part of the data analysis before training.",
+          "Sets parameters for the LightGBM model, including task type, boosting type, objective, metric, and other hyperparameters. \u2013 This is the model configuration step.",
+          "Iterates over specific discipline IDs and tags. \u2013 This indicates multiple models are being trained.",
+          "Creates LightGBM datasets for training and testing. \u2013 This is the preparation for model training.",
+          "Trains LightGBM models and saves them to pickle files. \u2013 This is the actual model training step."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/05-lgbm_feature_importance_PEP.py"
+      },
+      "Model Evaluation": {
+        "line_range": "Lines 100-136",
+        "evidence": [
+          "Iterates over discipline IDs and tags. \u2013 This indicates multiple evaluations are being performed.",
+          "Loads trained models from pickle files. \u2013 This is the preparation for model evaluation.",
+          "Calculates feature importance for each model. \u2013 This is part of the model evaluation process.",
+          "Saves feature importance to an Excel file. \u2013 This indicates the results of the evaluation are being saved.",
+          "Calculates and scales feature importance for each model. \u2013 This is part of the model evaluation process.",
+          "Displays feature importance for the top 10 features. \u2013 This is the final step in the model evaluation process."
+        ],
+        "why_separate": "Data Preprocessing and Model Training are distinct steps in the ML workflow. Data Preprocessing involves preparing the data for modeling, while Model Training involves fitting the model to the training data. There is no overlap in the line ranges (Lines 14-44 for Data Preprocessing and Lines 50-96 for Model Training). Model Training and Model Evaluation are also distinct steps. Model Training involves fitting the model, while Model Evaluation involves assessing the model's performance. There is no overlap in the line ranges (Lines 50-96 for Model Training and Lines 100-136 for Model Evaluation).",
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/05-lgbm_feature_importance_PEP.py"
+      }
+    },
+    {
+      "Data Preprocessing": {
+        "line_range": "Lines 14-55",
+        "evidence": [
+          "\"Reads dataset from a pickle file. Filters dataset based on specific conditions.\" \u2013 This indicates initial data loading and filtering, which is part of preprocessing.",
+          "\"Loads categorical and numerical column names from a pickle file. Converts specific columns to appropriate data types.\" \u2013 This involves data type conversion, a common preprocessing step.",
+          "\"Splits the dataset into development and out-of-time sets based on a date condition. Creates new binary columns based on specific conditions.\" \u2013 Splitting datasets and creating new columns are preprocessing tasks.",
+          "\"Converts categorical columns in both development and out-of-time sets to category data type.\" \u2013 Converting data types is a preprocessing activity.",
+          "\"Splits the development dataset into training and testing sets. Calculates and displays the mean of specific tags in both sets.\" \u2013 Splitting datasets and calculating statistics are part of preprocessing."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/06-lgbm_feature_importance_PS.py"
+      },
+      "Model Training": {
+        "line_range": "Lines 56-93",
+        "evidence": [
+          "\"Sets parameters for the LightGBM model, including task type, boosting type, objective, metric, and other hyperparameters.\" \u2013 Defining model parameters is part of the model training process.",
+          "\"Iterates over specific discipline IDs and tags. Creates LightGBM datasets for training and testing. Trains the LightGBM model and saves it to a pickle file.\" \u2013 This describes the actual training of the model and saving the trained model, which is the core of model training."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/06-lgbm_feature_importance_PS.py"
+      },
+      "Model Evaluation": {
+        "line_range": "Lines 97-133",
+        "evidence": [
+          "\"Loads trained models from pickle files. Calculates feature importance for each model. Saves the feature importance data to an Excel file.\" \u2013 Calculating and saving feature importance is part of evaluating the model's performance.",
+          "\"Loads trained models from pickle files. Calculates feature importance for each model. Displays the feature importance for the top 10 features.\" \u2013 Displaying feature importance for top features is also part of model evaluation."
+        ],
+        "why_separate": "The tasks of training the model and evaluating its performance are distinct and do not overlap. Training involves setting parameters and fitting the model, while evaluation involves assessing the model's performance through feature importance calculations.",
+        "file_name": "rmr_agent/repos/PEP_PS-Model/modeling_script/06-lgbm_feature_importance_PS.py"
+      }
+    }
+  ]
+}
