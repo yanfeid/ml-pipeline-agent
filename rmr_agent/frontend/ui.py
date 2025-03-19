@@ -1,143 +1,40 @@
-import os
+import sys
 import streamlit as st
 import requests
 import json
-import sys
 import time
 import yaml
 import uuid
 from datetime import datetime
 from rmr_agent.utils import parse_github_url 
+from rmr_agent.workflow import STEPS, HUMAN_STEPS
+from rmr_agent.frontend.ui_utils import (
+    clean_file_path, remove_line_numbers, clean_line_range,
+    get_components, get_cleaned_code, get_dag_yaml,
+    get_default_line_range, get_steps_could_start_from
+)
 
 BASE_URL = "http://localhost:8000"
-CHECKPOINT_BASE_PATH = "rmr_agent/checkpoints"
-
 
 sys.stdout.flush()
 
 # Maximize layout width
 st.set_page_config(layout="wide")
 
-# Define steps requiring human input
-HUMAN_STEPS = {"human_verification_of_components", "human_verification_of_dag"}
-
-# Define all steps (without human verification functions, as they'll be API-driven)
-STEPS = [
-    "clone_and_prepare_repo", 
-    "summarize",
-    "component_identification", 
-    "component_parsing", 
-    "human_verification_of_components", 
-    "attribute_identification", 
-    "attribute_parsing", 
-    "node_aggregator", 
-    "edge_identification", 
-    "generate_dag_yaml", 
-    "human_verification_of_dag",
-    "config_agent", 
-    "notebook_agent"
-]
-
-
-def clean_file_path(file_path, repo_name, repos_base_dir="rmr_agent/repos/"):
-    prefix = repos_base_dir + repo_name + "/"
-    cleaned_file_path = file_path.replace('.py', '.ipynb')
-    if file_path.startswith(prefix):
-        return cleaned_file_path[len(prefix):]
-    return cleaned_file_path
-
-def remove_line_numbers(code_lines):
-    cleaned_lines = []
-    for line in code_lines:
-        cleaned_lines.append(line.split('|')[-1])
-    return cleaned_lines
-
-def clean_line_range(line_range: str):
-    return line_range.lower().split('lines')[-1].strip()
-
-def get_components(repo_name, run_id):
-    try:
-        file_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'component_parsing.json')
-        with open(file_path, 'r') as file:
-            components = json.load(file)
-        return components['component_parsing']
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Component parsing file not found for repo: {repo_name}, run_id: {run_id}")
-    except json.JSONDecodeError as e:
-        raise json.JSONDecodeError(f"Invalid JSON in component parsing file: {e.msg}", e.doc, e.pos)
-    except IOError as e:
-        raise IOError(f"Error reading component parsing file: {str(e)}")
-
-
-def get_cleaned_code(repo_name, run_id):
-    try:
-        file_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'summarize.json')
-        with open(file_path, 'r') as file:
-            content = json.load(file)
-        return content['cleaned_code']
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Summarize file not found for repo: {repo_name}, run_id: {run_id}")
-    except json.JSONDecodeError as e:
-        raise json.JSONDecodeError(f"Invalid JSON in summarize file: {e.msg}", e.doc, e.pos)
-    except KeyError:
-        raise KeyError(f"Missing 'cleaned_code' key in summarize file for repo: {repo_name}, run_id: {run_id}")
-    except IOError as e:
-        raise IOError(f"Error reading summarize file: {str(e)}")
-
-
-def get_dag_yaml(repo_name, run_id):
-    try:
-        file_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'dag.yaml')
-        with open(file_path, 'r') as file:
-            # dag_yaml = yaml.safe_load(file)
-            dag_yaml_str = file.read()
-            print("Successfully loaded dag.yaml")
-        return dag_yaml_str
-    except FileNotFoundError:
-        raise FileNotFoundError(f"DAG YAML file not found for repo: {repo_name}, run_id: {run_id}")
-    except yaml.YAMLError as e:
-        raise yaml.YAMLError(f"Invalid YAML in DAG file: {str(e)}")
-    except IOError as e:
-        raise IOError(f"Error reading DAG YAML file: {str(e)}")
-
-def get_default_line_range(selected_components, cleaned_code):
-    if len(selected_components) == 1:
-        return f"1-{len(cleaned_code)}"
-    return "Specify line range here (e.g. 1-40)"
-
-def get_steps_could_start_from(repo_name, run_id):
-    directory_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id)
-    if not os.path.isdir(directory_path):
-        print(f"Directory does not exist: {directory_path}, so no start_from options will be shown")
-        return []
-    
-    # Get list of JSON files in the directory
-    json_files = set()
-    for filename in os.listdir(directory_path):
-        if filename.endswith(".json"):
-            # Remove the .json extension
-            step_name = os.path.splitext(filename)[0]
-            json_files.add(step_name)
-
-    # Accumulate steps until we find the first missing one
-    available_steps = []
-    for step in STEPS:
-        available_steps.append(step)
-        if step not in json_files:
-            # Found first missing step, add it because it could be started from, then break
-            break
-    
-    # Clean up step names
-    display_available_steps = []
-    for i, step in enumerate(available_steps):
-        display_step = f"{i + 1}. {step.replace("_", " ").title()}"
-        display_available_steps.append(display_step)
-
-    
-    return display_available_steps
-
+# Define all step names
+STEPS = [step_name for step_name, _ in STEPS]
 
 # Initialization of session state
+if 'github_url' not in st.session_state:
+    st.session_state["github_url"] = None
+if 'repo_name' not in st.session_state:
+    st.session_state["repo_name"] = None
+if 'run_id' not in st.session_state:
+    st.session_state["run_id"] = None
+if 'input_files' not in st.session_state:
+    st.session_state["input_files"] = None
+if 'start_from' not in st.session_state:
+    st.session_state["start_from"] = None
 if "display_welcome_page" not in st.session_state:
     st.session_state["display_welcome_page"] = True
 if "workflow_running" not in st.session_state:
@@ -150,16 +47,6 @@ if "current_file_index" not in st.session_state:
     st.session_state["current_file_index"] = 0
 if "edited_components_list" not in st.session_state:
     st.session_state["edited_components_list"] = []
-if 'github_url' not in st.session_state:
-    st.session_state["github_url"] = None
-if 'repo_name' not in st.session_state:
-    st.session_state["repo_name"] = None
-if 'run_id' not in st.session_state:
-    st.session_state["run_id"] = None
-if 'input_files' not in st.session_state:
-    st.session_state["input_files"] = None
-if 'start_from' not in st.session_state:
-    st.session_state["start_from"] = None
 if 'last_status' not in st.session_state:
     st.session_state["last_status"] = None
 
@@ -186,7 +73,7 @@ def display_welcome_page():
     # Allow starting from specific step
     start_from = st.selectbox(
         "Start From (optional)",
-        [""] + get_steps_could_start_from(st.session_state["repo_name"], st.session_state["run_id"]),  # Empty option + all step names
+        [""] + get_steps_could_start_from(st.session_state["repo_name"], st.session_state["run_id"], STEPS),  # Empty option + all step names
         help="Choose a step to start from, or leave blank to start from the beginning"
     )
     st.session_state["start_from"] = start_from.split('.')[-1].strip().lower().replace(" ", "_")
@@ -541,69 +428,71 @@ def human_verification_of_dag_ui(repo_name, run_id):
         submit_human_feedback(payload=payload, repo_name=repo_name, run_id=run_id)
 
 
+def main():
+    # UI welcome page before starting workflow
+    if st.session_state["display_welcome_page"] == True:
+        display_welcome_page()
 
-# UI welcome page before starting workflow
-if st.session_state["display_welcome_page"] == True:
-    display_welcome_page()
+        # Start workflow
+        if st.button("Start Workflow"):
+            start_workflow()
 
-    # Start workflow
-    if st.button("Start Workflow"):
-        start_workflow()
-
-# Status display while workflow is running in backend 
-elif st.session_state.workflow_running:
-    cancel_workflow_button()
-    st.write(f"Run ID: **{st.session_state["run_id"]}**")
-    with st.status(f"**Running {st.session_state["current_step"].replace("_", " ").title()}** ...", expanded=True, state="running") as status:
-        display_detailed_progress(st.session_state["current_step"])
-        while st.session_state.workflow_running:
-            step_changed = False
-            while not step_changed:
-                # Poll every 2 seconds
-                step_changed = check_workflow_status()
-                time.sleep(2)
-            # update the status with the new step
-            status.update(label=f"Running {st.session_state["current_step"].replace("_", " ").title()} ...", state="running")
-            display_progress_bar(st.session_state["current_step"], write_cur_step=False)
+    # Status display while workflow is running in backend 
+    elif st.session_state.workflow_running:
+        cancel_workflow_button()
+        st.write(f"Run ID: **{st.session_state["run_id"]}**")
+        with st.status(f"**Running {st.session_state["current_step"].replace("_", " ").title()}** ...", expanded=True, state="running") as status:
             display_detailed_progress(st.session_state["current_step"])
-            current_time = datetime.now().strftime("%H:%M:%S")
-            print(f"Displayed - Last updated: {current_time}, Running step: {st.session_state["current_step"]}")
-    
-    st.rerun()
-
-
-# Handle human verification steps and workflow completion
-else: 
-    back_to_home_button()
-
-    if st.session_state["last_status"] == "failed":
-        # Reset session state and return to home screen
-        st.session_state.workflow_running = False
-        st.session_state["display_welcome_page"] = True
-        st.error(f"Workflow failed: {st.session_state["result"].get('error', 'Unknown error')}")
-        time.sleep(10)  # Brief delay for user feedback
-        st.rerun()
+            while st.session_state.workflow_running:
+                step_changed = False
+                while not step_changed:
+                    # Poll every 2 seconds
+                    step_changed = check_workflow_status()
+                    time.sleep(2)
+                # update the status with the new step
+                status.update(label=f"Running {st.session_state["current_step"].replace("_", " ").title()} ...", state="running")
+                display_progress_bar(st.session_state["current_step"], write_cur_step=False)
+                display_detailed_progress(st.session_state["current_step"])
+                current_time = datetime.now().strftime("%H:%M:%S")
+                print(f"Displayed - Last updated: {current_time}, Running step: {st.session_state["current_step"]}")
         
-
-    result = st.session_state["result"]
-    repo_name = result.get("repo_name")
-    run_id = result.get("run_id")
-    current_step = result["step"]
-    print('handling a human step: ', current_step)
-
-    # Calculate and display progress bar
-    display_progress_bar(current_step, write_cur_step=False)
-    
-    if current_step == "human_verification_of_components":
-        human_verification_of_components_ui(repo_name, run_id)
-    elif current_step == "human_verification_of_dag":
-        human_verification_of_dag_ui(repo_name, run_id)
-    elif current_step == "complete":
-        st.session_state.workflow_running=False
-        st.success("Workflow Complete!")
-        st.json(result["result"])
+        st.rerun()
 
 
+    # Handle human verification steps and workflow completion
+    else: 
+        back_to_home_button()
+
+        if st.session_state["last_status"] == "failed":
+            # Reset session state and return to home screen
+            st.session_state.workflow_running = False
+            st.session_state["display_welcome_page"] = True
+            st.error(f"Workflow failed: {st.session_state["result"].get('error', 'Unknown error')}")
+            time.sleep(10)  # Brief delay for user feedback
+            st.rerun()
+            
+
+        result = st.session_state["result"]
+        repo_name = result.get("repo_name")
+        run_id = result.get("run_id")
+        current_step = result["step"]
+        print('handling a human step: ', current_step)
+
+        # Calculate and display progress bar
+        display_progress_bar(current_step, write_cur_step=False)
+        
+        if current_step == "human_verification_of_components":
+            human_verification_of_components_ui(repo_name, run_id)
+        elif current_step == "human_verification_of_dag":
+            human_verification_of_dag_ui(repo_name, run_id)
+        elif current_step == "complete":
+            st.session_state.workflow_running=False
+            st.success("Workflow Complete!")
+            st.json(result["result"])
 
 
-# Run: streamlit run ui.py
+if __name__ == "__main__":
+    main()
+
+
+# Run: streamlit run rmr_agent/frontend/ui.py

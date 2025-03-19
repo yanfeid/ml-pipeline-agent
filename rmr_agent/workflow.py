@@ -6,7 +6,7 @@ import argparse
 import subprocess
 from typing import Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor
-from utils import (
+from rmr_agent.utils import (
     clone_repo, parse_github_url, convert_notebooks,
     get_next_run_id, load_step_output, save_step_output
 )
@@ -290,36 +290,76 @@ def run_notebook_agent(state: WorkflowState) -> Dict[str, Any]:
     notebooks = notebook_agent(state["verified_dag"])
     return {"notebooks": notebooks}
 
+
+# Define steps requiring human input
+HUMAN_STEPS = {"human_verification_of_components", "human_verification_of_dag"}
+
+# Define all steps (without human verification functions, as they'll be API-driven)
+STEPS = [
+    ("clone_and_prepare_repo", clone_and_prepare_repo),
+    ("summarize", summarize),
+    ("component_identification", run_component_identification),
+    ("component_parsing", run_component_parsing),
+    ("human_verification_of_components", None),  # Placeholder
+    ("attribute_identification", run_attribute_identification),
+    ("attribute_parsing", run_attribute_parsing),
+    ("node_aggregator", run_node_aggregator),
+    ("edge_identification", run_edge_identification),
+    ("generate_dag_yaml", generate_dag_yaml),
+    ("human_verification_of_dag", None),  # Placeholder
+    ("config_agent", run_config_agent),
+    ("notebook_agent", run_notebook_agent)
+]
+
+INITIAL_STATE = {
+    # status related
+    "step": "",
+    "status": "",
+    "error": None,
+    
+    # workflow related
+    "github_url": "",
+    "input_files": "",
+    "repo_name": "",
+    "run_id": "",
+    "local_repo_path": "",
+    "existing_config_path": "",
+    "files": [],
+    "summaries": {},
+    "cleaned_code": {},
+    "component_identification": [],
+    "component_parsing": [],
+    "verified_components": [],
+    "attribute_identification": [],
+    "attribute_parsing": [],
+    "node_aggregator": [],
+    "edges": [],
+    "dag_yaml": "",
+    "verified_dag": {},
+    "config": {},
+    "notebooks": [],
+    "pr_url": ""
+}
+
 def build_workflow():
     workflow = StateGraph(WorkflowState)
-    workflow.add_node("clone_and_prepare_repo", clone_and_prepare_repo)
-    workflow.add_node("summarize", summarize)
-    workflow.add_node("component_identification", run_component_identification)
-    workflow.add_node("component_parsing", run_component_parsing)
-    workflow.add_node("human_verification_of_components", human_verification_of_components)
-    workflow.add_node("attribute_identification", run_attribute_identification)
-    workflow.add_node("attribute_parsing", run_attribute_parsing)
-    workflow.add_node("node_aggregator", run_node_aggregator)
-    workflow.add_node("edge_identification", run_edge_identification)
-    workflow.add_node("generate_dag_yaml", generate_dag_yaml)
-    workflow.add_node("human_verification_of_dag", human_verification_of_dag)
-    workflow.add_node("config_agent", run_config_agent)
-    workflow.add_node("notebook_agent", run_notebook_agent)
-
-    workflow.add_edge("clone_and_prepare_repo", "summarize")
-    workflow.add_edge("summarize", "component_identification")
-    workflow.add_edge("component_identification", "component_parsing")
-    workflow.add_edge("component_parsing", "human_verification_of_components")
-    workflow.add_edge("human_verification_of_components", "attribute_identification")
-    workflow.add_edge("attribute_identification", "node_aggregator")
-    workflow.add_edge("node_aggregator", "edge_identification")
-    workflow.add_edge("edge_identification", "generate_dag_yaml")
-    workflow.add_edge("generate_dag_yaml", "human_verification")
-    workflow.add_edge("human_verification_of_dag", "config_agent")
-    workflow.add_edge("config_agent", "notebook_agent")
-    workflow.add_edge("notebook_agent", END)
-
-    workflow.set_entry_point("clone_and_prepare_repo")
+    
+    # Add all nodes using a for loop
+    for step_name, step_function in STEPS:
+        workflow.add_node(step_name, step_function)
+    
+    # Add edges using a for loop - just a sequential workflow
+    for i in range(len(STEPS) - 1):
+        current_step = STEPS[i][0]
+        next_step = STEPS[i + 1][0]
+        workflow.add_edge(current_step, next_step)
+    
+    # Add final edge to END
+    workflow.add_edge(STEPS[-1][0], END)
+    
+    # Set entry point
+    workflow.set_entry_point(STEPS[0][0])
+    
     return workflow.compile()
 
 # For testing locally
@@ -327,61 +367,31 @@ def run_workflow(github_url: str, input_files: List[str], run_id: str | None = N
     _, repo_name = parse_github_url(github_url)
     if not run_id:
         run_id = get_next_run_id(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name)
+    start_idx = 0 if not start_from else next(i for i, (s, _) in enumerate(STEPS) if s == start_from)
+    step_name = STEPS[start_idx][0]
+    status = "initializing"
     
-    initial_state = {
-        "github_url": github_url,
-        "input_files": input_files,
-        "repo_name": repo_name,
-        "run_id": run_id,
-        "local_repo_path": "",
-        "existing_config_path": existing_config_path,
-        "files": [],
-        "summaries": {},
-        "cleaned_code": {},
-        "component_identification": [],
-        "component_parsing": [],
-        "verified_components": [],
-        "attribute_identification": [],
-        "attribute_parsing": [],
-        "node_aggregator": [],
-        "edges": [],
-        "dag_yaml": "",
-        "verified_dag": {},
-        "config": {},
-        "notebooks": []
-    }
-
-    # Define all steps with their functions
-    steps = [
-        ("clone_and_prepare_repo", clone_and_prepare_repo),
-        ("summarize", summarize),
-        ("component_identification", run_component_identification),
-        ("component_parsing", run_component_parsing),
-        ("human_verification_of_components", human_verification_of_components),
-        ("attribute_identification", run_attribute_identification),
-        ("attribute_parsing", run_attribute_parsing),
-        ("node_aggregator", run_node_aggregator),
-        ("edge_identification", run_edge_identification),
-        ("generate_dag_yaml", generate_dag_yaml),
-        ("human_verification_of_dag", human_verification_of_dag),
-        ("config_agent", run_config_agent),
-        ("notebook_agent", run_notebook_agent)
-    ]
+    state = INITIAL_STATE.copy()
+    state["step"] = step_name
+    state["status"] = status
+    state["github_url"] = github_url
+    state["input_files"] = input_files
+    state["repo_name"] = repo_name
+    state["run_id"] = run_id
 
     # Load state up to the start_from step
-    current_state = initial_state.copy()
-    start_idx = 0 if not start_from else next(i for i, (step, _) in enumerate(steps) if step == start_from)
-    for step_name, _ in steps[:start_idx]:
+    start_idx = 0 if not start_from else next(i for i, (step, _) in enumerate(STEPS) if step == start_from)
+    for step_name, _ in STEPS[:start_idx]:
         step_output = load_step_output(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name, run_id=run_id, step=step_name)
-        current_state.update(step_output)
+        state.update(step_output)
 
     # Run from start_from onward
-    for step_name, step_func in steps[start_idx:]:
-        update = step_func(current_state)
-        current_state.update(update)
+    for step_name, step_func in STEPS[start_idx:]:
+        update = step_func(state)
+        state.update(update)
         save_step_output(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name, run_id=run_id, step=step_name, output=update)
 
-    return current_state
+    return state
 
 
 
