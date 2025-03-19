@@ -1,9 +1,12 @@
+import os
 import streamlit as st
 import requests
 import json
 import sys
 import time
 import yaml
+import uuid
+from datetime import datetime
 from rmr_agent.utils import parse_github_url 
 
 BASE_URL = "http://localhost:8000"
@@ -54,7 +57,8 @@ def clean_line_range(line_range: str):
 
 def get_components(repo_name, run_id):
     try:
-        with open(f"{CHECKPOINT_BASE_PATH}/{repo_name}/{run_id}/component_parsing.json", 'r') as file:
+        file_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'component_parsing.json')
+        with open(file_path, 'r') as file:
             components = json.load(file)
         return components['component_parsing']
     except FileNotFoundError:
@@ -67,7 +71,8 @@ def get_components(repo_name, run_id):
 
 def get_cleaned_code(repo_name, run_id):
     try:
-        with open(f"{CHECKPOINT_BASE_PATH}/{repo_name}/{run_id}/summarize.json", 'r') as file:
+        file_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'summarize.json')
+        with open(file_path, 'r') as file:
             content = json.load(file)
         return content['cleaned_code']
     except FileNotFoundError:
@@ -82,7 +87,8 @@ def get_cleaned_code(repo_name, run_id):
 
 def get_dag_yaml(repo_name, run_id):
     try:
-        with open(f"{CHECKPOINT_BASE_PATH}/{repo_name}/{run_id}/dag.yaml", 'r') as file:
+        file_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'dag.yaml')
+        with open(file_path, 'r') as file:
             # dag_yaml = yaml.safe_load(file)
             dag_yaml_str = file.read()
             print("Successfully loaded dag.yaml")
@@ -99,6 +105,36 @@ def get_default_line_range(selected_components, cleaned_code):
         return f"1-{len(cleaned_code)}"
     return "Specify line range here (e.g. 1-40)"
 
+def get_steps_could_start_from(repo_name, run_id):
+    directory_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id)
+    if not os.path.isdir(directory_path):
+        print(f"Directory does not exist: {directory_path}, so no start_from options will be shown")
+        return []
+    
+    # Get list of JSON files in the directory
+    json_files = set()
+    for filename in os.listdir(directory_path):
+        if filename.endswith(".json"):
+            # Remove the .json extension
+            step_name = os.path.splitext(filename)[0]
+            json_files.add(step_name)
+
+    # Accumulate steps until we find the first missing one
+    available_steps = []
+    for step in STEPS:
+        available_steps.append(step)
+        if step not in json_files:
+            # Found first missing step, add it because it could be started from, then break
+            break
+    
+    # Clean up step names
+    display_available_steps = []
+    for i, step in enumerate(available_steps):
+        display_step = f"{i + 1}. {step.replace("_", " ").title()}"
+        display_available_steps.append(display_step)
+
+    
+    return display_available_steps
 
 
 # Initialization of session state
@@ -120,6 +156,8 @@ if 'repo_name' not in st.session_state:
     st.session_state["repo_name"] = None
 if 'run_id' not in st.session_state:
     st.session_state["run_id"] = None
+if 'input_files' not in st.session_state:
+    st.session_state["input_files"] = None
 if 'start_from' not in st.session_state:
     st.session_state["start_from"] = None
 if 'last_status' not in st.session_state:
@@ -130,25 +168,37 @@ if 'last_status' not in st.session_state:
 def display_welcome_page():
     if st.session_state.workflow_running == True:
         return
-    st.title("RMR Agent")
+    # st.title("RMR Agent")
+    st.image("assets/rmr_agent_image.jpg", width=500)
     st.subheader("Welcome to RMR Agent!")
     st.write("Convert your ML research code into a robust, modular, and configurable RMR pipeline.")
-    st.session_state["github_url"] = st.text_input("Specify the GitHub URL for your ML code", "https://github.paypal.com/GADS-Consumer-ML/ql-store-recommendation-prod.git")
-    st.session_state["input_files"] = st.text_area("List the notebooks in your repo which contain the core ML logic (one per line, relative to repo root directory)", "research/pipeline/00_driver.ipynb\nresearch/pipeline/01_bq_feat.ipynb\nresearch/pipeline/01_varmart_feat.ipynb\nresearch/pipeline/02_combine.ipynb\nresearch/pipeline/03_prepare_training_data.ipynb\nresearch/pipeline/04_training.ipynb\nresearch/pipeline/05_scoring_oot.ipynb\nresearch/pipeline/06_evaluation.ipynb").splitlines()
-    st.session_state["run_id"] = st.text_input("Run ID (optional)", "1", help="Enter an existing run ID (e.g. 1, 2, 3) to resume, or leave blank for a new run")
-    st.session_state["start_from"] = st.selectbox(
+    # Take in github url
+    default_url = st.session_state["github_url"] if st.session_state["github_url"] else "https://github.paypal.com/dnaomi/bt-retry-v2"
+    st.session_state["github_url"] = st.text_input("Specify the GitHub URL for your ML code", default_url)
+    _, st.session_state["repo_name"] = parse_github_url(st.session_state["github_url"])
+    # Take in input ML files
+    default_input_files = "\n".join(st.session_state["input_files"]) if st.session_state["input_files"] else "etl/01_etl.ipynb\netl/02_bq_to_dataproc.ipynb\nmodel-dev/train.ipynb\nmodel-dev/evaluate.ipynb\ndeployment/01_export_to_ume.ipynb\ndeployment/02_pyscoring_validation.ipynb"
+    input_files = st.text_area("List the notebooks in your repo which contain the core ML logic (one per line, relative to repo root directory)", default_input_files).splitlines()
+    st.session_state["input_files"] = [file for file in input_files if file]
+    # Take in run id
+    default_run_id = st.session_state["run_id"] if st.session_state["run_id"] else "1"
+    st.session_state["run_id"] = st.text_input("Run ID (optional)", default_run_id, help="Enter an existing run ID (e.g. 1, 2, 3) to resume, or leave blank for a new run")
+    # Allow starting from specific step
+    start_from = st.selectbox(
         "Start From (optional)",
-        [""] + [step for step in STEPS],  # Empty option + all step names
+        [""] + get_steps_could_start_from(st.session_state["repo_name"], st.session_state["run_id"]),  # Empty option + all step names
         help="Choose a step to start from, or leave blank to start from the beginning"
     )
+    st.session_state["start_from"] = start_from.split('.')[-1].strip().lower().replace(" ", "_")
+    print(st.session_state["start_from"])
 
 
 
 def start_workflow():
     """Function to start the workflow after the user presses Start Workflow button"""
-    _, repo_name = parse_github_url(st.session_state["github_url"])
-    print('Repo name:', repo_name)
-    st.session_state["repo_name"] = repo_name
+    if not st.session_state["repo_name"]:
+        _, st.session_state["repo_name"] = parse_github_url(st.session_state["github_url"])
+    print('Repo name:', st.session_state["repo_name"])
     payload = {
         "github_url": st.session_state["github_url"],
         "input_files": st.session_state["input_files"]
@@ -160,7 +210,7 @@ def start_workflow():
         payload["start_from"] = st.session_state["start_from"]
     
     # Construct url with repo_name and run_id (if specified)
-    url = f"{BASE_URL}/run-workflow/?repo_name={repo_name}"
+    url = f"{BASE_URL}/run-workflow/?repo_name={st.session_state["repo_name"]}"
     if st.session_state["run_id"]:
         url += f"&run_id={st.session_state["run_id"]}"
 
@@ -170,12 +220,12 @@ def start_workflow():
         data = response.json()
         st.session_state["result"] = data
         st.session_state["run_id"] = data["run_id"]
-        st.session_state.workflow_running = True
         st.session_state["last_status"] = "running"
-        st.session_state['current_step'] = st.session_state["start_from"] if st.session_state["start_from"] else STEPS[0]
+        st.session_state['current_step'] = st.session_state["start_from"] if st.session_state["start_from"] else "starting"
+        st.session_state.workflow_running = True if st.session_state['current_step'] not in HUMAN_STEPS else False
         st.session_state["display_welcome_page"] = False # remove welcome page now that workflow has started
         st.success(f"Starting workflow for run_id={data["run_id"]}")
-        time.sleep(1)  # Brief pause to show the success message
+        time.sleep(0.5)  # Brief pause to show the success message
         st.rerun() # update UI
     else:
         st.error(f"Error: {response.text}")
@@ -183,9 +233,6 @@ def start_workflow():
 
 def check_workflow_status():
     """Function to poll for the current workflow status"""
-    if not st.session_state.workflow_running or not st.session_state["run_id"]:
-        return
-    
     try:
         response = requests.get(
             f"{BASE_URL}/workflow-status/{st.session_state["repo_name"]}?run_id={st.session_state.run_id}"
@@ -197,7 +244,13 @@ def check_workflow_status():
             data = response.json()
             status = data.get("status")
             current_step = data.get("step")
-            #print(data)
+            print(f"{datetime.now().strftime("%H:%M:%S")} Poll API returned - Status: {status}, Step: {current_step}")
+
+            step_changed = False
+            prev_step = st.session_state.get("current_step", "")
+            if prev_step != current_step:
+                step_changed = True
+                print(f"Step changed from '{prev_step}' to '{current_step}'")
             
             # Update the session state with latest info
             st.session_state["result"] = data
@@ -208,7 +261,6 @@ def check_workflow_status():
                 # Found a human verification step - stop auto-polling
                 print(f"Human verification step detected: {current_step}")
                 st.session_state.workflow_running = False
-                st.rerun()
             elif status == "completed":
                 st.session_state.workflow_running = False
                 st.success("Workflow completed successfully!")
@@ -216,7 +268,7 @@ def check_workflow_status():
                 st.session_state.workflow_running = False
                 st.error(f"Workflow failed: {data.get('error', 'Unknown error')}")
                 
-            # If still running, we'll check again on next rerun
+            return step_changed
                 
     except Exception as e:
         st.warning(f"Error checking workflow status: {e}")
@@ -227,30 +279,64 @@ def submit_human_feedback(payload, repo_name, run_id):
     response = requests.post(url, json=payload)
     print(f"Submit Status: {response.status_code}, Response: '{response.text}'")
     if response.status_code == 200:
-        st.session_state["result"] = response.json()
+        data = response.json()
+        st.session_state["result"] = data
         st.session_state.workflow_running = True
+        st.session_state["current_step"] = data["step"]
+        st.session_state["last_status"] = data["status"]
         st.success("Feedback submitted successfully!")
         time.sleep(1)  # Brief pause to show the success message
         st.rerun()
     else:
         st.error(f"Submit Error: {response.text}")
 
-def display_progress(current_step):
+def display_progress_bar(current_step, write_cur_step=True):
+    if current_step not in STEPS:
+        return 
     # Calculate progress based on current step position
     total_steps = len(STEPS)
     current_step_idx = STEPS.index(current_step)
     if current_step == "complete":
         completed_steps = total_steps
     else:
-        completed_steps = current_step_idx + 1 if current_step_idx >= 0 else 0
+        completed_steps = current_step_idx if current_step_idx >= 0 else 0
     
     # Display progress
     st.progress(completed_steps / total_steps)
     st.write(f"Progress: {completed_steps}/{total_steps} steps completed")
+    if write_cur_step:
+        st.write(f"Running step {st.session_state["current_step"].replace("_", " ").title()} ...")
+
+def display_detailed_progress(current_step):
+    if current_step not in STEPS:
+        return
+    # Sidebar: Detailed step list
+    if "sidebar_placeholder" not in st.session_state:
+        st.session_state["sidebar_placeholder"] = st.sidebar.empty()
+    markdown_content = "### Workflow Steps\n\n"  # Plain text header
+    current_step_idx = STEPS.index(current_step)
+    for idx, step in enumerate(STEPS):
+        if idx < current_step_idx:
+            status_icon = "✅"
+        elif idx == current_step_idx:
+            status_icon = "⏳"
+        else:
+            status_icon = "⬜"
+        
+        # Human-readable step name
+        step_name = step.replace("_", " ").title()
+
+        # Append step to the markdown string
+        markdown_content += f"{status_icon} **{idx + 1}. {step_name}**\n\n"
+        
+    # Display step in sidebar with icon and status
+    st.session_state["sidebar_placeholder"].markdown(markdown_content)
+
 
 def cancel_workflow_button():
     # Cancel button
     if st.button("Cancel Workflow", type="primary", key="cancel_workflow"):
+        st.write("Cancelling workflow...")
         # Make API call to cancel the workflow
         cancel_url = f"{BASE_URL}/cancel-workflow/{st.session_state["repo_name"]}?run_id={st.session_state["run_id"]}"
         try:
@@ -278,7 +364,6 @@ def back_to_home_button():
         st.rerun()
 
 def human_verification_of_components_ui(repo_name, run_id):
-    st.subheader("ML Component Verification")
 
     # Load available ML components with their descriptions
     with open("rmr_agent/ml_components/component_definitions.json", 'r') as file:
@@ -290,19 +375,21 @@ def human_verification_of_components_ui(repo_name, run_id):
         with st.sidebar.expander(component_name):
             st.write(description)
 
+    # Load identified components
     components = get_components(repo_name, run_id) # result["components"] # loading from checkpoint instead of from API result
     if not isinstance(components, list):
         st.error("Components should be a non-empty list of dictionaries")
     if not components:
         st.error("Retrieved components is empty")
-    
+
+    # Get index for current file we are validating components for
     total_files = len(components)
     current_index = st.session_state["current_file_index"]
 
     # Initialize edited_components_list with empty dicts for all files
     if not st.session_state["edited_components_list"]:
         st.session_state["edited_components_list"] = [{} for _ in range(total_files)]
-
+    
     if current_index >= total_files:
         st.success("All files verified! Submitting...")
     else:
@@ -310,19 +397,6 @@ def human_verification_of_components_ui(repo_name, run_id):
         current_components_dict = components[current_index]
         file_name = next(iter(current_components_dict.values()))["file_name"]  # Get from first component
         cleaned_file_name = clean_file_path(file_name, repo_name)
-        st.write("Current file:")
-        st.write(f"     - **{cleaned_file_name}** ({current_index + 1}/{total_files})")
-
-        # Existing component names (identified by agent)
-        existing_component_names = list(current_components_dict.keys())
-
-        # Multiselect to keep/delete/add component names
-        selected_components = st.multiselect(
-            "Components identified in this file (please verify):",
-            options=list(ml_components.keys()),
-            default=existing_component_names,
-            key=f"components_{current_index}"
-        )
 
         # Get the cleaned code for the current file
         cleaned_code = get_cleaned_code(repo_name, run_id) # result.get("cleaned_code", {}) # loading from checkpoint instead of from API result
@@ -334,86 +408,132 @@ def human_verification_of_components_ui(repo_name, run_id):
         else:
             st.error(f"file_name = {file_name} not found in cleaned_code dict, keys = {list(cleaned_code.keys())}")
 
-        # Store edited components and verify line ranges
-        edited_components_dict = {}
+        # Code that will be displayed
         code_display = code_lines if file_name in cleaned_code else []
         code_display = remove_line_numbers(code_display) # line numbers will already be shown by streamlit
-        for component_name in selected_components:
-            # Base details (existing or new)
-            if component_name in current_components_dict:
-                details = current_components_dict[component_name].copy()
-            else:
-                details = {
-                    "evidence": ["Added manually during verification"],
-                    "why_separate": "Added manually during verification",
-                    "file_name": file_name,
-                    "line_range": get_default_line_range(selected_components, code_display)
-                }
-            
-            with st.expander(f"Details for **{component_name}** - needs verification!"):
-                st.write(f"Please correct the line range for this component by viewing the cleaned code below")
-                line_range_identified = clean_line_range(details["line_range"])
-                # Always allow line_range editing
-                line_range = st.text_input(
-                    "**Line Range**:",
-                    value=line_range_identified,
-                    key=f"{current_index}_{component_name}_line_range"
-                )
-                
-                # Highlight code for this component
-                if code_display:
-                    st.write(f"**Cleaned Code** ({len(code_display)} lines):")
-                    try:
-                        start, end = map(int, line_range.split("-"))
-                        highlighted_code = "\n".join(
-                            f"{i+1}: {line}" if start <= i+1 <= end else f"{i+1}: {line}"
-                            for i, line in enumerate(code_display)
-                        )
-                        st.code(highlighted_code, language="python")
-                    except (ValueError, AttributeError):
-                        st.code("\n".join(f"{i+1}: {line}" for i, line in enumerate(code_display)), language="python")
-                        st.warning("Invalid line range format. Use 'start-end'.")
-                else:
-                    st.error("Could not display code for this file")
-                
-                # Show evidence and why_separate for existing components
-                if component_name in current_components_dict:
-                    st.write("**Evidence for this ML component classification**:")
-                    for evidence in details["evidence"]:
-                        st.write(f"- {evidence}")
-                    if len(current_components_dict) > 1:
-                        # Only show separation reasoning if we performed a separation in this file (idenfitied more than one component)
-                        st.write(f"**Why this was identified as a separate component**:\n{details['why_separate']}")
-            
-            # Update line_range and store
-            details["line_range"] = line_range
-            edited_components_dict[component_name] = details
 
-        # Navigation
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Previous", disabled=(current_index == 0)):
-                st.session_state["edited_components_list"][current_index] = edited_components_dict
-                st.session_state["current_file_index"] -= 1
-                st.rerun()
-        with col2:
-            if st.button("Next", disabled=(current_index >= total_files - 1)):
-                st.session_state["edited_components_list"][current_index] = edited_components_dict
-                st.session_state["current_file_index"] += 1
-                st.rerun()
-    
-        # Submit all when done
-        if current_index == total_files - 1 and st.button("Submit All Components"):
-            st.session_state["edited_components_list"].append(edited_components_dict)
-            payload = {"verified_components": st.session_state["edited_components_list"]}
-            st.session_state.workflow_running = True # before submit back to API, set workflow running again to continue polling
-            submit_human_feedback(payload=payload, repo_name=repo_name, run_id=run_id)
-            st.session_state["edited_components_list"] = []
+        # Existing component names (identified by agent)
+        existing_component_names = list(current_components_dict.keys())
+
+        # Split into two columns so we can always show cleaned code on the right for reference -> easier to identify line numbers this way
+        col_1, col_2 = st.columns([0.4, 0.6])
+
+        with col_1:
+            st.subheader("ML Component Verification")
+            st.write("Current file:")
+            st.write(f"     - **{cleaned_file_name}** ({current_index + 1}/{total_files})")
+
+            # Multiselect to keep/delete/add component names
+            options = list(ml_components.keys()) + ["Other"]
+            selected_components = st.multiselect(
+                "Components identified in this file (please verify):",
+                options=options,
+                default=existing_component_names,
+                key=f"components_{current_index}"
+            )
+
+            # Allow user to enter their own ML component names if they feel the available list is insufficient
+            if "Other" in selected_components:
+                st.write("You selected 'Other' as the component type. Please ensure this is a component you want in your final RMR pipeline. Otherwise, remove it.")
+                other_components = st.text_area(
+                    "Please specify other component(s) (one per line):",
+                    key=f"other_components_{current_index}"
+                )
+                # Process the other components
+                if other_components:
+                    # Split by newline to get individual components
+                    custom_components = [comp.strip() for comp in other_components.split('\n') if comp.strip()]
+                    
+                    # Remove "Other" and add the custom components
+                    selected_components.remove("Other")
+                    selected_components.extend(custom_components)
+
+            # Store edited components and verify line ranges
+            edited_components_dict = {}
+
+            for component_name in selected_components:
+                # Base details (existing or new)
+                if component_name in current_components_dict:
+                    details = current_components_dict[component_name].copy()
+                    # If user deleted some components and resulted in a single component, we can update the line range to be the entire file
+                    if len(selected_components) == 1:
+                        details['line_range'] = get_default_line_range(selected_components, code_display)
+                else:
+                    details = {
+                        "evidence": ["Added manually during verification"],
+                        "why_separate": "Added manually during verification",
+                        "file_name": file_name,
+                        "line_range": get_default_line_range(selected_components, code_display)
+                    }
+                
+                with st.expander(f"Details for **{component_name}** - needs verification!"):
+                    # Always allow line_range editing
+                    line_range_identified = clean_line_range(details["line_range"])
+                    line_range = st.text_input(
+                        "**Line Range**:",
+                        value=line_range_identified,
+                        key=f"{current_index}_{component_name}_line_range"
+                    )
+                    st.write(f"Please delete this component if it is not actually present in your code!")
+                    st.write(f"Please correct the line range for this component by viewing the cleaned code to the right")
+                    st.write(f"     - Ensure line range is **not overlapping** with other components")
+                    st.write(f"     - Don't worry about import statements - just focus on setting the correct line ranges for each identified component.")
+                    
+                    # Show evidence and why_separate for existing components
+                    if component_name in current_components_dict:
+                        show_evidence = st.checkbox("Show Evidence for this ML component classification", key=str(uuid.uuid4()))
+                        if show_evidence:
+                            with st.container():
+                                for evidence in details["evidence"]:
+                                    st.write(f"- {evidence}")
+                                if len(current_components_dict) > 1:
+                                    # Only show separation reasoning if we performed a separation in this file (idenfitied more than one component)
+                                    st.write(f"**Why this was identified as a separate component**:\n{details['why_separate']}")
+                
+                # Update line_range and store
+                details["line_range"] = line_range
+                edited_components_dict[component_name] = details
+
+            # Navigation
+            col_1a, col_1b = st.columns(2)
+            with col_1a:
+                if st.button("Previous", disabled=(current_index == 0)):
+                    st.session_state["edited_components_list"][current_index] = edited_components_dict
+                    st.session_state["current_file_index"] -= 1
+                    st.rerun()
+            with col_1b:
+                if st.button("Next", disabled=(current_index >= total_files - 1)):
+                    st.session_state["edited_components_list"][current_index] = edited_components_dict
+                    st.session_state["current_file_index"] += 1
+                    st.rerun()
+        
+            # Submit all when done
+            if current_index == total_files - 1 and st.button("Submit All Components"):
+                st.session_state["edited_components_list"].append(edited_components_dict)
+                payload = {"verified_components": st.session_state["edited_components_list"]}
+                st.session_state.workflow_running = True # before submit back to API, set workflow running again to continue polling
+                submit_human_feedback(payload=payload, repo_name=repo_name, run_id=run_id)
+                st.session_state["edited_components_list"] = []
+
+        with col_2:
+            st.subheader("") # filler space for better alignment
+            # Display the code in right column so it can always be viewed alongside the identified components
+            if code_display:
+                st.write(f"**Cleaned Code For This File** ({len(code_display)} lines):")
+                # Create a fixed-height container that will automatically scroll
+                container = st.container(height=600)
+                # Display the code inside the container with line numbers and syntax highlighting
+                with container:
+                    numbered_code = "\n".join(f"{i+1}: {line}" for i, line in enumerate(code_display))
+                    st.code(numbered_code, language="python")
+            else:
+                st.error("Could not display code for this file")
 
 def human_verification_of_dag_ui(repo_name, run_id):
     # WIP -> improve DAG editing experience. Should focus on editing edges because nodes were already verified
     st.subheader("Please verify/edit the identified DAG")
     dag_yaml = get_dag_yaml(repo_name, run_id) # result["dag_yaml"] # loading from checkpoint instead of from API result
+    dag = yaml.safe_load(dag_yaml)  # Convert YAML string to Python dict
     edited_dag = st.text_area("DAG YAML", dag_yaml, height=300)
     if st.button("Submit DAG"):
         payload = {"verified_dag": edited_dag}
@@ -433,35 +553,38 @@ if st.session_state["display_welcome_page"] == True:
 # Status display while workflow is running in backend 
 elif st.session_state.workflow_running:
     cancel_workflow_button()
-
-    if 'status_placeholder' not in st.session_state:
-        st.session_state["status_placeholder"] = st.empty()
+    st.write(f"Run ID: **{st.session_state["run_id"]}**")
+    with st.status(f"**Running {st.session_state["current_step"].replace("_", " ").title()}** ...", expanded=True, state="running") as status:
+        display_detailed_progress(st.session_state["current_step"])
+        while st.session_state.workflow_running:
+            step_changed = False
+            while not step_changed:
+                # Poll every 2 seconds
+                step_changed = check_workflow_status()
+                time.sleep(2)
+            # update the status with the new step
+            status.update(label=f"Running {st.session_state["current_step"].replace("_", " ").title()} ...", state="running")
+            display_progress_bar(st.session_state["current_step"], write_cur_step=False)
+            display_detailed_progress(st.session_state["current_step"])
+            current_time = datetime.now().strftime("%H:%M:%S")
+            print(f"Displayed - Last updated: {current_time}, Running step: {st.session_state["current_step"]}")
     
-    # Calculate and display progress bar
-    current_step = st.session_state['current_step']
-    current_step_clean = current_step.replace("_", " ").title()
-    display_progress(current_step)
-    print(f"Running step: {current_step_clean}")
-    
-    # Display current status with a spinner
-    with st.session_state["status_placeholder"].container():
-        with st.spinner(f"Running step: {current_step_clean}"):
-            # Display additional info if needed
-            st.info(f"Workflow run_id = {st.session_state['run_id']}")
-            st.info(f"Status = {st.session_state['last_status']}")
-        
-            # Check status (this happens on every rerun)
-            check_workflow_status()
-            
-            # Auto-refresh using a timeout
-            if st.session_state.workflow_running:
-                time.sleep(3)  # Wait 3 seconds
-                st.rerun()  # Trigger a rerun to check status again
+    st.rerun()
 
 
 # Handle human verification steps and workflow completion
 else: 
     back_to_home_button()
+
+    if st.session_state["last_status"] == "failed":
+        # Reset session state and return to home screen
+        st.session_state.workflow_running = False
+        st.session_state["display_welcome_page"] = True
+        st.error(f"Workflow failed: {st.session_state["result"].get('error', 'Unknown error')}")
+        time.sleep(10)  # Brief delay for user feedback
+        st.rerun()
+        
+
     result = st.session_state["result"]
     repo_name = result.get("repo_name")
     run_id = result.get("run_id")
@@ -469,7 +592,7 @@ else:
     print('handling a human step: ', current_step)
 
     # Calculate and display progress bar
-    display_progress(current_step)
+    display_progress_bar(current_step, write_cur_step=False)
     
     if current_step == "human_verification_of_components":
         human_verification_of_components_ui(repo_name, run_id)
