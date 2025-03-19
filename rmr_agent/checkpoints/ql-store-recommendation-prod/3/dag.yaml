@@ -8,13 +8,13 @@ nodes:
       training_exclude_merch: "config['driver_config']['training_exclude_merch']"
       train_start_date: "config['driver_config']['train_start_date']"
       oot_start_date: "config['driver_config']['oot_start_date']"
-      val_start_date: "config['driver_config']['val_start_date']"
       training_hot_positive_attributed_txn_sampling_alpha: "config['driver_config']['training_hot_positive_attributed_txn_sampling_alpha']"
       training_attributed_txn_upsampling_rate: "config['driver_config']['training_attributed_txn_upsampling_rate']"
       removing_highly_active_user_threshold: "config['driver_config']['removing_highly_active_user_threshold']"
       removing_highly_active_user_merchant_threshold: "config['driver_config']['removing_highly_active_user_merchant_threshold']"
       removing_highly_active_user_merchant_date_threshold: "config['driver_config']['removing_highly_active_user_merchant_date_threshold']"
       training_hot_positive_organic_txn_sampling_alpha: "config['driver_config']['training_hot_positive_organic_txn_sampling_alpha']"
+      val_start_date: "config['driver_config']['val_start_date']"
       save_label_mixing_rate: "config['driver_config']['save_label_mixing_rate']"
       ratio_for_hard_negtive: "config['driver_config']['ratio_for_hard_negtive']"
       hard_negative_impression_time_window: "config['driver_config']['hard_negative_impression_time_window']"
@@ -22,56 +22,39 @@ nodes:
       training_hot_negative_sampling_alpha: "config['driver_config']['training_hot_negative_sampling_alpha']"
       uniform_negative_postive_ratio: "config['driver_config']['uniform_negative_postive_ratio']"
     outputs:
-      final_driver_table: "{bq_prefix}driver_dev"
-      oot_driver_table: "{bq_prefix}driver_oot"
+      driver_dev_table: "{bq_prefix}driver_dev"
+      driver_oot_table: "{bq_prefix}driver_oot"
 - Feature Engineering:
     file_name: rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_bq_feat.py
     line_range: 1-819
     inputs:
       file_path: ../config/base_config.yaml
-      bq_prefix: "{config['general_config']['bq_project_dataset_prefix']}"
-      train_start_date: "{config['driver_config']['train_start_date']}"
+      bq_prefix: "config['general_config']['bq_project_dataset_prefix']"
+      train_start_date: "config['driver_config']['train_start_date']"
     outputs:
-      driver_simu_txn_365d: "{bq_prefix}driver_simu_txn_365d"
-      driver_simu_txn_365d_agg: "{bq_prefix}driver_simu_txn_365d_agg"
-      driver_consumer_base: "{bq_prefix}driver_consumer_base"
-      driver_consumer_base_txn_5k_merch_category: "{bq_prefix}driver_consumer_base_txn_5k_merch_category"
-      driver_consumer_base_last_10_txn: "{bq_prefix}driver_consumer_base_last_10_txn"
-      driver_consumer_base_all_history_array_0: "{bq_prefix}driver_consumer_base_all_history_array_0"
-      driver_consumer_base_all_history_array: "{bq_prefix}driver_consumer_base_all_history_array"
-      driver_combine_category: "{bq_prefix}driver_combine_category"
-      driver_combine_category_agg_0: "{bq_prefix}driver_combine_category_agg_0"
-      driver_combine_category_agg_1: "{bq_prefix}driver_combine_category_agg_1"
-      driver_combine_category_agg_2: "{bq_prefix}driver_combine_category_agg_2"
-      driver_combine_category_agg_3: "{bq_prefix}driver_combine_category_agg_3"
-      driver_combine_category_agg_4: "{bq_prefix}driver_combine_category_agg_4"
-      driver_combine_category_agg_5: "{bq_prefix}driver_combine_category_agg_5"
-      driver_merchant_base: "{bq_prefix}driver_merchant_base"
-      driver_merchant_base_txn_30d: "{bq_prefix}driver_merchant_base_txn_30d"
-      driver_merchant_base_txn_30d_filter_sndr: "{bq_prefix}driver_merchant_base_txn_30d_filter_sndr"
-      driver_merchant_base_price_agg: "{bq_prefix}driver_merchant_base_price_agg"
-      driver_merchant_base_sales_agg: "{bq_prefix}driver_merchant_base_sales_agg"
-      driver_elig_save_365d_category: "{bq_prefix}driver_elig_save_365d_category"
-      driver_elig_save_agg_00: "{bq_prefix}driver_elig_save_agg_00"
-      driver_elig_save_agg_0: "{bq_prefix}driver_elig_save_agg_0"
-      driver_elig_save_agg_1: "{bq_prefix}driver_elig_save_agg_1"
-      driver_elig_save_agg_2: "{bq_prefix}driver_elig_save_agg_2"
-      driver_elig_save_agg_3: "{bq_prefix}driver_elig_save_agg_3"
-      driver_merchant_base_click_save: "{bq_prefix}driver_merchant_base_click_save"
-      driver_consumer_base_gender: "{bq_prefix}driver_consumer_base_gender"
+      final_table: "{bq_prefix}driver_consumer_base_gender"
 - Data Pulling:
     file_name: rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_varmart_feat.py
     line_range: 1-73
     inputs:
+      stage: training
+      seq_num: '20231005'
+      is_prod: 'True'
+      job_name: ql_store_rmr
+      group_name: mls_gads
+      model_name: ql_store_rmr_datafetcher
+      model_owner: chenzhao
+      description: ranking_combined_datafetcher
+      manager: Farhad
+      on_gcp: 'True'
       gcp_project_id: ccg24-hrzana-gds-pacman
       gcs_bucket_name: pypl-bkt-rsh-row-std-gds-pacman
       bq_materialization_project: pypl-bods
       bq_materialization_dataset: rsh_row_gds_pacman
       driver_loc: gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_simu_consumer
-      variables: "[\"prmry_addr_state\", \"days_on_file\", \"ebay_member_y_n\", \"\
-        consu_engagmnt_seg_key\", \"prmry_cc_type_code\", \"days_appweb_visit\", \"\
-        consu_age_band_key\", \"consu_income_band_key\", \"consu_dmgrphc_seg_key\"\
-        ]"
+      variables: "['prmry_addr_state', 'days_on_file', 'ebay_member_y_n', 'consu_engagmnt_seg_key',\
+        \ 'prmry_cc_type_code', 'days_appweb_visit', 'consu_age_band_key', 'consu_income_band_key',\
+        \ 'consu_dmgrphc_seg_key']"
       split_ratio: "{\"train\": 1.0}"
       num_of_splits: '1'
     outputs:
@@ -81,7 +64,7 @@ nodes:
     line_range: 1-642
     inputs:
       config_file_path: ../config/base_config.yaml
-      bq_project_dataset_prefix: "config['general_config']['bq_project_dataset_prefix']"
+      bq_prefix: "config['general_config']['bq_project_dataset_prefix']"
       driver_dev_table: "{bq_prefix}driver_dev"
       driver_simu_txn_365d_agg_table: "{bq_prefix}driver_simu_txn_365d_agg"
       driver_consumer_base_last_10_txn_table: "{bq_prefix}driver_consumer_base_last_10_txn"
@@ -98,34 +81,40 @@ nodes:
       ql_store_honey_merch_quality_scores_external_table: pypl-bods.gds_pacman_prod.ql_store_honey_merch_quality_scores_external
       driver_simu_consumer_varmart_external_table: "{bq_prefix}driver_simu_consumer_varmart_external"
       store_recommendation_kg_embedding_32_v2_table: pypl-bods.gds_pacman_prod.store_recommendation_kg_embedding_32_v2
+      driver_oot_table: "{bq_prefix}driver_oot"
     outputs:
       driver_dev_features_table: "{bq_prefix}driver_dev_features"
       driver_oot_features_table: "{bq_prefix}driver_oot_features"
       driver_oot_features_expand_seq_table: "{bq_prefix}driver_oot_features_expand_seq"
-      export_data_uri: gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_dev_features/part*.parquet
+      export_uri: gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_dev_features/part*.parquet
+      export_format: parquet
+      export_overwrite: 'true'
 - Data Preprocessing:
     file_name: rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/03_prepare_training_data.py
     line_range: 1-185
     inputs:
       model_version_base: ../artifacts/din_<today_date>
       directory: ../data/ql_store_rmr_driver_dev_features
-      parquet_files: "[\"file1.parquet\", \"file2.parquet\", ...]"
-      categorical_features: "[\"sndr_consu_engagmnt_seg_key\", \"sndr_ebay_member_y_n\"\
-        , \"gender\", \"sndr_prmry_cc_type_code\", \"sndr_consu_age_band_key\", \"\
-        sndr_consu_dmgrphc_seg_key\"]"
-      numeric_features: "[\"sndr_rcvr_txn_num_30d\", \"sndr_rcvr_txn_num_180d\", \"\
-        sndr_rcvr_txn_num_365d\", \"sndr_rcvr_txn_amt_30d\", \"sndr_rcvr_txn_amt_180d\"\
-        , ...]"
-      sequence_features: "[\"sndr_most_recent_100_merch_category\", \"sndr_most_recent_100_merch_list\"\
-        ]"
-      tokenizer_num_words: '1000'
-      tokenizer_oov_token: <OOV>
+      parquet_files: "[list of parquet files in the directory]"
+      state_to_abbreviation: "{ 'ALABAMA': 'AL', 'ALASKA': 'AK', ... }"
+      categorical_features: "['sndr_consu_engagmnt_seg_key', 'sndr_ebay_member_y_n',\
+        \ 'gender', 'sndr_prmry_cc_type_code', 'sndr_consu_age_band_key', 'sndr_consu_dmgrphc_seg_key']"
+      numeric_features: "['sndr_rcvr_txn_num_30d', 'sndr_rcvr_txn_num_180d', 'sndr_rcvr_txn_num_365d',\
+        \ ...]"
+      maxlen: '100'
+      num_words: '1000'
+      oov_token: <OOV>
       chunk_size: '1000000'
+      output_dir: ../data/ql_store_rmr_driver_dev_features_transformed
     outputs:
       model_version: din_<today_date>
       exported_feature_transformer: ../artifacts/din_<today_date>/exported_feature_transformer
-      output_dir: ../data/ql_store_rmr_driver_dev_features_transformed
-      rcvr_id_tokenizer_path: ../artifacts/din_<today_date>/exported_feature_transformer/rcvr_id_tokenizer
+      state_encoder_dict: "{ 'AL': 0, 'AK': 1, ... }"
+      categorical_feature_encoders: "{ 'sndr_consu_engagmnt_seg_key': { 'class1':\
+        \ 0, 'class2': 1, ... }, ... }"
+      numerical_feature_scalars: "{ 'sndr_rcvr_txn_num_30d': { 'mean': <value>, 'std':\
+        \ <value> }, ... }"
+      rcvr_id_tokenizer: ../artifacts/din_<today_date>/exported_feature_transformer/rcvr_id_tokenizer
       categorical_feature_encoders_path: ../artifacts/din_<today_date>/exported_feature_transformer/categorical_feature_encoders
       numerical_feature_scalars_path: ../artifacts/din_<today_date>/exported_feature_transformer/numerical_feature_scalars
 - Model Training:
@@ -133,14 +122,13 @@ nodes:
     line_range: 1-175
     inputs:
       config_file_path: ../config/base_config.yaml
-      model_version_path: ../_current_model_version
-      artifacts_base_path: ../artifacts/
+      model_version_file_path: ../_current_model_version
       data_directory: ../data/ql_store_rmr_driver_dev_features_transformed
-      numeric_feature_names: "[\"sndr_rcvr_txn_num_30d\", \"sndr_rcvr_txn_num_180d\"\
-        , \"sndr_rcvr_txn_num_365d\", ...]"
-      rcvr_id_names: "[\"rcvr_id\"]"
-      gpt_cate_names: "[\"gpt_1st_category_l2_index\", \"sndr_1st_freq_merchant_category_30d\"\
-        , ...]"
+      numeric_names: "[\"sndr_rcvr_txn_num_30d\", \"sndr_rcvr_txn_num_180d\", \"sndr_rcvr_txn_num_365d\"\
+        , \"sndr_rcvr_txn_amt_30d\", \"sndr_rcvr_txn_amt_180d\", ...]"
+      rcvr_id_names: "['rcvr_id']"
+      gpt_cate_names: "['gpt_1st_category_l2_index', 'sndr_1st_freq_merchant_category_30d',\
+        \ 'sndr_2nd_freq_merchant_category_30d', ...]"
       batch_size: "config['training_config']['DIN']['batch_size']"
       learning_rate: "config['training_config']['DIN']['learning_rate']"
       dnn_use_bn: "config['training_config']['DIN']['dnn_use_bn']"
@@ -155,31 +143,32 @@ nodes:
       seed: "config['training_config']['DIN']['seed']"
       epochs: "config['training_config']['DIN']['epochs']"
     outputs:
-      h5_model_path: ../artifacts/<model_version>/19/exported_models/din.h5
-      tf_model_path: ../artifacts/<model_version>/19/exported_models/din_saved_model
+      h5_model_path: "../artifacts/{model_version}/19/exported_models/din.h5"
+      tf_model_path: "../artifacts/{model_version}/19/exported_models/din_saved_model"
 - Model Packaging:
     file_name: rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/04_training.py
     line_range: 176-269
     inputs:
-      tf_model_path: ../artifacts/<model_version>/19/exported_models/din_saved_model
-      input_mappings: "{'hist_rcvr_id': [f'hist_rcvr_id_{i}' for i in range(1, 101)],\
-        \ 'hist_gpt_1st_category_l2_index': [f'hist_gpt_1st_category_{i}' for i in\
-        \ range(1, 101)]}"
-      output_mappings: "{model.output.name[:-2]: 'out'}"
+      tf_model_path: "../artifacts/{model_version}/19/exported_models/din_saved_model"
+      exported_model_base: "../artifacts/{model_version}/19/exported_models"
+      categorical_feature_encoders_path: "../artifacts/{model_version}/exported_feature_transformer/categorical_feature_encoders"
+      rcvr_id_tokenizer_path: "../artifacts/{model_version}/exported_feature_transformer/rcvr_id_tokenizer"
+      numerical_feature_scalars_path: "../artifacts/{model_version}/exported_feature_transformer/numerical_feature_scalars"
     outputs:
-      onnx_spec_path: ../artifacts/<model_version>/19/exported_models
-      oot_scoring_directory: ../artifacts/<model_version>/19/exported_models/oot_scoring
-      onnx_model_path: ../artifacts/<model_version>/19/exported_models/tf_2_onnx_model.m
-      renamed_model_path: ../artifacts/<model_version>/19/exported_models/oot_scoring/din_expand_seq.m
-      prod_model_path: ../artifacts/<model_version>/19/exported_models/din_prod.m
-      test_data_output_path: ./testdata/testdata.json
-      onnx_output_path: ../artifacts/<model_version>/19/exported_models/din.onnx
+      onnx_spec_path: "../artifacts/{model_version}/19/exported_models"
+      oot_scoring_directory: "../artifacts/{model_version}/19/exported_models/oot_scoring"
+      onnx_model_path: "../artifacts/{model_version}/19/exported_models/tf_2_onnx_model.m"
+      renamed_onnx_model_path: "../artifacts/{model_version}/19/exported_models/oot_scoring/din_expand_seq.m"
+      prod_model_path: "../artifacts/{model_version}/19/exported_models/din_prod.m"
+      test_data_json_path: ./testdata/testdata.json
+      onnx_output_path: "../artifacts/{model_version}/19/exported_models/din.onnx"
 - Model Scoring:
     file_name: rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.py
     line_range: 1-104
     inputs:
       working_path: /projects/gds-packman/apps/ql-store-recommendation-prod/research
       params_path: /projects/gds-packman/apps/ql-store-recommendation-prod/research/config
+      section_name: oot_data_scoring
       model_version_path: /projects/gds-packman/apps/ql-store-recommendation-prod/research/_current_model_version
       exported_model_base: "/projects/gds-packman/apps/ql-store-recommendation-prod/research/artifacts/{model_version}/exported_models"
       m_local_folder: /projects/gds-packman/apps/ql-store-recommendation-prod/research/artifacts/din_20240708/18/exported_models/oot_scoring
@@ -189,148 +178,79 @@ nodes:
     outputs:
       eval_result_path: gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_oot_transformed_scored
       log_file: "/projects/gds-packman/apps/ql-store-recommendation-prod/research/logs/{job_id}.log"
-- Model Version Loading:
+- Load Model Version:
     file_name: research/driver_creation.ipynb
     line_range: Lines 258-311
     inputs:
       model_version_path: ../_current_model_version
+      model_artifacts_base_path: ../artifacts/
     outputs:
-      model_version_base: "../artifacts/{model_version}/18"
-- Configuration Loading:
+      model_version: "[Loaded from file]"
+- Load Configuration:
     file_name: research/driver_creation.ipynb
     line_range: Lines 258-311
     inputs:
       config_file_path: ../config/base_config.yaml
     outputs:
-      bq_prefix: "{config['general_config']['bq_project_dataset_prefix']}"
-- BigQuery Table Creation (driver_oot_txn_365d):
+      config: "[Loaded from file]"
+- Create BigQuery Tables:
     file_name: research/driver_creation.ipynb
     line_range: Lines 258-311
     inputs:
-      bq_prefix: "{config['general_config']['bq_project_dataset_prefix']}"
-      oot_start_date: "{config['driver_config']['oot_start_date']}"
+      bq_project_dataset_prefix: "[Loaded from config]"
+      oot_start_date: "[Loaded from config]"
     outputs:
-      table_name: "{bq_prefix}driver_oot_txn_365d"
-- BigQuery Table Creation (driver_oot_txn_save_365d):
+      bq_table_driver_oot_txn_365d: "{bq_prefix}driver_oot_txn_365d"
+      bq_table_driver_oot_txn_save_365d: "{bq_prefix}driver_oot_txn_save_365d"
+      bq_table_mlv2_gpt_similar_map_snapshot: "{bq_prefix}mlv2_gpt_similar_map_snapshot"
+      bq_table_mlv2_gpt_similar_map_snapshot_1: "{bq_prefix}mlv2_gpt_similar_map_snapshot_1"
+      bq_table_driver_oot_txn_save_365d_similar: "{bq_prefix}driver_oot_txn_save_365d_similar"
+      bq_table_driver_oot_txn_save_365d_similar_dedup: "{bq_prefix}driver_oot_txn_save_365d_similar_dedup"
+      bq_table_driver_oot_two_tower_similar_score: "{bq_prefix}driver_oot_two_tower_similar_score"
+      bq_table_driver_oot_hueristic_model_comparison: "{bq_prefix}driver_oot_hueristic_model_comparison"
+- Export Evaluation Readouts:
     file_name: research/driver_creation.ipynb
     line_range: Lines 258-311
     inputs:
-      bq_prefix: "{config['general_config']['bq_project_dataset_prefix']}"
-      oot_start_date: "{config['driver_config']['oot_start_date']}"
+      exported_eval_readout_base: "[Constructed from model_version_base]"
     outputs:
-      table_name: "{bq_prefix}driver_oot_txn_save_365d"
-- BigQuery Table Creation (mlv2_gpt_similar_map_snapshot):
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
-      bq_prefix: "{config['general_config']['bq_project_dataset_prefix']}"
-    outputs:
-      table_name: "{bq_prefix}mlv2_gpt_similar_map_snapshot"
-- BigQuery Table Creation (mlv2_gpt_similar_map_snapshot_1):
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
-      bq_prefix: "{config['general_config']['bq_project_dataset_prefix']}"
-    outputs:
-      table_name: "{bq_prefix}mlv2_gpt_similar_map_snapshot_1"
-- BigQuery Table Creation (driver_oot_txn_save_365d_similar):
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
-      bq_prefix: "{config['general_config']['bq_project_dataset_prefix']}"
-    outputs:
-      table_name: "{bq_prefix}driver_oot_txn_save_365d_similar"
-- BigQuery Table Creation (driver_oot_txn_save_365d_similar_dedup):
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
-      bq_prefix: "{config['general_config']['bq_project_dataset_prefix']}"
-    outputs:
-      table_name: "{bq_prefix}driver_oot_txn_save_365d_similar_dedup"
-- BigQuery Table Creation (driver_oot_two_tower_similar_score):
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
-      bq_prefix: "{config['general_config']['bq_project_dataset_prefix']}"
-    outputs:
-      table_name: "{bq_prefix}driver_oot_two_tower_similar_score"
-- BigQuery Table Creation (driver_oot_hueristic_model_comparison):
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
-      bq_prefix: "{config['general_config']['bq_project_dataset_prefix']}"
-    outputs:
-      table_name: "{bq_prefix}driver_oot_hueristic_model_comparison"
-- Performance Evaluation:
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
-      bq_prefix: "{config['general_config']['bq_project_dataset_prefix']}"
-    outputs:
-      performance_all_csv: "{exported_eval_readout_base}/performane_all.csv"
-      performance_all_png: "{exported_eval_readout_base}/performane_all.png"
-      performance_ftu_csv: "{exported_eval_readout_base}/performane_ftu.csv"
-      performance_ftu_png: "{exported_eval_readout_base}/performane_ftu.png"
-      performance_wo_ebay_csv: "{exported_eval_readout_base}/performane_wo_ebay.csv"
-      performance_wo_ebay_png: "{exported_eval_readout_base}/performane_wo_ebay.png"
-- Visualization:
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
-      df_all: DataFrame containing performance metrics for all models
-      df_ftu: DataFrame containing performance metrics for FTU models
-      df_wo_ebay: DataFrame containing performance metrics without eBay
-    outputs:
-      performance_all_png: "{exported_eval_readout_base}/performane_all.png"
-      performance_ftu_png: "{exported_eval_readout_base}/performane_ftu.png"
-      performance_wo_ebay_png: "{exported_eval_readout_base}/performane_wo_ebay.png"
+      performance_all_csv: performane_all.csv
+      performance_all_png: performane_all.png
+      performance_ftu_csv: performane_ftu.csv
+      performance_ftu_png: performane_ftu.png
+      performance_wo_ebay_csv: performane_wo_ebay.csv
+      performance_wo_ebay_png: performane_wo_ebay.png
+
 edges:
 - from: Driver Creation
-    to: Feature Engineering
-    attributes:
-      bq_prefix: "{config['general_config']['bq_project_dataset_prefix']}"
-      train_start_date: "{config['driver_config']['train_start_date']}"
-  - from: Driver Creation
-    to: Feature Consolidation
-    attributes:
-      driver_dev_table: "{bq_prefix}driver_dev"
-  - from: Feature Engineering
-    to: Feature Consolidation
-    attributes:
-      driver_simu_txn_365d_agg_table: "{bq_prefix}driver_simu_txn_365d_agg"
-      driver_consumer_base_last_10_txn_table: "{bq_prefix}driver_consumer_base_last_10_txn"
-      driver_consumer_base_all_history_array_table: "{bq_prefix}driver_consumer_base_all_history_array"
-      driver_combine_category_agg_3_table: "{bq_prefix}driver_combine_category_agg_3"
-      driver_combine_category_agg_5_table: "{bq_prefix}driver_combine_category_agg_5"
-      driver_merchant_base_price_agg_table: "{bq_prefix}driver_merchant_base_price_agg"
-      driver_merchant_base_sales_agg_table: "{bq_prefix}driver_merchant_base_sales_agg"
-      driver_elig_save_agg_00_table: "{bq_prefix}driver_elig_save_agg_00"
-      driver_elig_save_agg_0_table: "{bq_prefix}driver_elig_save_agg_0"
-      driver_elig_save_agg_3_table: "{bq_prefix}driver_elig_save_agg_3"
-      driver_merchant_base_click_save_table: "{bq_prefix}driver_merchant_base_click_save"
-      driver_consumer_base_gender_table: "{bq_prefix}driver_consumer_base_gender"
-  - from: Data Pulling
-    to: Feature Consolidation
-    attributes:
-      driver_simu_consumer_varmart_external_table: "{bq_prefix}driver_simu_consumer_varmart_external"
-  - from: Feature Consolidation
-    to: Data Preprocessing
-    attributes:
-      export_data_uri: gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_dev_features/part*.parquet
-  - from: Data Preprocessing
-    to: Model Training
-    attributes:
-      data_directory: ../data/ql_store_rmr_driver_dev_features_transformed
-  - from: Model Training
-    to: Model Packaging
-    attributes:
-      tf_model_path: ../artifacts/<model_version>/19/exported_models/din_saved_model
-  - from: Model Packaging
-    to: Model Scoring
-    attributes:
-      m_local_folder: /projects/gds-packman/apps/ql-store-recommendation-prod/research/artifacts/din_20240708/18/exported_models/oot_scoring
-      m_gcp_folder: gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/challenger/oot_scoring
-  - from: Model Scoring
-    to: Performance Evaluation
-    attributes:
-      eval_result_path: gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_oot_transformed_scored
+  to: Feature Consolidation
+  attributes:
+    driver_dev_table: "{bq_prefix}driver_dev"
+    driver_oot_table: "{bq_prefix}driver_oot"
+- from: Feature Engineering
+  to: Feature Consolidation
+  attributes:
+    final_table: "{bq_prefix}driver_consumer_base_gender"
+- from: Data Pulling
+  to: Feature Consolidation
+  attributes:
+    data_loc: "gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_simu_consumer_varmart"
+- from: Feature Consolidation
+  to: Data Preprocessing
+  attributes:
+    export_uri: "gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_dev_features/part*.parquet"
+- from: Data Preprocessing
+  to: Model Training
+  attributes:
+    data_directory: "../data/ql_store_rmr_driver_dev_features_transformed"
+- from: Model Training
+  to: Model Packaging
+  attributes:
+    tf_model_path: "../artifacts/{model_version}/19/exported_models/din_saved_model"
+    categorical_feature_encoders_path: "../artifacts/{model_version}/exported_feature_transformer/categorical_feature_encoders"
+    rcvr_id_tokenizer_path: "../artifacts/{model_version}/exported_feature_transformer/rcvr_id_tokenizer"
+    numerical_feature_scalars_path: "../artifacts/{model_version}/exported_feature_transformer/numerical_feature_scalars"
+- from: Model Packaging
+  to: Model Scoring
+  attributes:
+    exported_model_base: "/projects/gds-packman/apps/ql-store-recommendation-prod/research/artifacts/{model_version}/exported_models"

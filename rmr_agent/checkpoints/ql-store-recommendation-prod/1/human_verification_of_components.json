@@ -4,11 +4,28 @@
       "Driver Creation": {
         "line_range": "1-513",
         "evidence": [
-          "\"Create live unique merchants training table (Lines 18-52): Drops the existing table if it exists. Creates a new table with unique merchants by joining multiple tables and applying filters.\" \u2013 This indicates the creation of a foundational dataset by joining multiple tables and applying filters, which is a key aspect of driver creation.",
-          "\"Create driver_00 table (Lines 54-81): Drops the existing table if it exists. Creates a new table with customer and merchant interaction data, applying various filters and transformations.\" \u2013 This step involves creating a new dataset with specific interactions, which is part of the initial data loading and transformation process.",
-          "\"Create driver_positive_training_split_0 table (Lines 281-307): Drops the existing table if it exists. Creates a new table by splitting positive training samples into hard and uniform negatives.\" \u2013 This step involves creating a new dataset by splitting existing data, which is part of the driver creation process.",
-          "\"Create driver_dev table (Lines 410-445): Drops the existing table if it exists. Combines positive and negative samples into a development dataset, including both hard and uniform negatives.\" \u2013 This step involves combining various samples into a development dataset, which is a key part of creating the driver dataset.",
-          "\"Create driver_oot table (Lines 481-495): Drops the existing table if it exists. Combines positive and negative OOT samples into a single table.\" \u2013 This step involves combining out-of-time samples into a single dataset, which is part of the driver creation process."
+          "\"Create live_unique_merchants_train table (Lines 18-52)\" \u2013 This involves creating a new table with merchant information by joining multiple tables and filtering based on specific conditions, which is part of the initial data loading and extraction process.",
+          "\"Create driver_00 table (Lines 54-81)\" \u2013 This involves creating a new table with customer and merchant interaction data, applying various filters and transformations, which is part of the initial data loading and extraction process.",
+          "\"Create driver_0 table (Lines 84-102)\" \u2013 This involves creating a new table by filtering and combining data from driver_00 based on specific conditions, which is part of the initial data loading and extraction process.",
+          "\"Create driver_1 table (Lines 105-120)\" \u2013 This involves creating a new table with transaction data, joining with merchant information and applying filters, which is part of the initial data loading and extraction process.",
+          "\"Create driver_positive_train_attributed table (Lines 124-168)\" \u2013 This involves creating a new table with positive training samples, applying various transformations and sampling techniques, which is part of the initial data loading and extraction process.",
+          "\"Create driver_positive_train_organic_0 table (Lines 170-204)\" \u2013 This involves creating a new table with organic positive training samples, applying multiple filters to remove biases, which is part of the initial data loading and extraction process.",
+          "\"Create driver_positive_train_organic table (Lines 207-244)\" \u2013 This involves creating a new table with further processed organic positive training samples, applying additional sampling techniques, which is part of the initial data loading and extraction process.",
+          "\"Create driver_positive table (Lines 247-277)\" \u2013 This involves combining various positive training samples into a single table, applying specific conditions and transformations, which is part of the initial data loading and extraction process.",
+          "\"Create driver_positive_training_split_0 table (Lines 281-307)\" \u2013 This involves creating a new table by splitting positive training samples into different types of negatives, which is part of the initial data loading and extraction process.",
+          "\"Create driver_positive_training_split table (Lines 310-321)\" \u2013 This involves adding a count of daily positive samples to the training split table, which is part of the initial data loading and extraction process.",
+          "\"Create driver_training_hard_negative table (Lines 324-336)\" \u2013 This involves creating a new table with hard negative samples by joining with driver_0 and applying specific conditions, which is part of the initial data loading and extraction process.",
+          "\"Create driver_training_hard_negative_downsample table (Lines 339-349)\" \u2013 This involves downsampling hard negative samples based on specific conditions, which is part of the initial data loading and extraction process.",
+          "\"Create driver_training_uniform_negative table (Lines 352-364)\" \u2013 This involves creating a new table with uniform negative samples by joining with live_unique_merchants_train, which is part of the initial data loading and extraction process.",
+          "\"Create driver_training_uniform_negative_remove_window_positive table (Lines 367-376)\" \u2013 This involves removing uniform negative samples that overlap with positive feedback windows, which is part of the initial data loading and extraction process.",
+          "\"Create driver_training_uniform_negative_downsample_0 table (Lines 379-401)\" \u2013 This involves downsampling uniform negative samples based on merchant sampling probabilities, which is part of the initial data loading and extraction process.",
+          "\"Create driver_training_uniform_negative_downsample table (Lines 404-408)\" \u2013 This involves further downsampling uniform negative samples based on a specified ratio, which is part of the initial data loading and extraction process.",
+          "\"Create driver_dev table (Lines 410-445)\" \u2013 This involves combining positive and negative samples into a development dataset, applying specific conditions and transformations, which is part of the initial data loading and extraction process.",
+          "\"Create driver_oot_uniform_negative_0 table (Lines 449-469)\" \u2013 This involves creating a new table with out-of-time (OOT) uniform negative samples, applying specific conditions, which is part of the initial data loading and extraction process.",
+          "\"Create driver_oot_uniform_negative table (Lines 472-478)\" \u2013 This involves removing duplicate OOT uniform negative samples, which is part of the initial data loading and extraction process.",
+          "\"Create driver_oot table (Lines 481-495)\" \u2013 This involves combining positive and negative OOT samples into a single table, which is part of the initial data loading and extraction process.",
+          "\"Create driver_simu table (Lines 498-506)\" \u2013 This involves combining distinct customer and merchant interactions from development and OOT datasets, which is part of the initial data loading and extraction process.",
+          "\"Create driver_simu_consumer table (Lines 509-512)\" \u2013 This involves creating a new table with distinct customer and run date pairs from the simulation dataset, which is part of the initial data loading and extraction process."
         ],
         "why_separate": null,
         "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/00_driver.py"
@@ -28,10 +45,10 @@
       "Data Pulling": {
         "line_range": "1-73",
         "evidence": [
-          "\"Imports necessary modules and sets up a Fetcher object with various configurations such as stage, sequence number, job name, group name, model name, model owner, description, and manager.\" \u2013 This indicates the setup of a Fetcher object, which is typically used for pulling data from a feature store or variable mart.",
-          "\"Configures the Fetcher object with Google Cloud Platform settings including project ID, bucket name, BigQuery project and dataset, and data locations.\" \u2013 This further supports the configuration of a Fetcher object for data pulling.",
-          "\"Specifies the variables to be fetched and sets the split ratio for training data.\" \u2013 This step involves specifying the variables to be fetched, which is a key part of data pulling.",
-          "\"Executes the Fetcher to fetch the data based on the provided configurations.\" \u2013 This confirms the execution of the Fetcher to pull data."
+          "\"Imports necessary modules and sets up a Fetcher object with various attributes like stage, sequence number, job name, group name, model name, model owner, description, and manager.\" \u2013 This indicates the setup of a Fetcher object, which is typically used for pulling data from a feature store or variable mart.",
+          "\"Configures the Fetcher object with Google Cloud Platform settings including project ID, bucket name, BigQuery project and dataset, and data locations.\" \u2013 This further supports the configuration of the Fetcher for data pulling.",
+          "\"Defines a list of variables to fetch and sets the data split ratio for training.\" \u2013 This specifies the variables to be fetched, which is a key part of the data pulling process.",
+          "\"Executes the Fetcher to fetch the data based on the provided configurations.\" \u2013 This confirms the actual data pulling action."
         ],
         "why_separate": null,
         "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_varmart_feat.py"
@@ -41,11 +58,10 @@
       "Feature Consolidation": {
         "line_range": "1-642",
         "evidence": [
-          "Creates a new `driver_dev_features` table with a comprehensive SELECT statement. Joins multiple tables to enrich the data with various features, using COALESCE to handle null values. \u2013 This indicates the merging of multiple datasets into a unified feature set.",
-          "Creates a new `driver_oot_features` table with a comprehensive SELECT statement. Joins multiple tables to enrich the data with various features, using COALESCE to handle null values. \u2013 This further supports the merging of datasets into a unified feature set.",
-          "Creates a new `driver_oot_features_expand_seq` table by expanding sequence features from `sndr_most_recent_100_merch_list` and `sndr_most_recent_100_merch_category` into individual columns. \u2013 This step involves further consolidation by expanding sequence features into individual columns."
+          "\"Create driver_dev_features table\" (Lines 17-218) \u2013 This section constructs a SQL query to join multiple tables and select various features, which is a key aspect of feature consolidation.",
+          "\"Create driver_oot_features table\" (Lines 219-419) \u2013 Similar to the previous block, this section constructs a SQL query to join multiple tables and select various features, further supporting the feature consolidation process."
         ],
-        "why_separate": "The entire section from lines 17 to 624 is dedicated to creating and populating tables by joining multiple datasets, which is a clear indication of feature consolidation. There is no overlap with other components' line ranges as the other sections (loading YAML configuration, extracting dataset prefix, and exporting to GCS) are distinct and do not involve merging datasets.",
+        "why_separate": "There is no overlap with the other identified component's line ranges. This section involves merging multiple datasets into a unified feature set for modeling, which aligns with the Feature Consolidation category.",
         "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/02_combine.py"
       }
     },
@@ -53,14 +69,16 @@
       "Data Preprocessing": {
         "line_range": "1-185",
         "evidence": [
-          "Initializes empty dictionaries to store categorical feature encoders and numerical feature scalers. \u2013 This indicates the setup for data preprocessing tasks.",
-          "Reads all parquet files from a specified directory and concatenates them into a single DataFrame. \u2013 Loading and concatenating data is a common preprocessing step.",
-          "Cleans the state feature by mapping full state names to abbreviations and encoding them using LabelEncoder. \u2013 Cleaning and encoding categorical data is a key part of preprocessing.",
-          "Encodes several categorical features using LabelEncoder and stores the encodings in a dictionary. \u2013 Encoding categorical features is a preprocessing task.",
-          "Scales a list of numerical features using StandardScaler and stores the scaling parameters (mean and standard deviation) in a dictionary. \u2013 Scaling numerical features is a preprocessing task.",
-          "Processes sequence features by replacing missing values, splitting sequences, and padding them to a fixed length. \u2013 Handling sequence features is part of preprocessing.",
-          "Defines a function to write DataFrame chunks to parquet files. \u2013 Writing transformed data to files is often the final step in preprocessing.",
-          "Saves the trained Tokenizer, categorical feature encoders, and numerical feature scalers to files using pickle. \u2013 Exporting feature transformers is part of the preprocessing workflow."
+          "Reads parquet files from a specified directory. Concatenates the data from these files into a single DataFrame. \u2013 This indicates the initial step of loading and combining data, which is a part of preprocessing.",
+          "Creates a mapping from state names to their abbreviations. Applies this mapping to the 'sndr_prmry_addr_state' column in the data. Encodes the state abbreviations using a LabelEncoder. \u2013 This involves encoding categorical variables, a common preprocessing task.",
+          "Encodes several categorical features using LabelEncoders. Stores the encoders for future use. \u2013 This is another instance of encoding categorical variables.",
+          "Standardizes numerical features using StandardScaler. Stores the mean and standard deviation for each feature. \u2013 This involves scaling numerical features, which is part of data preprocessing.",
+          "Processes and pads sequences in the 'sndr_most_recent_100_merch_category' column. \u2013 This involves sequence padding, a preprocessing step for sequence data.",
+          "Tokenizes and pads sequences in the 'sndr_most_recent_100_merch_list' column. Renames the resulting column to 'hist_rcvr_id'. \u2013 This involves tokenization and padding, which are preprocessing steps for text data.",
+          "Tokenizes the 'rcvr_id' column using the previously fitted tokenizer. \u2013 This is another instance of tokenization, a preprocessing step.",
+          "Drops the original merchant list and category columns from the data. \u2013 Dropping unnecessary columns is part of data cleaning, a preprocessing task.",
+          "Defines a function to write data chunks to parquet files. Splits the data into chunks and writes each chunk to a parquet file. \u2013 Writing the preprocessed data to files is the final step in the preprocessing pipeline.",
+          "Saves the tokenizer, categorical feature encoders, and numerical feature scalars to files for future use. \u2013 Saving the preprocessing artifacts is part of the preprocessing workflow."
         ],
         "why_separate": null,
         "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/03_prepare_training_data.py"
@@ -70,8 +88,8 @@
       "Model Training": {
         "line_range": "1-170",
         "evidence": [
-          "\"Set up distributed training strategy and compile model\" \u2013 This indicates the setup for training the model using TensorFlow's MirroredStrategy.",
-          "\"Train the model using the training and validation datasets\" \u2013 This confirms the actual training process of the model."
+          "\"Set up and compile the model\" \u2013 This indicates the configuration and compilation of the model, which is a part of the training process.",
+          "\"Train the model with early stopping\" \u2013 This clearly describes the training process, including the use of early stopping based on validation loss."
         ],
         "why_separate": null,
         "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/04_training.py"
@@ -79,11 +97,11 @@
       "Model Packaging": {
         "line_range": "171-269",
         "evidence": [
-          "\"Save the trained model in H5 and TensorFlow SavedModel formats\" \u2013 This indicates the saving of the trained model in deployment-ready formats.",
-          "\"Convert TensorFlow model to ONNX format and save the ONNX specification\" \u2013 This shows the conversion of the model to another format for deployment.",
-          "\"Create and save production model with preprocessing layers\" \u2013 This involves creating a production-ready model that includes preprocessing steps."
+          "\"Save the trained model in both H5 and TensorFlow SavedModel formats\" \u2013 This indicates the process of saving the trained model, which is part of model packaging.",
+          "\"Convert TensorFlow model to ONNX format and save the ONNX specification\" \u2013 This describes the conversion of the model to a deployment-ready format (ONNX), which is a key aspect of model packaging.",
+          "\"Build an ONNX graph with preprocessing layers and save the final model\" \u2013 This further supports the packaging process by including preprocessing layers in the final model."
         ],
-        "why_separate": "The model packaging steps are distinct from the training process and involve saving the model in various formats and preparing it for deployment, which is a separate workflow node from training.",
+        "why_separate": "Verification of ZERO overlap with other components' line ranges: The lines for Model Packaging (171-186, 207-229) do not overlap with the lines for Model Training (140-170). Justification for why this should be split from the other code: Model Packaging involves saving the trained model into deployment-ready formats and ensuring it includes necessary preprocessing steps, which is distinct from the training process itself. This split results in the Model Packaging category as defined above.",
         "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/04_training.py"
       }
     },
@@ -91,9 +109,10 @@
       "Model Scoring": {
         "line_range": "1-104",
         "evidence": [
-          "\"Defines a function `oot_data_eval` to evaluate out-of-time (OOT) data. Loads OOT data and model files. Scores the data using the loaded models. Saves the scored data to a specified path.\" \u2013 This clearly describes the process of scoring data using a trained model, which fits the Model Scoring category.",
-          "\"Configures and submits a Spark job to GCP for scoring the OOT data. Specifies the function to run, packages to install, and other job parameters.\" \u2013 This indicates the execution of the scoring function on a distributed system, which is part of the Model Scoring process.",
-          "\"Creates or replaces an external table in BigQuery using the scored data stored in GCS.\" \u2013 This step involves saving the scored data, which is a typical part of the Model Scoring workflow."
+          "Defines a function `oot_data_eval` to evaluate out-of-time (OOT) data. \u2013 This indicates the primary function of the code is to score the OOT data using a trained model.",
+          "Uses `ModelScorer` to create a DataFrame with scores. \u2013 This shows the actual scoring process where the model is applied to the data.",
+          "Configures and submits a Spark job to Google Cloud Platform (GCP) for scoring the OOT data. \u2013 This confirms that the scoring process is executed as a job on GCP, which is a typical setup for model scoring tasks.",
+          "Monitors the Spark job status and waits for its completion. \u2013 This is part of the scoring process, ensuring that the job runs to completion and the results are obtained."
         ],
         "why_separate": null,
         "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.py"
@@ -104,12 +123,12 @@
       "Model Evaluation": {
         "line_range": "1-731",
         "evidence": [
-          "Calculate recall metrics and save performance data (Lines 375-446): Calculates recall metrics for different models and saves the results to a CSV file. Plots the performance metrics and saves the plot as an image. \u2013 This indicates the calculation of performance metrics, which is part of model evaluation.",
-          "Calculate recall metrics for specific merchant category and save performance data (Lines 448-530): Calculates recall metrics for different models for a specific merchant category and saves the results to a CSV file. Plots the performance metrics and saves the plot as an image. \u2013 This continues the process of calculating performance metrics for a specific category.",
-          "Calculate recall metrics excluding specific merchants and save performance data (Lines 531-607): Calculates recall metrics for different models excluding specific merchants and saves the results to a CSV file. Plots the performance metrics and saves the plot as an image. \u2013 This step involves calculating performance metrics excluding specific merchants.",
-          "Calculate recall metrics for recent data and save performance data (Lines 608-731): Calculates recall metrics for different models for recent data and saves the results to a CSV file. Plots the performance metrics and saves the plot as an image. \u2013 This step involves calculating performance metrics for recent data."
+          "\"Calculate recall metrics and save performance data (Lines 375-430)\" \u2013 This indicates the calculation of performance metrics, which is a key part of model evaluation.",
+          "\"Calculate recall metrics for specific merchant category and save performance data (Lines 448-530)\" \u2013 This further supports the evaluation of the model by calculating metrics for a specific subset of data.",
+          "\"Calculate recall metrics excluding specific merchants and save performance data (Lines 532-607)\" \u2013 This shows the evaluation of the model by excluding certain data points, which is part of assessing model performance.",
+          "\"Calculate recall metrics for recent and older data and save performance data (Lines 608-731)\" \u2013 This indicates the evaluation of the model over different time periods, which is crucial for understanding model performance over time."
         ],
-        "why_separate": "The model evaluation steps are distinct from the driver creation steps as they involve calculating and saving performance metrics, which is a separate process from creating and transforming the driver dataset. There is no overlap with the driver creation line ranges.",
+        "why_separate": null,
         "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/06_evaluation.py"
       }
     }

@@ -1,0 +1,129 @@
+{
+  "attribute_parsing": [
+    {
+      "Driver Creation": {
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/00_driver.py",
+        "line_range": "1-513",
+        "inputs": [
+          "config_file_path: '../config/base_config.yaml'",
+          "bq_project_dataset_prefix: config['general_config']['bq_project_dataset_prefix']",
+          "training_exclude_merch: config['driver_config']['training_exclude_merch']",
+          "train_start_date: config['driver_config']['train_start_date']",
+          "oot_start_date: config['driver_config']['oot_start_date']",
+          "val_start_date: config['driver_config']['val_start_date']",
+          "training_hot_positive_attributed_txn_sampling_alpha: config['driver_config']['training_hot_positive_attributed_txn_sampling_alpha']",
+          "training_attributed_txn_upsampling_rate: config['driver_config']['training_attributed_txn_upsampling_rate']",
+          "removing_highly_active_user_threshold: config['driver_config']['removing_highly_active_user_threshold']",
+          "removing_highly_active_user_merchant_threshold: config['driver_config']['removing_highly_active_user_merchant_threshold']",
+          "removing_highly_active_user_merchant_date_threshold: config['driver_config']['removing_highly_active_user_merchant_date_threshold']",
+          "training_hot_positive_organic_txn_sampling_alpha: config['driver_config']['training_hot_positive_organic_txn_sampling_alpha']",
+          "save_label_mixing_rate: config['driver_config']['save_label_mixing_rate']",
+          "ratio_for_hard_negtive: config['driver_config']['ratio_for_hard_negtive']",
+          "hard_negative_impression_time_window: config['driver_config']['hard_negative_impression_time_window']",
+          "negative_sampling_avoid_delay_postive_feedback_window: config['driver_config']['negative_sampling_avoid_delay_postive_feedback_window']",
+          "training_hot_negative_sampling_alpha: config['driver_config']['training_hot_negative_sampling_alpha']",
+          "uniform_negative_postive_ratio: config['driver_config']['uniform_negative_postive_ratio']"
+        ],
+        "outputs": [
+          "final_driver_table: '{bq_prefix}driver_simu_consumer'"
+        ]
+      }
+    },
+    {
+      "Driver Creation": {
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_bq_feat.py",
+        "line_range": "1-819",
+        "inputs": [
+          "file_path: '../config/base_config.yaml'",
+          "bq_prefix: config['general_config']['bq_project_dataset_prefix']",
+          "train_start_date: config['driver_config']['train_start_date']"
+        ],
+        "outputs": [
+          "final_driver_table: '{bq_prefix}driver_consumer_base_gender'"
+        ]
+      }
+    },
+    {
+      "Data Pulling": {
+        "file_name": "rmr_agent/repos/ql-store-recommendation-prod/research/pipeline/01_varmart_feat.py",
+        "line_range": "1-73",
+        "inputs": [
+          "is_prod: 'True'",
+          "stage: 'training'",
+          "job_name: 'ql_store_rmr'",
+          "group_name: 'mls_gads'",
+          "model_name: 'ql_store_rmr_datafetcher'",
+          "model_owner: 'chenzhao'",
+          "description: 'ranking_combined_datafetcher'",
+          "manager: 'Farhad'",
+          "on_gcp: True",
+          "gcp_project_id: 'ccg24-hrzana-gds-pacman'",
+          "gcs_bucket_name: 'pypl-bkt-rsh-row-std-gds-pacman'",
+          "bq_materialization_project: 'pypl-bods'",
+          "bq_materialization_dataset: 'rsh_row_gds_pacman'",
+          "driver_loc: 'gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_simu_consumer'",
+          "variables: ['prmry_addr_state', 'days_on_file', 'ebay_member_y_n', 'consu_engagmnt_seg_key', 'prmry_cc_type_code', 'days_appweb_visit', 'consu_age_band_key', 'consu_income_band_key', 'consu_dmgrphc_seg_key']",
+          "split_ratio: {\"train\": 1.0}",
+          "num_of_splits: 1"
+        ],
+        "outputs": [
+          "data_loc: 'gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_simu_consumer_varmart'"
+        ]
+      }
+    },
+    {
+      "Load YAML Configuration": {
+        "file_name": "research/driver_creation.ipynb",
+        "line_range": "Lines 258-311",
+        "inputs": [
+          "file_path: '../config/base_config.yaml'"
+        ],
+        "outputs": [
+          "config: Loaded YAML content"
+        ]
+      },
+      "Create Driver Dev Features Table": {
+        "file_name": "research/driver_creation.ipynb",
+        "line_range": "Lines 258-311",
+        "inputs": [
+          "bq_prefix: Value from config['general_config']['bq_project_dataset_prefix']"
+        ],
+        "outputs": [
+          "table_name: '{bq_prefix}driver_dev_features'"
+        ]
+      },
+      "Create Driver OOT Features Table": {
+        "file_name": "research/driver_creation.ipynb",
+        "line_range": "Lines 258-311",
+        "inputs": [
+          "bq_prefix: Value from config['general_config']['bq_project_dataset_prefix']"
+        ],
+        "outputs": [
+          "table_name: '{bq_prefix}driver_oot_features'"
+        ]
+      },
+      "Create Driver OOT Features Expand Seq Table": {
+        "file_name": "research/driver_creation.ipynb",
+        "line_range": "Lines 258-311",
+        "inputs": [
+          "bq_prefix: Value from config['general_config']['bq_project_dataset_prefix']"
+        ],
+        "outputs": [
+          "table_name: '{bq_prefix}driver_oot_features_expand_seq'"
+        ]
+      },
+      "Export Data to GCS": {
+        "file_name": "research/driver_creation.ipynb",
+        "line_range": "Lines 258-311",
+        "inputs": [
+          "uri: 'gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_dev_features/part*.parquet'",
+          "format: 'parquet'",
+          "overwrite: true"
+        ],
+        "outputs": [
+          "exported_data: 'gs://pypl-bkt-rsh-row-std-gds-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_driver_dev_features'"
+        ]
+      }
+    }
+  ]
+}

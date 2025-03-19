@@ -26,7 +26,7 @@ def parse_github_url(url: str) -> tuple[str, str]:
         ('owner', 'repo_name')
     """
     # First attempt: use regex pattern
-    pattern = r"(?:https?://)?(?:www\.)?github\.(?:[\w.]+)/([^/]+)/([^/]+?)(?:\.git)?/?$"
+    pattern = r"(?:https?://)?(?:www\.)?github\.(?:[\w.]+)/([^/]+)/([^/]+?)(?:\.git|/tree/|/blob/|/commit/|/pull/|/issues/)?(?:/.*)?$"
     match = re.match(pattern, url)
     
     if match:
@@ -35,12 +35,14 @@ def parse_github_url(url: str) -> tuple[str, str]:
     
     # Second attempt: use URL parsing
     try:
+        # Parse the URL and get the path
+        parsed_url = urlparse(url)
         # Split the path and remove empty strings
-        path_parts = [p for p in urlparse(url).path.split('/') if p]
+        path_parts = [p for p in parsed_url.path.split('/') if p]
         
         if len(path_parts) >= 2:
-            owner = path_parts[-2]
-            repo = path_parts[-1].replace('.git', '')
+            owner = path_parts[0]
+            repo = path_parts[1].replace('.git', '')
             return owner, repo
             
     except Exception as e:

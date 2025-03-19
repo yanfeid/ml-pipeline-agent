@@ -58,10 +58,11 @@ def parse_attribute_identification(component_identification_dict, attribute_text
 }}
 
 ### Make Sure To:
-1. Keep the line range exactly as specified in the text.
-2. Extract all input and output items with their variable names and descriptions.
-3. Exclude input/output attributes that contain function/method calls or list comprehension expressions. 
-4. Ignore any additional text that appears after the last component.
+1. Exclude any extra components which are not present in the "Components Locations" section with a file name and line range identified
+2. Keep the line range exactly as specified in the text.
+3. Extract all input and output items with their variable names and descriptions. If no name is present, make a descriptive name for the attribute. 
+4. Exclude input/output attributes that contain function/method calls or list comprehension expressions. 
+5. Ignore any additional text that appears after the last component.
 
 ### Component Locations:
 {location_str}

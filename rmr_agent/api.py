@@ -53,7 +53,7 @@ STEPS = [
 ]
 
 
-async def save_human_feedback(request: ComponentsResponse | DagResponse, repo_name: str, run_id: str, background_tasks: BackgroundTasks = None):
+def save_human_feedback(request: ComponentsResponse | DagResponse, repo_name: str, run_id: str, background_tasks: BackgroundTasks = None):
     # Save the human verification response
     if not run_id:
         raise HTTPException(400, "run_id required for continuing")
@@ -80,7 +80,7 @@ async def save_human_feedback(request: ComponentsResponse | DagResponse, repo_na
     return {"repo_name": repo_name, "run_id": run_id, "step": step_name, "status": "running"}
 
 
-async def run_workflow_background(request: WorkflowRequest, repo_name: str, run_id: str, start_idx: int):
+def run_workflow_background(request: WorkflowRequest, repo_name: str, run_id: str, start_idx: int):
     # Get the global state
     state = workflow_states[repo_name][run_id]
     state["step"] = STEPS[start_idx][0]
@@ -109,7 +109,7 @@ async def run_workflow_background(request: WorkflowRequest, repo_name: str, run_
             state.update(step_output)
             # Save to checkpoints folder
             save_step_output(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name, run_id=run_id, step=step_name, output=step_output)
-            await asyncio.sleep(1)
+            # await asyncio.sleep(1)
         else:
             # Loop completed without break - mark that we have successfully completed the entire workflow
             if state.get("status") != "cancelled":
@@ -122,7 +122,7 @@ async def run_workflow_background(request: WorkflowRequest, repo_name: str, run_
 
 
 @app.get("/workflow-status/{repo_name}")
-async def get_workflow_status(
+def get_workflow_status(
     repo_name: str,
     run_id: str = Query(..., description="Run ID for continuing workflow")
 ):
@@ -135,10 +135,11 @@ async def get_workflow_status(
         raise HTTPException(status_code=404, detail=f"Run ID {run_id} not found in repository {repo_name}")
     
     # Return the current state for this specific run
+    print("returning status update with current step being: ", workflow_states[repo_name][run_id]["step"])
     return workflow_states[repo_name][run_id]
 
 @app.post("/cancel-workflow/{repo_name}")
-async def cancel_workflow(
+def cancel_workflow(
     repo_name: str,
     run_id: str = Query(..., description="Run ID for continuing workflow")
 ):
@@ -157,7 +158,7 @@ async def cancel_workflow(
 
 # Main workflow endpoint
 @app.post("/run-workflow")
-async def run_workflow_endpoint(
+def run_workflow_endpoint(
     request: WorkflowRequest | ComponentsResponse | DagResponse,
     repo_name: str = Query(..., description="Repository name (required)"),
     run_id: Optional[str] = Query(None, description="Run ID for continuing workflow"),
@@ -174,7 +175,7 @@ async def run_workflow_endpoint(
         # Initialize the workflow state
         if repo_name not in workflow_states:
             workflow_states[repo_name] = {}
-            
+
         workflow_states[repo_name][run_id] = {
             # status related
             "step": step_name,
@@ -210,13 +211,15 @@ async def run_workflow_endpoint(
         return {"repo_name": repo_name, "run_id": run_id, "step": step_name, "status": status}
     elif isinstance(request, ComponentsResponse):
         # Save the verified components and move on to next step
+        workflow_states[repo_name]["step"] = "human_verification_of_components"
         workflow_states[repo_name]["status"] = "saving_feedback"
-        result = await save_human_feedback(request=request, repo_name=repo_name, run_id=run_id, background_tasks=background_tasks)
+        result = save_human_feedback(request=request, repo_name=repo_name, run_id=run_id, background_tasks=background_tasks)
         return result
     elif isinstance(request, DagResponse):
         # Save the verified DAG and move on to next step
+        workflow_states[repo_name]["step"] = "human_verification_of_dag"
         workflow_states[repo_name]["status"] = "saving_feedback"
-        result = await save_human_feedback(request=request, repo_name=repo_name, run_id=run_id, background_tasks=background_tasks)
+        result = save_human_feedback(request=request, repo_name=repo_name, run_id=run_id, background_tasks=background_tasks)
         return result
     else:
         raise HTTPException(400, "Invalid request type")
