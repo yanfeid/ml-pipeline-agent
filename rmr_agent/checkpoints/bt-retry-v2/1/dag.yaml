@@ -1,71 +1,57 @@
 nodes:
-- Driver Creation:
+- Driver Creation 1:
     file_name: rmr_agent/repos/bt-retry-v2/etl/01_etl.py
     line_range: 1-1125
     inputs:
-      base_transactions_table: pypl-edl.braintree_raw_tables.gateway_transactions
-      retry_transactions_table: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_retry_transactions
-      primary_retry_transactions_table: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_primary_retry_transactions
-      fx_info_table: pypl-edw.pp_access_views.dim_curr_exchng_rate_dly
-      authy_merchants_table: pypl-edl.braintree_raw_tables.authy_merchants
-      payment_methods_table: pypl-edl.braintree_raw_tables.gateway_payment_methods
-      credit_cards_table: pypl-edl.braintree_raw_tables.gateway_credit_cards
-      network_tokenization_enrollments_table: pypl-edl.braintree_raw_tables.gateway_network_tokenization_enrollments
-      credit_card_details_table: pypl-edl.braintree_raw_tables.gateway_credit_card_details
-      bin_features_table: pypl-edw.pp_cmt_access_views.bt_unbranded_retry_bin
-      strategy_features_table: pypl-edw.pp_cmt_access_views.bt_unbranded_retry_strategy
-      bin_strategy_features_table: pypl-edw.pp_cmt_access_views.bt_unbranded_retry_bin_strategy
-      three_d_secure_results_table: pypl-edl.braintree_raw_tables.gateway_three_d_secure_results
-      three_d_secure_verifications_table: pypl-edl.braintree_raw_tables.gateway_three_d_secure_verifications
-      verifications_table: pypl-edl.braintree_raw_tables.gateway_verifications
-      vaulted_payment_method_grants_table: pypl-edl.braintree_raw_tables.gateway_vaulted_payment_method_grants
-      salem_settings_table: pypl-edl.braintree_raw_tables.gateway_salem_settings
-      adyen_settings_table: pypl-edl.braintree_raw_tables.gateway_adyen_settings
-      world_pay_settings_table: pypl-edl.braintree_raw_tables.gateway_world_pay_settings
-      first_data_settings_table: pypl-edl.braintree_raw_tables.gateway_first_data_settings
-      visa_direct_settings_table: pypl-edl.braintree_raw_tables.gateway_visa_direct_settings
-      mastercard_direct_settings_table: pypl-edl.braintree_raw_tables.gateway_mastercard_direct_settings
-      aib_settings_table: pypl-edl.braintree_raw_tables.gateway_aib_settings
-      card_processor_settings_table: pypl-edl.braintree_raw_tables.gateway_card_processor_settings
-      omnipay_direct_settings_table: pypl-edl.braintree_raw_tables.gateway_omnipay_direct_settings
-      amex_direct_settings_table: pypl-edl.braintree_raw_tables.gateway_amex_direct_settings
-      nab_settings_table: pypl-edl.braintree_raw_tables.gateway_nab_settings
-      moneris_settings_table: pypl-edl.braintree_raw_tables.gateway_moneris_settings
-      paypal_closed_loop_settings_table: pypl-edl.braintree_raw_tables.gateway_paypal_closed_loop_settings
-      tsys_settings_table: pypl-edl.braintree_raw_tables.gateway_tsys_settings
-      custom_actions_settings_table: pypl-edl.braintree_raw_tables.gateway_custom_actions_settings
-      fake_processor_settings_table: pypl-edl.braintree_raw_tables.gateway_fake_processor_settings
-      date_range_start: '2023-08-15'
-      date_range_end: '2025-01-02'
-      sampling_factor: '15'
-      train_downsampling_factor: '900'
-      validation_downsampling_factor_start: '900'
-      validation_downsampling_factor_end: '950'
-      oot_downsampling_factor: '950'
+      Source Table: pypl-edl.braintree_raw_tables.gateway_custom_actions_settings
+      Date Range: 2023-01-01' to '2025-01-02
     outputs:
-      final_driver_table: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
-      train_table: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3
-      validation_table: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3
-      test_table: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
-      scratch_test_table: pypl-edw.pp_scratch.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
-- Driver Creation:
+      Final Driver Table: pypl-edw.pp_scratch.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
+- Driver Creation 2:
     file_name: rmr_agent/repos/bt-retry-v2/etl/02_bq_to_dataproc.py
     line_range: 1-40
     inputs:
-      spark_jars: gs://spark-lib/bigquery/spark-bigquery-with-dependencies_2.12-0.18.1.jar
-      spark_executor_extraClassPath: spark-bigquery-with-dependencies_2.12-0.18.1.jar
-      spark_driver_extraClassPath: spark-bigquery-with-dependencies_2.12-0.18.1.jar
-      viewsEnabled: 'true'
-      materializationProject: pypl-edw
-      materializationDataset: pp_scratch
-      temporaryGcsBucket: pypl-bkt-rsh-row-std-gds-pacman
-      source_table_name_train: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train
-      source_table_name_valid: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid
-      source_table_name_test: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test
+      source_table_name: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test
+      spark.jars: gs://spark-lib/bigquery/spark-bigquery-with-dependencies_2.12-0.18.1.jar
+      spark.executor.extraClassPath: spark-bigquery-with-dependencies_2.12-0.18.1.jar
+      spark.driver.extraClassPath: spark-bigquery-with-dependencies_2.12-0.18.1.jar
+      spark.conf.set("viewsEnabled"): 'true'
+      spark.conf.set("materializationProject"): pypl-edw
+      spark.conf.set("materializationDataset"): pp_scratch
+      spark.conf.set('temporaryGcsBucket'): pypl-bkt-rsh-row-std-gds-pacman
     outputs:
-      target_gcs_path_train: gs://pypl-bkt-rsh-row-std-gds-pacman/user/dnaomi/bt_retry_refresh/pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_2
-      target_gcs_path_valid: gs://pypl-bkt-rsh-row-std-gds-pacman/user/dnaomi/bt_retry_refresh/pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_2
-      target_gcs_path_test: gs://pypl-bkt-rsh-row-std-gds-pacman/user/dnaomi/bt_retry_refresh/pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_2
+      target_gcs_path: gs://pypl-bkt-rsh-row-std-gds-pacman/user/dnaomi/bt_retry_refresh/pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_2
+- Model Training:
+    file_name: rmr_agent/repos/bt-retry-v2/model-dev/train.py
+    line_range: 1-367
+    inputs:
+      TRAIN_PARQUET_PATH: /projects/dnaomi/bt-retry-global-v2/data/pypl-bods.gds_pacman_prod.bt_retry_global_v2_driverset_cc_renamed_radd_subset_filtered_full_train_3/
+      VAL_PARQUET_PATH: /projects/dnaomi/bt-retry-global-v2/data/pypl-bods.gds_pacman_prod.bt_retry_global_v2_driverset_cc_renamed_radd_subset_filtered_full_valid_3/
+      V2_FEATURES_PATH: /projects/dnaomi/bt-retry-global-v2/metadata/v2_features.txt
+      V1_LATEST_FEATURES_PATH: /projects/dnaomi/bt-retry-global-v2/metadata/v0_features_latest.txt
+      numerical_columns: "['setec_txn_amt_usd', 'idi_bt_unbranded_retry_bin_rdd_cnt_pri_success_ratio_7d',\
+        \ ...] (abbreviated)"
+      integer_columns: "[]"
+      encoded_columns: "[]"
+      categorical_columns: "['merchant_fk', 'setec_currency_code', 'primary_response_type',\
+        \ ...] (abbreviated)"
+      target_col: retry_is_success
+      features: "['setec_txn_amt_usd', 'idi_bt_unbranded_retry_bin_rdd_cnt_pri_success_ratio_7d',\
+        \ ...] (abbreviated)"
+      EARLY_STOPPING_PARAMS: "{\"stopping_rounds\": 10}"
+      EARLY_STOPPING_METRIC: average_precision
+      METRIC_FUNCTIONS: "[precision_at_95, precision_at_99, savings_at_95, savings_at_99,\
+        \ partial_aucpr_geq90]"
+      METRIC_NAMES: "[\"precision_at_95\", \"precision_at_99\", \"savings_at_95\"\
+        , \"savings_at_99\", \"partial_aucpr_geq90\"]"
+      OBJECTIVE_METRIC_NAME: partial_aucpr_geq90
+      best_params: "{'colsample_bytree': 0.5837239684404587, 'learning_rate': 0.0598927112458938,\
+        \ 'min_child_samples': 61, 'min_data_in_bin': 25, 'num_leaves': 217, 'num_trees':\
+        \ 141, 'n_estimators': 141, 'n_jobs': 8, 'reg_alpha': 4.784258485091152e-08,\
+        \ 'reg_lambda': 0.0002699654851946926, 'subsample': 0.6899589770039457, 'subsample_freq':\
+        \ 5}"
+    outputs:
+      Model artifact path: /projects/dnaomi/bt-retry-global-v2/models/final/bt_retry_v2.txt
 - Model Evaluation:
     file_name: rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py
     line_range: 1-383
@@ -76,58 +62,18 @@ nodes:
       V2_FEATURES_PATH: /projects/dnaomi/bt-retry-global-refresh/metadata/v2_features_final_2.txt
       V2_MODEL_PATH: /projects/dnaomi/bt-retry-global-refresh/models/final/bt_retry_v2.txt
       numerical_columns: "[\"setec_txn_amt_usd\", \"idi_bt_unbranded_retry_bin_rdd_cnt_pri_success_ratio_7d\"\
-        , ...]"
+        , ...] (abbreviated)"
       integer_columns: "[]"
       categorical_columns: "[\"merchant_fk\", \"setec_currency_code\", \"primary_response_type\"\
-        , ...]"
+        , ...] (abbreviated)"
       target_col: retry_is_success
+      METRIC_FUNCTIONS: "[precision_at_95, precision_at_99, precision_at_995, savings_at_95,\
+        \ savings_at_99, savings_at_995, partial_aucpr_geq90]"
       METRIC_NAMES: "[\"precision_at_95\", \"precision_at_99\", \"precision_at_995\"\
         , \"savings_at_95\", \"savings_at_99\", \"savings_at_995\", \"partial_aucpr_geq90\"\
         ]"
     outputs:
-      valid_data_filtered_path: /projects/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
-- Model Training:
-    file_name: rmr_agent/repos/bt-retry-v2/model-dev/train.py
-    line_range: 1-367
-    inputs:
-      train_data_path: /projects/dnaomi/bt-retry-global-v2/data/pypl-bods.gds_pacman_prod.bt_retry_global_v2_driverset_cc_renamed_radd_subset_filtered_full_train_3/
-      val_data_path: /projects/dnaomi/bt-retry-global-v2/data/pypl-bods.gds_pacman_prod.bt_retry_global_v2_driverset_cc_renamed_radd_subset_filtered_full_valid_3/
-      features_path: /projects/dnaomi/bt-retry-global-v2/metadata/v2_features.txt
-      latest_features_path: /projects/dnaomi/bt-retry-global-v2/metadata/v0_features_latest.txt
-      numerical_columns: "[\"setec_txn_amt_usd\", \"idi_bt_unbranded_retry_bin_rdd_cnt_pri_success_ratio_7d\"\
-        , ...]"
-      integer_columns: "[]"
-      categorical_columns: "[\"merchant_fk\", \"setec_currency_code\", \"primary_response_type\"\
-        , ...]"
-      target_col: retry_is_success
-      best_params: |-
-        - colsample_bytree: 0.5837239684404587
-                    - learning_rate: 0.0598927112458938
-                    - min_child_samples: 61
-                    - min_data_in_bin: 25
-                    - num_leaves: 217
-                    - num_trees: 141
-                    - n_estimators: 141
-                    - n_jobs: 8
-                    - reg_alpha: 4.784258485091152e-08
-                    - reg_lambda: 0.0002699654851946926
-                    - subsample: 0.6899589770039457
-                    - subsample_freq: 5
-      early_stopping_params: "{\"stopping_rounds\": 10}"
-      early_stopping_metric: average_precision
-      objective_metric_name: partial_aucpr_geq90
-    outputs:
-      model_artifact_path: /projects/dnaomi/bt-retry-global-v2/models/final/bt_retry_v2.txt
-      feature_importance_path: /projects/dnaomi/bt-retry-global-v2/metadata/v2_features_final.txt
-      metrics_output_path: /projects/dnaomi/bt-retry-global-v2/metadata/metrics_output.csv
-      mlflow_tracking_url: https://mlflow.apps.cosmos-onprem.dp.lvs.paypalinc.com
-      experiment_name: bt_retry_global_v2_full_fts_strategy_subset_model_all_strat_valid_control
-      study_name: bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control
-      studies_dir: ../reports/studies/
-      study_dir: ../reports/studies/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control
-      optuna_study_path: ../reports/studies/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control.pkl
-      stdout_path: ../reports/studies/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control-stdout.txt
-      stderr_path: ../reports/studies/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control-stdout.txt
+      valid_data_filtered_final.csv: /projects/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
 - Model Packaging:
     file_name: rmr_agent/repos/bt-retry-v2/deployment/01_export_to_ume.py
     line_range: 1-60
@@ -147,103 +93,43 @@ nodes:
     outputs:
       model_json_with_pd_path: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json
       output_path: /projects/dnaomi/bt-retry-global-v2/models/ume/
-- Feature Selection:
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
+- Model Scoring:
+    file_name: rmr_agent/repos/bt-retry-v2/deployment/02_pyscoring_validation.py
+    line_range: 1-140
     inputs:
       numerical_columns: "[\"setec_txn_amt_usd\", \"idi_bt_unbranded_retry_bin_rdd_cnt_pri_success_ratio_7d\"\
         , ...]"
       integer_columns: "[]"
-      encoded_columns: "[]"
       categorical_columns: "[\"merchant_fk\", \"setec_currency_code\", \"primary_response_type\"\
         , ...]"
       target_col: retry_is_success
-    outputs: {}
-- Model Training:
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
+      MODELS_DIR: /home/dnaomi/bt-retry-global-refresh/models/ume/
       MODEL_DIR: /home/dnaomi/bt-retry-global-refresh/models/ume/
       MODEL_UME_NAME: bt_retry_v2
-    outputs: {}
-- Model Validation:
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
       VALID_SAMPLE_PATH: /home/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
-      numerical_columns: "[\"setec_txn_amt_usd\", \"idi_bt_unbranded_retry_bin_rdd_cnt_pri_success_ratio_7d\"\
-        , ...]"
-      integer_columns: "[]"
-      categorical_columns: "[\"merchant_fk\", \"setec_currency_code\", \"primary_response_type\"\
-        , ...]"
-    outputs: {}
-- Feature List Loading:
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
-      features_file_path: /projects/dnaomi/bt-retry-global-refresh/metadata/v2_features_final_2.txt
     outputs:
-      features: "[\"feature_1\", \"feature_2\", ...]"
-- Model Prediction:
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
-      model_file: /home/dnaomi/bt-retry-global-refresh/models/ume/ume/bt_retry_v2.m
-      valid_sample: DataFrame loaded from VALID_SAMPLE_PATH
-    outputs:
-      ume_predictions_valid: DataFrame with predictions
-- Filtered Predictions Saving:
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
-      ume_preds_filtered: DataFrame with filtered predictions
-    outputs:
-      filtered_predictions_path: /projects/dnaomi/bt-retry-global-refresh/deployment/cosmos_ai_valid_data.csv
-- Model Validation with LightGBM:
-    file_name: research/driver_creation.ipynb
-    line_range: Lines 258-311
-    inputs:
-      model_file: /home/dnaomi/bt-retry-global-refresh/models/ume/ume/bt_retry_v2.m
-      VALID_SAMPLE_PATH: /home/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
-      score_column: v2_score
-      delta: 1e-6
-    outputs:
-      valid_mismatches: Validation results
+      ume_predictions_valid: DataFrame with UME model predictions
+      ume_preds_filtered: DataFrame with filtered UME model predictions
+      scored_data_path: /projects/dnaomi/bt-retry-global-refresh/deployment/cosmos_ai_valid_data.csv
 
 edges:
-- from: Driver Creation
-  to: Driver Creation
-  attributes:
-    train_table: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3
-    validation_table: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3
-    test_table: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
-- from: Driver Creation
+- from: Driver Creation 1
   to: Model Evaluation
   attributes:
-    test_table: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
-- from: Model Evaluation
-  to: Model Validation
+    Final Driver Table: pypl-edw.pp_scratch.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
+- from: Driver Creation 2
+  to: Model Training
   attributes:
-    valid_data_filtered_path: /projects/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
+    target_gcs_path: gs://pypl-bkt-rsh-row-std-gds-pacman/user/dnaomi/bt_retry_refresh/pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_2
 - from: Model Training
-  to: Model Packaging
+  to: Model Evaluation
   attributes:
-    feature_importance_path: /projects/dnaomi/bt-retry-global-v2/metadata/v2_features_final.txt
-    model_artifact_path: /projects/dnaomi/bt-retry-global-v2/models/final/bt_retry_v2.txt
+    Model artifact path: /projects/dnaomi/bt-retry-global-v2/models/final/bt_retry_v2.txt
+- from: Model Evaluation
+  to: Model Scoring
+  attributes:
+    valid_data_filtered_final.csv: /projects/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
 - from: Model Packaging
-  to: Model Prediction
+  to: Model Scoring
   attributes:
-    model_file: /home/dnaomi/bt-retry-global-refresh/models/ume/ume/bt_retry_v2.m
-- from: Model Prediction
-  to: Filtered Predictions Saving
-  attributes:
-    ume_predictions_valid: DataFrame with predictions
-- from: Model Validation
-  to: Model Validation with LightGBM
-  attributes:
-    VALID_SAMPLE_PATH: /home/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
-    model_file: /home/dnaomi/bt-retry-global-refresh/models/ume/ume/bt_retry_v2.m
-- from: Feature List Loading
-  to: Model Packaging
-  attributes:
-    features_file_path: /projects/dnaomi/bt-retry-global-refresh/metadata/v2_features_final_2.txt
+    output_path: /projects/dnaomi/bt-retry-global-v2/models/ume/

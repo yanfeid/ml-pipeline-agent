@@ -4,7 +4,7 @@ import yaml
 import re
 from typing import List, Dict
 import litellm
-from llms import LLMClient
+from rmr_agent.llms import LLMClient
 
 
 def clean_string_value(value):
@@ -66,7 +66,7 @@ def dict_list_to_yaml(components_list):
             # Create a new component name, potentially with a number suffix
             final_component_name = component_name
             if component_occurance_count[component_name] > 1:
-                final_component_name = f"{component_name}_{component_counter[component_name]}"
+                final_component_name = f"{component_name} {component_counter[component_name]}"
 
             # Create a dictionary for this component
             yaml_component = {
@@ -88,7 +88,7 @@ def dict_list_to_yaml(components_list):
                     # Clean the value string - remove outer quotes and unescape inner quotes
                     value = clean_string_value(value)
                     
-                    yaml_component[component_name]['inputs'][key] = value
+                    yaml_component[final_component_name]['inputs'][key] = value
             
             # Process outputs 
             for output_item in component_data['outputs']:
@@ -100,7 +100,7 @@ def dict_list_to_yaml(components_list):
                     # Clean the value string
                     value = clean_string_value(value)
                     
-                    yaml_component[component_name]['outputs'][key] = value
+                    yaml_component[final_component_name]['outputs'][key] = value
             
             yaml_list.append(yaml_component)
     

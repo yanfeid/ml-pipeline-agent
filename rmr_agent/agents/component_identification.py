@@ -1,7 +1,7 @@
 import os
 import json
 import litellm
-from llms import LLMClient
+from rmr_agent.llms import LLMClient
     
 def get_component_definitions_str():
     with open('rmr_agent/ml_components/component_definitions.json', 'r') as f:

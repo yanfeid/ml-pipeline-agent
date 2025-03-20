@@ -1,17 +1,17 @@
 import os
 import json
 from typing import Dict, Any
-from llms import LLMClient
 import litellm
+from rmr_agent.llms import LLMClient
 
 
 component_specific_hints = {
     "Driver Creation": [
-        "Focus on major inputs like raw data paths (e.g., BigQuery table paths) and SQL query parameters.",
+        "For the input variables, focus on SQL query parameters. Do not include tables.",
         "Output should only be the very final driver table/dataset. It is often also saved to GCS (e.g. parquet, CSV).",
         "Intermediate table results should NEVER be included (e.g. positive, negative, base tables etc.). Focus on the major inputs and FINAL output table(s) of the entire driver creation process.",
         #"The final driver dataset contains the all of the basic rows and metadata all in one table (e.g. class labels (0, 1), class weights, split category (train, val, test/OOT)).",
-        "If the different splits (train, validation, OOT (test)) are saved in separate tables/datasets, include those as output attributes as well."
+        "If the different splits (train, validation, test, OOT) are saved in separate tables/datasets, include those as output variables as well."
     ],
     "Feature Engineering": [
         "Inputs include driver dataset (BigQuery table or GCS path) and SQL query parameters for transformations",
@@ -72,7 +72,7 @@ component_specific_hints = {
 }
 
 generic_tips = [
-    "User specified a custom component name, use your best judgment of what input & output attributes exist for this component that should be made configurable"
+    "User specified a custom component name, use your best judgment of what input & output variables exist for this component that should be made configurable"
 ]
 
 def get_component_hints(component, component_specific_hints):    
@@ -104,54 +104,42 @@ def attribute_identification_agent(python_file_path: str, component_dict: Dict[s
     # Identify attributes for each of the identified components separately for improved accuracy
     for component, component_details in component_dict.items():
         line_range = component_details["line_range"]
+        start_line_str, end_line_str = line_range.split('-')
+        start_line, end_line = max(int(start_line_str) - 1, 0), int(end_line_str)
+        component_code = clean_code[start_line:end_line]
         formatted_component_hints = get_component_hints(component, component_specific_hints)
         attribute_prompt = f"""### SETTING:
-You are analyzing python code which comes from a jupyter notebook in a ML workflow. You will be provided with the code itself and a machine learning (ML) component that was identified to be present in the code. Your task is to determine the input and output attributes for this component.
+You are analyzing Python code which comes from a jupyter notebook in a ML workflow. You will be provided with the code itself and a machine learning (ML) component that was identified to be present in the code. Your task is to determine the input and output variables for this component.
 
 ### INSTRUCTIONS
-1. Examine the component's code carefully, leveraging the line number ranges given for the component for rough guidance. 
-2. Identify all input attribute names and values. For example:
-    - Local/GCS data paths (e.g., '/data/train.csv', 'gs://bucket/data.parquet')
-    - Column/feature lists and names (e.g., features = ['age', 'income'], meta_columns = ['cust_id', 'weight'], target_col = 'target')
-    - Model parameters (e.g., learning_rate=0.01, loss='binary_crossentropy', epochs=5, batch_size=512)
-    - Other pipeline-relevant attributes
-3. Identify all output attribute names and values. For example:
-    - Local/GCS data paths (e.g., '/data/train.csv', 'gs://bucket/data.parquet')
-    - Model artifact paths (e.g., '/saved_model_ume/model.m')
-4. For each attribute identified, provide:
-    a. The attribute name
+1. Examine the component's code carefully
+2. Identify all input variables (name & value).
+3. Identify all output variables (name & value).
+4. For each variable identified, provide:
+    a. The variable name, formatted as valid Python variable names: use all lowercase letters, with words separated by underscores (e.g. driver_output_path, batch_size). Avoid spaces, uppercase letters, or special characters other than underscores.
     b. The current value in the code
 
 ### ADDITIONAL GUIDANCE
-    - Focus only on input/output attributes that should be configurable in a rerunnable pipeline. Pay special attention to hardcoded values that might change between pipeline runs!
-    - Look for patterns like:
-        - File paths in string literals
-        - Configuration parameters passed to functions
-        - Constants defined at the top of files
-        - Command line arguments or gsutil commands
-        - Values written to or read from config files
+    - Focus only on input/output variables that should be configurable in a rerunnable pipeline. Pay special attention to hardcoded variables that might change between pipeline runs!
     - Include only static, configurable variables. Exclude function/method calls and file name lists.
     - You may abbreviate the value for an attribute if it is especially long (e.g. feature list with 10+ hard coded feature names)
-    - Make sure each attribute in your output has a corresponding attribute name followed by its value
+    - Make sure each variable in your response has both a variable name followed by its value
     
 ### OUTPUT FORMAT:
 [Component Name]:
-    Inputs:
-        - [Attribute Name]: [Attribute Value - abbreviated if a long list of values]
-    Outputs:
-        - [Attribute Name]: [Attribute Value - abbreviated if a long list of values]
+    inputs:
+        [input_attribute_name]: [input attribute value]
+    outputs:
+        [output_attribute_name]: [output attribute value]
 
 ### IDENTIFIED ML COMPONENT:
 {component}
 
-### LINE RANGE
-{line_range}
-
-### COMPONENT SPECIFIC HINTS FOR IDENTIFYING ATTRIBUTES:
+### COMPONENT SPECIFIC HINTS FOR IDENTIFYING VARIABLES:
 {formatted_component_hints}
         
-### CURRENT FILE'S CODE:
-{clean_code}
+### COMPONENT CODE:
+{component_code}
     """
         #print(attribute_prompt)
         llm_client = LLMClient(model_name="gpt-4o")

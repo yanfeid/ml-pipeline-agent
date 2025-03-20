@@ -1,7 +1,7 @@
 import os
-from utils import preprocess_python_file
-from llms import LLMClient
 import litellm
+from rmr_agent.llms import LLMClient
+from rmr_agent.utils import preprocess_python_file
 
 def summarize_code(python_file_path, full_file_list):
     base_name = os.path.basename(python_file_path)  

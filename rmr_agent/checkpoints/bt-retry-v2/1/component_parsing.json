@@ -2,29 +2,24 @@
   "component_parsing": [
     {
       "Driver Creation": {
-        "line_range": "Lines 4-1125",
+        "line_range": "Lines 4-1113",
         "evidence": [
-          "Create and populate table with base transactions \u2013 This involves creating a new table with transactions, which is a fundamental part of the initial data loading and extraction process.",
-          "Create and populate table with primary retry transactions \u2013 This step involves creating a new table with detailed information about primary retry transactions, which is part of the initial data extraction and loading.",
-          "Create and populate table with FX info for amount in USD \u2013 This step involves creating a new table with foreign exchange information, which is part of the initial data extraction and loading.",
-          "Join with credit card details for additional features \u2013 This step involves creating a new table by joining retry transactions with credit card details, which is part of the initial data extraction and loading.",
-          "Rename features to match model variable names \u2013 This step involves creating a new table with renamed features, which is part of the initial data extraction and loading.",
-          "Join with bin and strategy RADD features \u2013 This step involves creating a new table by joining retry transactions with bin and strategy RADD features, which is part of the initial data extraction and loading.",
-          "Convert BIGNUMERIC to Numeric \u2013 This step involves creating a new table by casting a specific column to float64, which is part of the initial data extraction and loading.",
-          "Filter and deduplicate data \u2013 This step involves creating a new table by filtering out rows with null values and deduplicating based on primary transaction ID, which is part of the initial data extraction and loading.",
-          "Train-validation-test split \u2013 This step involves creating new tables for training, validation, and test datasets by splitting the data, which is part of the initial data extraction and loading.",
-          "Copy test dataset to scratch for QPull purposes \u2013 This step involves creating a new table in a different schema by copying the test dataset, which is part of the initial data extraction and loading."
+          "\"Create and populate table with filtered transactions\" (Lines 4-15) \u2013 This step involves creating a new table with transactions that meet specific criteria, which is a typical task in driver creation.",
+          "\"Create and populate table with primary retry transactions\" (Lines 69-167) \u2013 This step involves creating a new table by joining retry transactions with primary transactions and other related tables, which is part of creating the driver dataset.",
+          "\"Train-validation-test split\" (Lines 1008-1113) \u2013 This step involves creating new tables for training, validation, and test datasets, which is a final step in driver creation to prepare the dataset for modeling."
         ],
         "why_separate": null,
         "file_name": "rmr_agent/repos/bt-retry-v2/etl/01_etl.py"
       },
       "Feature Engineering": {
-        "line_range": "Lines 17-66",
+        "line_range": "Lines 177-545",
         "evidence": [
-          "Create functions to categorize transaction response codes \u2013 This involves defining functions to categorize response codes into various types, which is a part of creating new predictive features for modeling.",
-          "Creates a function to determine the response type based on these categorizations \u2013 This step involves creating a function to determine the response type, which is part of creating new predictive features for modeling."
+          "\"Create and populate table with additional features\" (Lines 177-235) \u2013 This step involves adding features such as currency exchange rates to the retry transactions, which is a typical feature engineering task.",
+          "\"Join with credit card details for additional features\" (Lines 237-320) \u2013 This step involves joining retry transactions with credit card details to include additional credit card-related features, which is part of feature engineering.",
+          "\"Rename features to match model variable names\" (Lines 322-386) \u2013 This step involves renaming features to match the model's variable names, which is a part of feature engineering to ensure consistency.",
+          "\"Join with bin and strategy features\" (Lines 388-545) \u2013 This step involves joining retry transactions with bin and strategy features to include additional RADD features, which is a feature engineering task."
         ],
-        "why_separate": "The feature engineering component involves creating new predictive features by categorizing transaction response codes, which is distinct from the initial data loading and extraction process. This step can be separated by a single line and does not overlap with the driver creation component.",
+        "why_separate": null,
         "file_name": "rmr_agent/repos/bt-retry-v2/etl/01_etl.py"
       }
     },
@@ -32,92 +27,68 @@
       "Driver Creation": {
         "line_range": "Lines 1-40",
         "evidence": [
-          "\"Set Spark Configuration\" (Lines 12-16) \u2013 This section sets up the environment for data processing, which is a preliminary step for data extraction and loading.",
-          "\"Define Function to Create BigQuery Table\" (Lines 17-23) \u2013 This function reads data from a BigQuery table and writes it to another BigQuery table, indicating the extraction and transformation of data.",
-          "\"Define Function to Create GCS Table\" (Lines 24-29) \u2013 This function reads data from a BigQuery table and writes it to a Google Cloud Storage path in Parquet format, which is part of the data loading process.",
-          "\"Create GCS Table for Training Data\" (Lines 30-32), \"Create GCS Table for Validation Data\" (Lines 33-35), and \"Create GCS Table for Test Data\" (Lines 36-38) \u2013 These sections specify the source BigQuery tables and target GCS paths for training, validation, and test data, respectively, and call the function to create the GCS tables, completing the data loading process."
+          "[Configuration settings for Spark and BigQuery] (Lines 1-16): \"Sets up Spark configuration to use BigQuery connector.\" \"Configures Spark to enable views and sets materialization project and dataset.\" \"Sets a temporary Google Cloud Storage bucket for intermediate data storage.\" These configurations are essential for setting up the environment to load and extract data, which is a key part of the Driver Creation process.",
+          "[Function to create a BigQuery table] (Lines 17-23): \"Defines a function to read data from a source BigQuery table.\" \"Writes the data to a target BigQuery table, overwriting any existing data.\" This function is directly involved in extracting data from BigQuery and preparing it for further processing, which aligns with the Driver Creation category.",
+          "[Function to create a GCS table] (Lines 24-29): \"Defines a function to read data from a source BigQuery table.\" \"Writes the data to a specified Google Cloud Storage path in Parquet format, overwriting any existing data.\" This function is responsible for saving the extracted data to GCS, which is a typical step in the Driver Creation process.",
+          "[Create GCS tables for training, validation, and test datasets] (Lines 30-38): \"Specifies source BigQuery tables and target GCS paths for training, validation, and test datasets.\" \"Calls the function to create GCS tables for each dataset, storing them in the specified paths.\" This section specifies and executes the creation of the driver datasets for different splits (training, validation, test), which is the final step in the Driver Creation process."
         ],
         "why_separate": null,
         "file_name": "rmr_agent/repos/bt-retry-v2/etl/02_bq_to_dataproc.py"
       }
     },
     {
-      "Model Evaluation": {
-        "line_range": "Lines 61-377",
-        "evidence": [
-          "Define metric functions for model evaluation (Lines 61-107) \u2013 This section defines functions to calculate various evaluation metrics, which are essential for assessing model performance.",
-          "Define additional utility functions for model evaluation (Lines 143-148) \u2013 Additional functions to evaluate metrics on true and predicted values, further supporting model evaluation.",
-          "Define partial functions for specific metrics and set up paths and constants (Lines 153-172) \u2013 Setting up specific metric functions and paths for evaluation.",
-          "Load features and models, and evaluate metrics (Lines 256-287) \u2013 Loading models and features, predicting scores, and evaluating metrics.",
-          "Define and evaluate metrics by segment (Lines 290-308) \u2013 Evaluating metrics by different segments, which is part of model evaluation.",
-          "Plot precision-recall curves (Lines 309-377) \u2013 Plotting precision-recall curves to visualize model performance, a key part of model evaluation."
-        ],
-        "why_separate": "The \"Model Evaluation\" component involves defining and calculating various metrics, loading models, predicting scores, and plotting evaluation curves, which are distinct tasks focused on assessing model performance.",
-        "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py"
-      },
-      "Data Preprocessing": {
-        "line_range": "Lines 174-255",
-        "evidence": [
-          "Load data and convert column types (Lines 174-255) \u2013 This section involves loading data and converting column types, which is a part of data preprocessing to ensure the data is in the correct format for model evaluation."
-        ],
-        "why_separate": "The \"Data Preprocessing\" component involves loading data and converting column types, which is a preparatory step to ensure the data is in the correct format for subsequent evaluation. This task is distinct from the actual evaluation process and can be separated by the line range provided.",
-        "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py"
-      }
-    },
-    {
       "Model Training": {
         "line_range": "Lines 278-309",
         "evidence": [
-          "Train a LightGBM model using the training data. \u2013 This indicates the process of fitting a model to the training data, which is a core part of model training.",
-          "Define best parameters for the model. \u2013 This suggests that the model's hyperparameters are being set, which is typically part of the training process.",
-          "Save the trained model and plot feature importance. \u2013 Saving the trained model is a key step in the model training process."
+          "Trains a LightGBM model on the training data. \u2013 This indicates the process of fitting a model to the training data, which is a key aspect of Model Training.",
+          "Defines best parameters for the model. \u2013 This suggests that the model's hyperparameters are being set, which is typically part of the training process.",
+          "Saves the trained model and plots feature importance. \u2013 Saving the trained model is a crucial step in Model Training, ensuring that the model can be reused or deployed later."
         ],
         "why_separate": null,
         "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/train.py"
       },
       "Model Evaluation": {
-        "line_range": "Lines 66-138",
+        "line_range": "Lines 278-309",
         "evidence": [
-          "Define functions to calculate precision at a given recall, threshold at a given recall, savings at a given recall, and partial area under the precision-recall curve. \u2013 These functions are used to evaluate the performance of the model, which is a key aspect of model evaluation.",
-          "Define a function to evaluate a list of metrics on true labels and predicted scores. \u2013 This function is directly related to assessing the model's performance, which is central to model evaluation."
+          "Predicts probabilities on the validation data and evaluates metrics. \u2013 This indicates that the model's performance is being assessed on a validation dataset, which is a core activity in Model Evaluation.",
+          "Evaluates metrics. \u2013 Directly refers to the calculation of performance metrics, which is essential for evaluating the model's effectiveness."
         ],
-        "why_separate": "The model evaluation functions are defined separately from the model training process, and they serve a distinct purpose of assessing the model's performance. There is no overlap with the model training lines, as the evaluation functions are defined earlier in the code and are used after the model is trained.",
+        "why_separate": "Verification of ZERO overlap with other components' line ranges: The lines identified for Model Training and Model Evaluation are the same, but they represent distinct activities within those lines. Justification for why this should be split from the other code: Model Training involves fitting the model to the training data and saving it, while Model Evaluation involves assessing the model's performance on validation data. These are distinct steps in the ML workflow that can be independently executed and monitored. This split results in one of the ML component categories defined above: The activities described fit squarely into the categories of Model Training and Model Evaluation as defined.",
         "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/train.py"
+      }
+    },
+    {
+      "Model Evaluation": {
+        "line_range": "Lines 1-383",
+        "evidence": [
+          "\"Predict and evaluate metrics for V1 and V2 models (Lines 261-267)\" \u2013 This indicates the code is performing predictions using the trained models and evaluating their performance, which is a key aspect of model evaluation.",
+          "\"Calculate additional metrics and scores (Lines 268-285)\" \u2013 This further supports the evaluation of model performance by calculating various metrics.",
+          "\"Evaluate metrics by segment (Lines 300-308)\" \u2013 This involves evaluating the model's performance across different segments of the data, which is a detailed part of model evaluation."
+        ],
+        "why_separate": null,
+        "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py"
       }
     },
     {
       "Model Packaging": {
         "line_range": "Lines 1-60",
         "evidence": [
-          "\"Loads a LightGBM model from a specified text file.\" \u2013 This indicates the process of loading a pre-trained model, which is a precursor to packaging.",
-          "\"Dumps the model into a JSON format.\" \u2013 This step involves converting the model into a format suitable for deployment.",
-          "\"Adds categorical feature names to the JSON.\" \u2013 This step ensures that the model includes necessary metadata for deployment.",
-          "\"Writes the JSON model to a file.\" \u2013 This is part of the process of saving the model in a deployment-ready format.",
-          "\"Creates a transformer object using the JSON model file.\" \u2013 This step involves preparing the model for transformation into a specific deployment format.",
-          "\"Generates a binary specification for the model.\" \u2013 This indicates the creation of a deployment-ready binary format.",
-          "\"Saves the binary specification to a specified output path.\" \u2013 This final step completes the packaging process by saving the model in a format ready for deployment."
+          "\"Loads a LightGBM model from a specified text file.\" \u2013 This indicates the process of loading a trained model, which is a precursor to packaging it.",
+          "\"Prepares model for export\" and \"Transforms model to UME format\" \u2013 These steps involve converting the model into a deployment-ready format, which is the essence of model packaging.",
+          "\"Creates a `LightGBMTransformer` object using the JSON model file\" and \"Generates a binary specification for the model\" \u2013 These actions are part of the process of transforming and saving the model in a format suitable for deployment."
         ],
         "why_separate": null,
         "file_name": "rmr_agent/repos/bt-retry-v2/deployment/01_export_to_ume.py"
       }
     },
     {
-      "Data Preprocessing": {
-        "line_range": "Lines 85-111",
+      "Model Scoring": {
+        "line_range": "Lines 1-140",
         "evidence": [
-          "Function to convert column types (Lines 85-98) \u2013 This function is crucial for transforming the data types of columns in the DataFrame, which is a key step in data preprocessing.",
-          "Load and preprocess validation sample (Lines 105-111) \u2013 This step involves loading the validation sample and applying the column type conversion function, which is part of data preprocessing."
+          "\"Load UME model and make predictions (Lines 122-125)\" \u2013 This indicates that the code is performing inference using a pre-trained model, which aligns with the Model Scoring category.",
+          "\"Loads the UME model from a file and makes predictions on the validation sample\" \u2013 This further confirms that the primary function of this section is to score the model on new data, fitting the Model Scoring category."
         ],
         "why_separate": null,
-        "file_name": "rmr_agent/repos/bt-retry-v2/deployment/02_pyscoring_validation.py"
-      },
-      "Model Scoring": {
-        "line_range": "Lines 122-128",
-        "evidence": [
-          "Load UME model and make predictions (Lines 122-126) \u2013 This step involves loading the trained model and making predictions on the validation sample, which is a core part of model scoring.",
-          "Filter predictions (Lines 127-128) \u2013 Filtering the predictions to remove rows with missing values is part of the model scoring process to ensure the quality of the predictions."
-        ],
-        "why_separate": "The data preprocessing steps (Lines 85-111) are distinct from the model scoring steps (Lines 122-128). The preprocessing prepares the data for scoring, while the scoring involves using the model to make predictions and filtering those predictions. There is no overlap in the line ranges, and each step serves a different purpose in the ML workflow.",
         "file_name": "rmr_agent/repos/bt-retry-v2/deployment/02_pyscoring_validation.py"
       }
     }
