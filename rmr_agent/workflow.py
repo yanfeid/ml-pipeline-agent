@@ -37,7 +37,7 @@ def summarize(state: WorkflowState) -> Dict[str, Any]:
     if "summaries" in state and state["summaries"]:
         print("Skipping summarize: 'summaries' already in state")
         return {}
-    from agents.summarization import summarize_code
+    from rmr_agent.agents.summarization import summarize_code
     full_file_list = state["files"]
     summaries = {}
     cleaned_code = {}
@@ -66,7 +66,7 @@ def run_component_identification(state: WorkflowState) -> Dict[str, Any]:
     if "component_identification" in state and state["component_identification"]:
         print("Skipping run_component_identification: 'component_identification' already in state")
         return {}
-    from agents.component_identification import component_identification_agent
+    from rmr_agent.agents.component_identification import component_identification_agent
     full_file_list = state["files"]
     summaries = state["summaries"]
     component_identification = []
@@ -91,7 +91,7 @@ def run_component_parsing(state: WorkflowState) -> Dict[str, Any]:
     if "component_parsing" in state and state["component_parsing"]:
         print("Skipping run_component_parsing: 'component_parsing' already in state")
         return {}
-    from agents.component_parsing import parse_component_identification
+    from rmr_agent.agents.component_parsing import parse_component_identification
     full_file_list = state["files"]
     component_identification = state["component_identification"]
     component_parsing = []
@@ -175,7 +175,7 @@ def run_attribute_identification(state: WorkflowState) -> Dict[str, Any]:
     if 'attribute_identification' in state and state['attribute_identification']:
         print("Skipping run_attribute_identification: 'attribute_identification' already in state")
         return {}
-    from agents.attribute_identification import attribute_identification_agent
+    from rmr_agent.agents.attribute_identification import attribute_identification_agent
     full_file_list = state["files"]
     verified_components = state['verified_components']
     cleaned_code = state['cleaned_code']
@@ -202,7 +202,7 @@ def run_attribute_parsing(state: WorkflowState) -> Dict[str, Any]:
     if 'attribute_parsing' in state and state['attribute_parsing']:
         print("Skipping run_attribute_parsing: 'attribute_parsing' already in state")
         return {}
-    from agents.attribute_parsing import parse_attribute_identification
+    from rmr_agent.agents.attribute_parsing import parse_attribute_identification
     verified_components = state['verified_components']
     attribute_identification = state['attribute_identification']
     attribute_parsing = []
@@ -226,7 +226,7 @@ def run_node_aggregator(state: WorkflowState) -> Dict[str, Any]:
     if "node_aggregator" in state and state["node_aggregator"]:
         print("Skipping run_node_aggregator: 'node_aggregator' already in state")
         return {}
-    from agents.node_aggregator import node_aggregator_agent
+    from rmr_agent.agents.node_aggregator import node_aggregator_agent
     nodes_yaml = node_aggregator_agent(state["attribute_parsing"])
     nodes_yaml_path = f"{CHECKPOINT_BASE_PATH}/{state['repo_name']}/{state['run_id']}/nodes.yaml"
     try:
@@ -242,7 +242,7 @@ def run_edge_identification(state: WorkflowState) -> Dict[str, Any]:
     if "edges" in state and state["edges"]:
         print("Skipping run_edge_identification: 'edges' already in state")
         return {}
-    from agents.edge_identification import edge_identification_agent
+    from rmr_agent.agents.edge_identification import edge_identification_agent
     edges = edge_identification_agent(state["node_aggregator"])
     return {"edges": edges}
 
@@ -250,7 +250,7 @@ def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
     if "dag_yaml" in state and state["dag_yaml"]:
         print("Skipping generate_dag_yaml: 'dag_yaml' already in state")
         return {}
-    from agents.dag import generage_dag_yaml
+    from rmr_agent.agents.dag import generage_dag_yaml
     dag_yaml_str = generage_dag_yaml(aggregated_nodes=state["node_aggregator"], edges=state["edges"])
     dag_yaml_path = f"{CHECKPOINT_BASE_PATH}/{state['repo_name']}/{state['run_id']}/dag.yaml"
     try:
@@ -278,7 +278,7 @@ def run_config_agent(state: WorkflowState) -> Dict[str, Any]:
     if "config" in state and state["config"]:
         print("Skipping run_config_agent: 'config' already in state")
         return {}
-    from agents.ini_config import config_agent
+    from rmr_agent.agents.ini_config import config_agent
     config = config_agent(state["verified_dag"])
     return {"config": config}
 
@@ -286,7 +286,7 @@ def run_notebook_agent(state: WorkflowState) -> Dict[str, Any]:
     if "notebooks" in state and state["notebooks"]:
         print("Skipping run_notebook_agent: 'notebooks' already in state")
         return {}
-    from agents.notebook import notebook_agent
+    from rmr_agent.agents.notebook import notebook_agent
     notebooks = notebook_agent(state["verified_dag"])
     return {"notebooks": notebooks}
 

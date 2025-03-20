@@ -361,16 +361,20 @@ def human_verification_of_components_ui(repo_name, run_id):
                         value=line_range_identified,
                         key=f"{current_index}_{component_name}_line_range"
                     )
-                    st.write(f"Please delete this component if it is not actually present in your code!")
-                    st.write(f"Please correct the line range for this component by viewing the cleaned code to the right")
-                    st.write(f"     - Ensure line range is **not overlapping** with other components")
-                    st.write(f"     - Don't worry about import statements - just focus on setting the correct line ranges for each identified component.")
+                    st.write(f"**Please delete this identified ML component if**:")
+                    st.write(f"     - It is not actually what your code is doing")
+                    st.write(f"     - It is not actually a separate ML component that should run independently")
+                    st.write(f"     - It's line range overlaps with other identified components in this file")
+                    st.write(f"Otherwise, please **correct the line range above** for this component by viewing the cleaned code to the right")
+                    st.write(f"     - Ensure the line range is **not overlapping** with other components")
+                    st.write(f"     - Don't worry about import statements")
                     
                     # Show evidence and why_separate for existing components
                     if component_name in current_components_dict:
-                        show_evidence = st.checkbox("Show Evidence for this ML component classification", key=str(uuid.uuid4()))
+                        show_evidence = st.checkbox("Show Evidence for this ML component classification", key=f"{component_name}_{current_index}")
                         if show_evidence:
                             with st.container():
+                                st.write("**Classification Evidence**:")
                                 for evidence in details["evidence"]:
                                     st.write(f"- {evidence}")
                                 if len(current_components_dict) > 1:
@@ -378,7 +382,7 @@ def human_verification_of_components_ui(repo_name, run_id):
                                     st.write(f"**Why this was identified as a separate component**:\n{details['why_separate']}")
                 
                 # Update line_range and store
-                details["line_range"] = line_range
+                details["line_range"] = clean_line_range(line_range).replace(':', '-')
                 edited_components_dict[component_name] = details
 
             # Navigation
@@ -396,11 +400,15 @@ def human_verification_of_components_ui(repo_name, run_id):
         
             # Submit all when done
             if current_index == total_files - 1 and st.button("Submit All Components"):
-                st.session_state["edited_components_list"].append(edited_components_dict)
+                st.session_state["edited_components_list"][current_index] = edited_components_dict
                 payload = {"verified_components": st.session_state["edited_components_list"]}
                 st.session_state.workflow_running = True # before submit back to API, set workflow running again to continue polling
                 submit_human_feedback(payload=payload, repo_name=repo_name, run_id=run_id)
                 st.session_state["edited_components_list"] = []
+
+            st.write("**Tips**:")
+            st.write("  - Please review the Descriptions for Available ML Components on the left for further details how we define each component")
+            st.write("  - Select 'Other' if you feel none of the available ML components match what your code in this file is doing.")
 
         with col_2:
             st.subheader("") # filler space for better alignment

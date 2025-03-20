@@ -4,8 +4,8 @@
   "files": [
     "rmr_agent/repos/bt-retry-v2/etl/01_etl.py",
     "rmr_agent/repos/bt-retry-v2/etl/02_bq_to_dataproc.py",
-    "rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py",
     "rmr_agent/repos/bt-retry-v2/model-dev/train.py",
+    "rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py",
     "rmr_agent/repos/bt-retry-v2/deployment/01_export_to_ume.py",
     "rmr_agent/repos/bt-retry-v2/deployment/02_pyscoring_validation.py"
   ]

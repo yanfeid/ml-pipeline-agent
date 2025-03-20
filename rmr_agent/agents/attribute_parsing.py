@@ -1,7 +1,7 @@
 from pathlib import Path
 import litellm
-from llms import LLMClient
-from utils import convert_to_dict
+from rmr_agent.llms import LLMClient
+from rmr_agent.utils import convert_to_dict
 
 
 def update_attributes_with_existing_config(attribute_yaml, config_path):
