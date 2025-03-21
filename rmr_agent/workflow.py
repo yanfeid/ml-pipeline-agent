@@ -78,11 +78,11 @@ def run_component_identification(state: WorkflowState) -> Dict[str, Any]:
             full_file_list
         )
         
-        for file, nodes in results:
+        for file, component_id_str in results:
             if is_cancelled(state):
                 print("Workflow cancelled during component identification")
                 return {}
-            component_identification.append(nodes)
+            component_identification.append(component_id_str)
             print(f"Identified components for {file}")
 
     return {"component_identification": component_identification}
@@ -103,11 +103,11 @@ def run_component_parsing(state: WorkflowState) -> Dict[str, Any]:
             zip(full_file_list, component_identification)
         )
         
-        for file, parsed_component_identification_text, parsed_component_identification_dict in results:
+        for file, parsed_component_id_text, parsed_component_id_dict in results:
             if is_cancelled(state):
                 print("Workflow cancelled during component parsing")
                 return {}
-            component_parsing.append(parsed_component_identification_dict)
+            component_parsing.append(parsed_component_id_dict)
             print(f"Parsed the component identification response for {file}")
 
     return {"component_parsing": component_parsing}
@@ -210,7 +210,7 @@ def run_attribute_parsing(state: WorkflowState) -> Dict[str, Any]:
     with ThreadPoolExecutor() as executor:
         # Map processing across threads using a lambda
         results = executor.map(
-            lambda pair: (pair[0], *parse_attribute_identification(pair[0], pair[1])),
+            lambda x: (x[0], *parse_attribute_identification(x[0], x[1])),
             zip(verified_components, attribute_identification)
         )
         

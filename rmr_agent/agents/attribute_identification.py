@@ -36,7 +36,7 @@ component_specific_hints = {
         "Shifu runs normalization through the eval() method with the '-norm' flag set. The resulting normalized dataset will be located in the `hdfsModelSetPath` if specified"
     ],
     "Feature Selection": [
-        "Input is train dataset path(s), candidate feature lists, meta feature lists, target column lists, etc.",
+        "Input is train dataset path(s), and may include other parameters and the target column list, etc.",
         "Outputs include final variable list path and optional feature importance path",
         "Look for Shifu or model_automation calls"
     ],
@@ -50,6 +50,14 @@ component_specific_hints = {
         "Output is model artifact path using library-specific formats (e.g., .h5, .tf, .model, .pt, .txt, .json on local or GCS)",
         "If hyperparameter optimization is present, the output may include those final hyperparameter values",
         "Note that Model Packaging to formats such as UME and ONNX is considered a separate component from Model Training, so do not include them here"
+    ],
+    "Hyperparameter Optimization": [
+        "Inputs include training data path (potentially normalized data paths or tfrecord paths), initial hyperparameters (e.g., learning_rate, n_estimators), and training params (e.g., epochs, batch_size)",
+        "Output should be the final best hyperparameter results path (e.g. optuna study path)"
+    ],
+    "Model Ensembling": [
+        "Inputs include the trained models' paths and any other ensembling parameters",
+        "Output is the final ensembled model artifact path",
     ],
     "Model Packaging": [
         "Input is trained model path (e.g., 'gs://bucket/model.h5') and optional preprocessing logic (e.g., Shifu path, saved preprocessor paths)",
@@ -104,42 +112,53 @@ def attribute_identification_agent(python_file_path: str, component_dict: Dict[s
     # Identify attributes for each of the identified components separately for improved accuracy
     for component, component_details in component_dict.items():
         line_range = component_details["line_range"]
-        start_line_str, end_line_str = line_range.split('-')
-        start_line, end_line = max(int(start_line_str) - 1, 0), int(end_line_str)
-        component_code = clean_code[start_line:end_line]
         formatted_component_hints = get_component_hints(component, component_specific_hints)
-        attribute_prompt = f"""### SETTING:
-You are analyzing Python code which comes from a jupyter notebook in a ML workflow. You will be provided with the code itself and a machine learning (ML) component that was identified to be present in the code. Your task is to determine the input and output variables for this component.
+        attribute_prompt = f"""You are analyzing Python code from a machine learning (ML) component within an ML workflow (DAG). You will be given the code along with the identified ML component. Your task is to extract the input and output variables for this component into a valid JSON. 
 
-### INSTRUCTIONS
-1. Examine the component's code carefully
-2. Identify all input variables (name & value).
-3. Identify all output variables (name & value).
-4. For each variable identified, provide:
-    a. The variable name, formatted as valid Python variable names: use all lowercase letters, with words separated by underscores (e.g. driver_output_path, batch_size). Avoid spaces, uppercase letters, or special characters other than underscores.
-    b. The current value in the code
+### Instructions:
+    1. Examine the component's code carefully, leveraging the verified **line range** provided. 
+    2. Identify all **input** variables (name & value) for this component.
+    3. Identify all **output** variables (name & value) for this component. 
+    4. For each input and output variable identified, provide:
+        a. The variable **name**: the exact Python variable name if it exists
+            - If there is no existing variable name, create a descriptive name which follows standard Python variable naming: use all lowercase letters, with words separated by underscores (e.g. driver_output_path, batch_size). Avoid spaces, uppercase letters, or special characters other than underscores.
+        b. The current **value** in the code
+    5. Detect variables loaded from a configuration file - identify whether any of the variables you found have a value which is missing in the code and instead being loaded dynamically from a configuration file
 
-### ADDITIONAL GUIDANCE
-    - Focus only on input/output variables that should be configurable in a rerunnable pipeline. Pay special attention to hardcoded variables that might change between pipeline runs!
-    - Include only static, configurable variables. Exclude function/method calls and file name lists.
-    - You may abbreviate the value for an attribute if it is especially long (e.g. feature list with 10+ hard coded feature names)
-    - Make sure each variable in your response has both a variable name followed by its value
+### Additional Guidance:
+    - Focus only on input/output variables that should be **configurable** in a rerunnable pipeline. Pay special attention to hardcoded variables that might change between pipeline runs!
+        - If a variable should be configurable and is already being loaded from a config file, still include it. Your output will be used in the next step to retrieve its actual value from the config file.
+    - Include only static, configurable variables. Exclude function/method calls and file name lists. Paths constructed with `os.path.join()` are okay to include.
+    - Exclude long column lists, such as categorical, numerical, meta, or candidate columns, from being treated as variables. The target (or label) column list, weight column list, can be included as variables however. Also, lists used directly in data operations (e.g., join keys, filter keys, grouping keys, indexing or sort keys) are fine to include if necessary.
+    - Make sure each variable in your response has both a variable name followed by its value. Use valid JSON structure for your output. 
     
-### OUTPUT FORMAT:
-[Component Name]:
-    inputs:
-        [input_attribute_name]: [input attribute value]
-    outputs:
-        [output_attribute_name]: [output attribute value]
+### Output Format (JSON):
+{{
+    "Component Name": {{
+        "inputs": [
+            {{"name": "variable_name_1", "value": "variable value 1"}},
+            {{"name": "variable_name_2", "value": "variable value 2"}},
+        ],
+        "outputs": [
+            {{"name": "variable_name_1", "value": "variable value 1"}},
+            {{"name": "variable_name_2", "value": "variable value 2"}},
+        ],
+        "needs_config_fill": false // Mark as true if any variable values are loading from a config
+    }}
+}}
 
-### IDENTIFIED ML COMPONENT:
+
+### The Identified ML Component:
 {component}
 
-### COMPONENT SPECIFIC HINTS FOR IDENTIFYING VARIABLES:
+### Line range to focus on for this ML Component:
+{line_range}
+
+### Hints for Identifying Input & Output Variables for this Component:
 {formatted_component_hints}
         
-### COMPONENT CODE:
-{component_code}
+### Code:
+{clean_code}
     """
         #print(attribute_prompt)
         llm_client = LLMClient(model_name="gpt-4o")
