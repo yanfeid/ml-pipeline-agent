@@ -78,6 +78,9 @@ def display_welcome_page():
     )
     st.session_state["start_from"] = start_from.split('.')[-1].strip().lower().replace(" ", "_")
     print(st.session_state["start_from"])
+    # allow specifying existing config file if their code leverages one
+    # TO DO: let user set config file path in their repo if they are using a configuration file already during research
+
 
 
 
@@ -312,6 +315,8 @@ def human_verification_of_components_ui(repo_name, run_id):
 
             # Multiselect to keep/delete/add component names
             options = list(ml_components.keys()) + ["Other"]
+            if not existing_component_names:
+                st.warning("None of the available ML components could identified in this file. Please select the appropriate component(s).")
             selected_components = st.multiselect(
                 "Components identified in this file (please verify):",
                 options=options,
@@ -348,7 +353,7 @@ def human_verification_of_components_ui(repo_name, run_id):
                 else:
                     details = {
                         "evidence": ["Added manually during verification"],
-                        "why_separate": "Added manually during verification",
+                        "why_this_is_separate": "Added manually during verification",
                         "file_name": file_name,
                         "line_range": get_default_line_range(selected_components, code_display)
                     }
@@ -375,11 +380,12 @@ def human_verification_of_components_ui(repo_name, run_id):
                         if show_evidence:
                             with st.container():
                                 st.write("**Classification Evidence**:")
-                                for evidence in details["evidence"]:
-                                    st.write(f"- {evidence}")
+                                for evidence_dict in details["evidence"]:
+                                    st.write(f'- "{evidence_dict.get("quote_or_paraphrase", "Could not get evidence quote")}": {evidence_dict.get("support_reason", "Could not get support reasoning")}')
                                 if len(current_components_dict) > 1:
                                     # Only show separation reasoning if we performed a separation in this file (idenfitied more than one component)
-                                    st.write(f"**Why this was identified as a separate component**:\n{details['why_separate']}")
+                                    st.write("**Why this was identified as a separate component**:")
+                                    st.write(f"    - {details['why_this_is_separate']}")
                 
                 # Update line_range and store
                 details["line_range"] = clean_line_range(line_range).replace(':', '-')
@@ -429,7 +435,7 @@ def human_verification_of_dag_ui(repo_name, run_id):
     st.subheader("Please verify/edit the identified DAG")
     dag_yaml = get_dag_yaml(repo_name, run_id) # result["dag_yaml"] # loading from checkpoint instead of from API result
     dag = yaml.safe_load(dag_yaml)  # Convert YAML string to Python dict
-    edited_dag = st.text_area("DAG YAML", dag_yaml, height=300)
+    edited_dag = st.text_area("DAG YAML", dag_yaml, height=800)
     if st.button("Submit DAG"):
         payload = {"verified_dag": edited_dag}
         st.session_state.workflow_running = True # before submit back to API, set workflow running again to continue polling

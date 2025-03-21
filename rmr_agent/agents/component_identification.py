@@ -22,47 +22,52 @@ def component_identification_agent(python_file_path, full_file_list, code_summar
 
     classification_prompt = f"""Analyze the provided code summary to identify MAJOR ML components — substantial, primary elements that should function as independent ML workflow nodes. Use only the ML component categories defined below.
 
-ML COMPONENT CATEGORIES:
+### ML Component Categories:
 {component_definitions_str}
 
-CLASSIFICATION RULES:
-1. Use only the predefined ML component categories listed above. Do not invent new categories.
-2. Only classify to multiple component categories if you are absolutely sure the code can be divided by a single, distinct line of separation (components should never overlap!). You must be extremely confident that each resulting component after the split can be identified as one of the predefined ML component categories.
+### Classification Rules:
+1. Use only the predefined ML component categories listed above. **Do not invent new categories!**
+2. Only identify multiple components if you are absolutely sure the code can be divided by a single, distinct line of separation (components should never overlap!). You must be extremely confident that each resulting component after the split can be identified as one of the predefined ML component categories.
     - If you think more than one major component is present, justify why they warrant separate major nodes, and confirm you could split them based on a single line.
     - If you cannot separate the components by a single line, DO NOT IDENTIFY THEM AS SEPARATE COMPONENTS. Keep it as one major component.
     - Do not split SQL into separate components.
 3. For the identified component(s), provide:
     - Line Range: A merged, non-overlapping range (e.g., Lines 50-100).
-    - Evidence: Key quotes from the summary supporting your classification decision, with a brief explanation of their relevance.
+    - Evidence: Top 3 most important quotes from the summary supporting your classification decision, with a brief explanation of their relevance.
     - (If multiple components are listed) Why This Is Separate: Provide verification there is no overlap with other identified components' line ranges. Then explain why you think we should split this code into a distinct ML workflow node that should be run separately. Then explain why this split results in one of the ML component categories defined above. 
-4. Identified components should be UNIQUE. Do not repeat a component category multiple times. 
+4. Identified components should be **unique**. Do not repeat a component category multiple times. 
 5. If you are uncertain about any classification, DO NOT include it.
 6. If none of these components can be confidently identified from the code summary, leave component name as "Undetermined", line range as "None", and give evidence why this does not fit any category.
 
-RESPONSE FORMAT:
-MAJOR COMPONENTS IDENTIFIED: [list of components identified]
-DETAILS FOR EACH:
-[Component 1]:
-    - Line Range: [Merged, non-overlapping range (e.g., Lines 0-49)]
-    - Evidence:
-        - [Quote/paraphrase 1] – [Why it supports this category]
-        - [Quote/paraphrase 2] – [Why it supports this category]
-    - (If multiple components identified) Why This Is Separate: [Verification of ZERO overlap with other components' line ranges; Justification for why this should be split from the other code]
-
-[Component 2]: (if applicable)
-    - Line Range: [Merged, non-overlapping range (e.g., Lines 50-100)]
-    - Evidence:
-        - [Quote/paraphrase 1] – [Why it supports this category]
-        - [Quote/paraphrase 2] – [Why it supports this category]
-    - Why This Is Separate: [Verification of ZERO overlap with other components' line ranges; Justification for why this should be split from the other code]
-
-FULL ML PIPELINE FILE LIST:
-{full_file_list}
-
-CURRENT FILE'S NAME:
+### Response Format (JSON):
+{{
+  "Component Name": {{
+    "line_range": "Merged, non-overlapping range (e.g., 0-49)",
+    "evidence": [
+      {{
+        "quote_or_paraphrase": "Quote/paraphrase 1",
+        "support_reason": "Why it supports this category"
+      }},
+      {{
+        "quote_or_paraphrase": "Quote/paraphrase 2",
+        "support_reason": "Why it supports this category"
+      }},
+      {{
+        "quote_or_paraphrase": "Quote/paraphrase 3",
+        "support_reason": "Why it supports this category"
+      }}
+    ],
+    "why_this_is_separate": "Verification of no overlap with other component line ranges; Justification for why this should be split from the other code"
+    }}
+}}
+    
+### Current File's Name:
 {file_name}
 
-CURRENT FILE'S CODE SUMMARY:
+### Full ML Pipeline File List:
+{full_file_list}
+
+### Current File's Code Summary:
 {code_summary}
 """
     llm_client = LLMClient(model_name="gpt-4o")
@@ -74,7 +79,7 @@ CURRENT FILE'S CODE SUMMARY:
         top_p=0.3,
     )
     choices: litellm.types.utils.Choices = response.choices
-    component_identification = choices[0].message.content or ""
+    component_id_str = choices[0].message.content or ""
     #print("Components identified:")
     #print(classification)
-    return component_identification
+    return component_id_str
