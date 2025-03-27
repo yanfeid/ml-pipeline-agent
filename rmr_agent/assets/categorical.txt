@@ -1,0 +1,6 @@
+gender
+sndr_most_recent_100_merch_list
+sndr_most_recent_100_merch_category
+sndr_ebay_member_y_n
+sndr_prmry_cc_type_code
+sndr_prmry_addr_state
