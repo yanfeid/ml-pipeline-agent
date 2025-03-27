@@ -1,53 +1,103 @@
+## gsutil authentication
+%ppauth
+                    
+from rmr_config.simple_config import Config
+from rmr_config.state_manager import StateManager
+import os, sys, ast, json
+from datetime import datetime
+
+if "working_path" not in globals():
+    from pathlib import Path
+    path = Path(os.getcwd())
+    working_path = path.parent.absolute()
+
+folder = os.getcwd()
+username = os.environ['NB_USER']
+params_path = os.path.join(working_path, 'config')
+config = Config(params_path)
+local_base_path = config.get("general","local_output_base_path")
+os.makedirs(local_base_path, exist_ok=True)
+
+# set working directory
+os.chdir(working_path)
+if not config:
+    raise ValueError('config is not correctly setup')
+                
+print(f'username={username}, working_path={working_path}')
+                    
 # Section Name
-section_name = "Model Training"
+section_name = "model_training"
 
 # General Parameters (from environment.ini)
-refresh_date = "2023-10-05"
-user = "chenzhao"
-environment = "dev"
-mo_name = ""
-driver_dataset = ""
-dataproc_project_name = "ccg24-hrzana-gds-pacman"
-dataproc_storage_bucket = "pypl-bkt-rsh-row-std-gds-pacman"
-local_output_base_path = "/projects/gds-packman/apps/ql-store-recommendation-prod/research"
-gcs_base_path = "gs://${general:dataproc_storage_bucket}/user/${general:user}/prod/ql-store-rmr"
-queue_name = "default"
-namespace = "gds-packman"
-model_name = "RMR_MODEL_ID"
-check_point = ""
-email_to = "chenzhao"
-state_file = ""
-cosmos_project = "chenzhao"
-gcp_app_id = ""
+mo_name = config.get('general', 'mo_name')
+driver_dataset = config.get('general', 'driver_dataset')
+dataproc_project_name = config.get('general', 'dataproc_project_name')
+dataproc_storage_bucket = config.get('general', 'dataproc_storage_bucket')
+gcs_base_path = config.get('general', 'gcs_base_path')
+queue_name = config.get('general', 'queue_name')
+check_point = config.get('general', 'check_point')
+state_file = config.get('general', 'state_file')
 
 # Section-Specific Parameters (from solution.ini)
-file_name = "repos/ql-store-recommendation-prod/research/pipeline/04_training.ipynb"
-line_range = "Lines 140-170"
-att_activation = "config['training_config']['DIN']['att_activation']"
-att_hidden_size = "config['training_config']['DIN']['att_hidden_size']"
-att_weight_normalization = "config['training_config']['DIN']['att_weight_normalization']"
-batch_size = "config['training_config']['DIN']['batch_size']"
-dnn_activation = "config['training_config']['DIN']['dnn_activation']"
-dnn_dropout = "config['training_config']['DIN']['dnn_dropout']"
-dnn_hidden_units = "config['training_config']['DIN']['dnn_hidden_units']"
-dnn_use_bn = "config['training_config']['DIN']['dnn_use_bn']"
-epochs = "config['training_config']['DIN']['epochs']"
-gpt_cate_names = "'["gpt_1st_category_l2_index", "sndr_1st_freq_merchant_category_30d", ...]'"
-l2_reg_dnn = "config['training_config']['DIN']['l2_reg_dnn']"
-l2_reg_embedding = "config['training_config']['DIN']['l2_reg_embedding']"
-learning_rate = "config['training_config']['DIN']['learning_rate']"
-numeric_names = "'["sndr_rcvr_txn_num_30d", "sndr_rcvr_txn_num_180d", "sndr_rcvr_txn_num_365d", ...]'"
-rcvr_id_names = "'["rcvr_id"]'"
-seed = "config['training_config']['DIN']['seed']"
-train_data_path = "../data/ql_store_rmr_driver_dev_features_transformed"
-model_artifact_path = "os.path.join(exported_model_base, 'din.h5')"
-tf_model_path = "os.path.join(exported_model_base, 'din_saved_model')"
+att_activation = config.get('section_name', 'att_activation')
+att_hidden_size = config.get('section_name', 'att_hidden_size')
+att_weight_normalization = config.get('section_name', 'att_weight_normalization')
+batch_size = config.get('section_name', 'batch_size')
+dnn_activation = config.get('section_name', 'dnn_activation')
+dnn_dropout = config.get('section_name', 'dnn_dropout')
+dnn_hidden_units = config.get('section_name', 'dnn_hidden_units')
+dnn_use_bn = config.get('section_name', 'dnn_use_bn')
+epochs = config.get('section_name', 'epochs')
+gpt_cate_names = config.get('section_name', 'gpt_cate_names')
+l2_reg_dnn = config.get('section_name', 'l2_reg_dnn')
+l2_reg_embedding = config.get('section_name', 'l2_reg_embedding')
+learning_rate = config.get('section_name', 'learning_rate')
+numeric_names = config.get('section_name', 'numeric_names')
+rcvr_id_names = config.get('section_name', 'rcvr_id_names')
+seed = config.get('section_name', 'seed')
+train_data_path = config.get('section_name', 'train_data_path')
+model_artifact_path = config.get('section_name', 'model_artifact_path')
+tf_model_path = config.get('section_name', 'tf_model_path')
 
-# Dependencies from Other Sections
+# Dependencies from Previous Sections
 # Previous section: data_preprocessing
 # Edge Attributes from DAG
-output_dir = "../data/ql_store_rmr_driver_dev_features_transformed"
+output_dir = config.get('data_preprocessing', 'output_dir')
 
-# Research code goes here
-def research_function():
-    print('Running research code for', section_name)
+
+# === Research Code ===
+strategy = tf.distribute.MirroredStrategy([]) # single machine multiple gpu
+with strategy.scope():
+    adam = adam_v2.Adam(learning_rate=learning_rate)
+    model = DIN(
+        dnn_feature_columns, behavior_feature_list,
+        dnn_use_bn=dnn_use_bn,
+        dnn_hidden_units=dnn_hidden_units,
+        dnn_activation=dnn_activation,
+        att_hidden_size=att_hidden_size,
+        att_activation=att_activation,
+        att_weight_normalization=att_weight_normalization,
+        l2_reg_dnn=l2_reg_dnn,
+        l2_reg_embedding=l2_reg_embedding,
+        dnn_dropout=dnn_dropout,
+        seed=seed,
+        task='binary'
+    )
+    model.compile(adam, loss="binary_crossentropy", metrics=[tf.keras.metrics.AUC()])
+    early_stopping = tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss',
+        patience=3,
+        mode='max',
+        restore_best_weights=True,
+        verbose=1
+    )
+    history = model.fit(
+        train_dataset,
+        steps_per_epoch=steps_per_epoch,
+        epochs=epochs,
+        validation_data=val_dataset,
+        validation_steps=validation_steps,
+        callbacks=[early_stopping]
+    )
+
+print('Script initialized')

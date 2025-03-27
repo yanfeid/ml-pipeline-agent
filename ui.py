@@ -248,6 +248,10 @@ def display_progress(current_step):
     st.progress(completed_steps / total_steps)
     st.write(f"Progress: {completed_steps}/{total_steps} steps completed")
 
+    print(f"Current Steps List: {STEPS}")
+    print(f"Current Step Received: {current_step}")
+
+
 def cancel_workflow_button():
     # Cancel button
     if st.button("Cancel Workflow", type="primary", key="cancel_workflow"):

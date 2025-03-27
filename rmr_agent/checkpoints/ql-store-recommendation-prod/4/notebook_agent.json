@@ -1,0 +1,16 @@
+{
+  "notebooks": {
+    "driver_creation": "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/notebooks/driver_creation.py",
+    "feature_engineering": "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/notebooks/feature_engineering.py",
+    "data_pulling": "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/notebooks/data_pulling.py",
+    "feature_consolidation": "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/notebooks/feature_consolidation.py",
+    "data_preprocessing": "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/notebooks/data_preprocessing.py",
+    "model_training": "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/notebooks/model_training.py",
+    "model_packaging": "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/notebooks/model_packaging.py",
+    "model_scoring": "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/notebooks/model_scoring.py",
+    "model_version_loading": "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/notebooks/model_version_loading.py",
+    "configuration_loading": "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/notebooks/configuration_loading.py",
+    "bigquery_table_creation": "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/notebooks/bigquery_table_creation.py",
+    "performance_evaluation": "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/notebooks/performance_evaluation.py"
+  }
+}

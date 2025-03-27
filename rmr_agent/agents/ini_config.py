@@ -1,13 +1,9 @@
-import yaml
-import configparser
-from typing import Dict, Any
-from llms import LLMClient 
 import os
 import re
-import configparser
-from io import StringIO
-from utils.save_file import save_state, save_ini_file
-
+import yaml
+from llms import LLMClient 
+from typing import Dict, Any
+from utils import save_ini_file
 
 # ========== **Extract .ini Content from AI Response** ==========
 def extract_ini_content(response):
@@ -33,6 +29,53 @@ def extract_ini_content(response):
 
     return response_text
 
+# ========== **Filter duplicate lines** ==========
+def filter_duplicate_lines(ini_str):
+    """ Filter duplicated lines in ini
+    Keep the first occurrence of each line and remove duplicates.
+
+    :param ini_str: The original ini-format string
+    :return: The filtered ini string
+    """
+    seen_lines = set()
+    filtered_lines = []
+
+    for line in ini_str.splitlines():
+        if line == "":  # keep blank line
+            filtered_lines.append(line)
+        elif line not in seen_lines:  # filter duplicated row
+            seen_lines.add(line)
+            filtered_lines.append(line)
+
+    return "\n".join(filtered_lines)
+
+# ========== **Replace hard-coded params with general configurable params in env.ini** ==========
+def parse_env_ini(env_ini):
+    """
+    Parse environment_ini_str into a dictionary of key-value pairs.
+    :param env_ini_str: The environment ini content as a string.
+    :return: A dictionary of parameters.
+    """
+    env_vars = {}
+    for line in env_ini.splitlines():
+        match = re.match(r'(\w+)\s*=\s*(.+)', line)  # Match key=value pairs
+        if match:
+            key, value = match.groups()
+            env_vars[key] = value.strip()
+    return env_vars
+
+def replace_with_env_vars(generated_file, env_vars):
+    """
+    Replace paths in the generated file with ${general:<param_name>} if they match env.ini values.
+    :param generated_file_str: The content of the generated file.
+    :param env_vars: Dictionary of environment variables.
+    :return: The modified file content.
+    """
+    for param_name, param_value in sorted(env_vars.items(), key=lambda x: -len(x[1])):  # Sort by length (longest first)
+        if param_value and param_value in generated_file:
+            generated_file = generated_file.replace(param_value, f"${{general:{param_name}}}")
+
+    return generated_file
 
 # ========== **Config Agent Part** ==========
 def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dict[str, Dict[str, Dict[str, str]]]:
@@ -63,11 +106,10 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     - Your goal is to **fill in the missing values based on the given YAML data**.
     - If a value **exists in the YAML**, insert it into the corresponding field.
     - If a value **is missing in the YAML**, leave the field empty (`""`).
-    - Your response MUST be valid JSON. No explanations. No extra text.
+    - Your response MUST be No explanations, No extra text.
 
     ### Fixed Structure of `environment.ini`:
-    The file should always contain the following fields:
-    ```
+ 
     [general]
     refresh_date =
     user =
@@ -80,7 +122,6 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     gcs_base_path =
     queue_name =
     namespace =
-    ```
 
     ### Guidelines to Follow
 
@@ -88,7 +129,7 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     - **Insert Today's Date:** Automatically fill in `refresh_date` with the current date.
     - **Default Values:**
         - Set `mo_name` as blank by default.
-        - Set `environment` as `dev` by default.
+        - Set `environment` as blank by default.
         - `Queue Name` set to `default` if not provided.
         - `Namespace` set to `gds-packman` if not provided.
 
@@ -157,19 +198,16 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     This task involves converting a YAML file into an INI format while maintaining structural integrity and ensuring configurability. 
 
     <Steps to Follow>
-    1.First section should always be general section. All parameters in this section is fixed. Populate it with values extracted from the YAML file; leave it blank if no corresponding information is found.
-    2.Ignore edges part in yaml. For each node in the YAML structure, create a separate section (e.g., [driver_creation], [feature_engineering], [data_pulling]) in the order they appear in the YAML file.
-    3.Extract relevant key-value pairs for each section, replacing hardcoded values with configurable parameters from environment.ini where applicable.
-    4.Avoid duplicate entries: if a path appears in one section, it should not be repeated in any other section. Ideally, you should classify these info into the first section.
-    5.Preserve the original YAML file order for all sections (except that the [general] section must always be placed at the top and appear only once).
-    6.Confirm and verify that no information is missed and the order of sections matches the YAML file.
+    1.First section should always be general section. All parameters in this section is fixed. The general section differs from general section of environment.ini. Populate it with values extracted from the YAML file; leave it blank if no corresponding information is found.
+    2.For each node in the YAML structure, create a separate section (e.g., [driver_creation], [feature_engineering], [data_pulling]) in the order they appear in the YAML file.
+    3.Extract relevant key-value pairs for each section, replacing hardcoded values with configurable parameters from environment.ini only in the values, not in the keys. 
+    4.Do not use variables in keys or parameter names — keep them hardcoded as originally written (e.g., driver_dev_features_table = /projects/gds, !Do not change it to driver_${{general:environment}}_features_table = /projects/gds.
+    5.Do not include the file_name and the line_range in the solution.ini output.
+    6.Confirm and verify that no information is missed. 
    
     ###
     EXAMPLE INPUTS
     [Given the YAML content]
-    - Model Packaging:
-        file_name: repos/ql-store-recommendation-prod/research/pipeline/04_packaging.ipynb
-        line_range: Lines 15-24
     - Model Scoring:
         file_name: repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.ipynb
         line_range: Lines 25-94
@@ -178,14 +216,15 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
         params_path: /projects/gds/ql-store-recommendation-prod/research/config
         outputs:
         eval_result_path: gs://pypl-pacman/user/chenzhao/prod/ql-store-rmr/data/ql_store_rmr_oot_transformed_scored
-        log_file: "/projects/gds/ql-store-recommendation-prod/research/logs/{{job_id}}.log"
+        log_file: /projects/gds/ql-store-recommendation-prod/research/logs/{{job_id}}.log
     -  Model Evaluation:
         file_name: repos/ql-store-recommendation-prod/research/pipeline/06_evaluation.ipynb
         line_range: Lines 95-125
         inputs:
+        driver_dev_table_list: driver_dev_features
         model_version_path: ../_current_model_version
         outputs:
-        exported_eval_readout_base: "../artifacts/18/exported_eval_readouts"
+        exported_eval_readout_base: ../artifacts/18/exported_eval_readouts
 
     [Given the environment.ini]
         [general]
@@ -210,24 +249,17 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
         state_file = 
         cosmos_project = chenzhao
         gcp_app_id = 
-
-        [Model Packaging]
-        file_name: repos/ql-store-recommendation-prod/research/pipeline/04_packaging.ipynb
-        line_range: Lines 15-24
-
+        
         [model_scoring]
-        file_name: repos/ql-store-recommendation-prod/research/pipeline/05_scoring_oot.ipynb
-        line_range: Lines 25-94
-        working_path: ${{general:local_output_base_path}}
-        params_path: ${{general:local_output_base_path}}/config
-        eval_result_path: ${{general:gcs_base_path}}/ql_store_rmr_oot_transformed_scored
-        log_file: "${{general:local_output_base_path}}/logs/{{job_id}}.log"
+        working_path = ${{general:local_output_base_path}}
+        params_path = ${{general:local_output_base_path}}/config
+        eval_result_path = ${{general:gcs_base_path}}/ql_store_rmr_oot_transformed_scored
+        log_file = ${{general:local_output_base_path}}/logs/{{job_id}}.log
 
         [Model Evaluation]
-        file_name: repos/ql-store-recommendation-prod/research/pipeline/06_evaluation.ipynb
-        line_range: Lines 95-125
-        model_version_path: ../_current_model_version
-        exported_eval_readout_base: "../artifacts/18/exported_eval_readouts"
+        driver_dev_table_list = driver_${{general:environment}}_features
+        model_version_path = ../_current_model_version
+        exported_eval_readout_base = ../artifacts/18/exported_eval_readouts
     ###
         
 
@@ -242,18 +274,19 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     and key-value pairs using the `key = value` syntax. Avoid using JSON format.
     """
 
-    print("DEBUG: Prompt I used in the second call==================================================================================================================:", prompt_solution)
+    print("DEBUG: Prompt I used in the second call:", prompt_solution)
 
     response_solution = llm_client.call_llm(
         prompt=prompt_solution,
-        max_tokens=3500,  #need to change to a approprate value
+        max_tokens=4096,  # increase the max_tokens
         temperature=0,
         repetition_penalty=1.0,
         top_p=1
     )
 
     try:
-        solution_ini_str = extract_ini_content(response_solution)
+        env_vars = parse_env_ini(environment_ini_str)
+        solution_ini_str = replace_with_env_vars(filter_duplicate_lines(extract_ini_content(response_solution)),env_vars)
 
         result = {
             "environment_ini": environment_ini_str,
@@ -263,25 +296,28 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     except ValueError as e:
         print(f"⚠️ Error extracting .ini content: {e}")
 
-
     return result
 
     
  # ========== **Step 3: Simple Unit Test Code** ==========
-
 if __name__ == "__main__":
-    with open("dag.yaml", "r") as file:
-        test_verified_dag = yaml.safe_load(file)
+    # Base paths
+    BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
+    CHECKPOINT_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod", "1")
+    CONFIG_DIR = os.path.join(BASE_DIR, "config")
 
-    # get .ini data
-    state = config_agent(test_verified_dag)
+    # Load DAG config
+    dag_path = os.path.join(CHECKPOINT_DIR, "dag_copy.yaml")
+    with open(dag_path, "r") as f:
+        verified_dag = yaml.safe_load(f)
 
-    CHECKPOINT_SUBDIR = os.path.abspath("../checkpoints/ql-store-recommendation-prod")
-    STATE_FILE = os.path.join(CHECKPOINT_SUBDIR, "ini_config.json") 
+    # Generate config
+    config = config_agent(verified_dag)
 
-    print(f"Checkpoints will be stored in: {CHECKPOINT_SUBDIR}")
-    print(f"State file path: {STATE_FILE}")
+    # Save configs
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    save_ini_file("environment.ini", config["environment_ini"], CONFIG_DIR)
+    save_ini_file("solution.ini", config["solution_ini"], CONFIG_DIR)
 
-    save_state(state, STATE_FILE )
-    save_ini_file("environment.ini", state["environment_ini"], CHECKPOINT_SUBDIR)
-    save_ini_file("solution.ini", state["solution_ini"], CHECKPOINT_SUBDIR)
+    print(f"[✓] INI files saved to: {CONFIG_DIR}")
+    print(f"[✓] Checkpoint directory used: {CHECKPOINT_DIR}")

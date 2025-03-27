@@ -1,26 +1,25 @@
 import os
 import json
+import yaml
 import tempfile
-<<<<<<< HEAD:workflow.py
-from utils.git_utils import clone_repo, parse_github_url
-from utils.convert_ipynb_to_py import convert_notebooks
-from utils.save_file import save_state, save_ini_file
-=======
 import requests
->>>>>>> main:rmr_agent/workflow.py
 import argparse
 import subprocess
 from typing import Dict, Any, List
 from utils import (
     clone_repo, parse_github_url, convert_notebooks,
-    get_next_run_id, load_step_output, save_step_output
+    get_next_run_id, load_step_output, save_step_output,
+    save_ini_file
 )
 from langgraph.graph import StateGraph, END
+import time
 
 # State
 WorkflowState = Dict[str, Any]
 
 CHECKPOINT_BASE_PATH = "rmr_agent/checkpoints"
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
 
 def is_cancelled(state: WorkflowState) -> bool:
     """Check if the workflow has been cancelled."""
@@ -192,11 +191,6 @@ def run_node_aggregator(state: WorkflowState) -> Dict[str, Any]:
         print("Skipping run_node_aggregator: 'node_aggregator' already in state")
         return {}
     from agents.node_aggregator import node_aggregator_agent
-<<<<<<< HEAD:workflow.py
-    node_aggregator = node_aggregator_agent(state["attribute_parsing"])
-    return {"node_aggregator": node_aggregator}
-    
-=======
     nodes_yaml = node_aggregator_agent(state["attribute_parsing"])
     nodes_yaml_path = f"{CHECKPOINT_BASE_PATH}/{state['repo_name']}/{state['run_id']}/nodes.yaml"
     try:
@@ -208,7 +202,6 @@ def run_node_aggregator(state: WorkflowState) -> Dict[str, Any]:
 
     return {"node_aggregator": nodes_yaml}
 
->>>>>>> main:rmr_agent/workflow.py
 def run_edge_identification(state: WorkflowState) -> Dict[str, Any]:
     if "edges" in state and state["edges"]:
         print("Skipping run_edge_identification: 'edges' already in state")
@@ -246,37 +239,42 @@ def human_verification_of_dag(state: WorkflowState) -> Dict[str, Any]:
         time.sleep(2)
 
 def run_config_agent(state: WorkflowState) -> Dict[str, Any]:
+    print(state.keys())
     if "config" in state and state["config"]:
         print("Skipping run_config_agent: 'config' already in state")
         return {}
     from agents.ini_config import config_agent
-    config = config_agent(state["verified_dag"])
+    config = config_agent(state["dag_yaml"]) 
 
-    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  
-    CHECKPOINT_SUBDIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod")
-    STATE_FILE = os.path.join(CHECKPOINT_SUBDIR, "ini_config.json")
+    config_dir = os.path.join(BASE_DIR, "config")
+    os.makedirs(config_dir, exist_ok=True)
 
- 
-    os.makedirs(CHECKPOINT_SUBDIR, exist_ok=True)
+    save_ini_file("environment.ini", config["environment_ini"], config_dir)
+    save_ini_file("solution.ini", config["solution_ini"], config_dir)
 
-    print(f" Checkpoints will be stored in: {CHECKPOINT_SUBDIR}")
-    print(f" State file path: {STATE_FILE}")
-
-
-    save_state(config, STATE_FILE)
-    save_ini_file("environment.ini", config["environment_ini"], CHECKPOINT_SUBDIR)
-    save_ini_file("solution.ini", config["solution_ini"], CHECKPOINT_SUBDIR)
-
-    return {"config": config}  
-
+    return {"config": config}
 
 def run_notebook_agent(state: WorkflowState) -> Dict[str, Any]:
+    print("DEBUG - verified_dag type:", type(state["dag_yaml"]))
     if "notebooks" in state and state["notebooks"]:
         print("Skipping run_notebook_agent: 'notebooks' already in state")
         return {}
     from agents.notebook import notebook_agent
-    notebooks = notebook_agent(state["verified_dag"])
+    notebooks = notebook_agent(yaml.safe_load(state["dag_yaml"]),state["summaries"])
     return {"notebooks": notebooks}
+
+def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:
+    if "edited_notebooks" in state and state["edited_notebooks"]:
+        print("Skipping run_notebook_agent: 'notebooks' already in state")
+        return {}
+    
+    from agents.code_editor import code_editor_agent
+    edited_notebooks = {}
+
+    for name, path in state["notebooks"].items():
+        edited_notebooks[name] = code_editor_agent(path)
+    return {"edited_notebooks": edited_notebooks}
+
 
 def build_workflow():
     workflow = StateGraph(WorkflowState)
@@ -293,6 +291,7 @@ def build_workflow():
     workflow.add_node("human_verification_of_dag", human_verification_of_dag)
     workflow.add_node("config_agent", run_config_agent)
     workflow.add_node("notebook_agent", run_notebook_agent)
+    workflow.add_node("code_editor_agent", run_code_editor_agent)
 
     workflow.add_edge("clone_and_prepare_repo", "summarize")
     workflow.add_edge("summarize", "component_identification")
@@ -305,7 +304,9 @@ def build_workflow():
     workflow.add_edge("generate_dag_yaml", "human_verification")
     workflow.add_edge("human_verification_of_dag", "config_agent")
     workflow.add_edge("config_agent", "notebook_agent")
-    workflow.add_edge("notebook_agent", END)
+    workflow.add_edge("notebook_agent", "code_editor_agent")
+    workflow.add_edge("code_editor_agent",END)
+
 
     workflow.set_entry_point("clone_and_prepare_repo")
     return workflow.compile()
@@ -336,7 +337,8 @@ def run_workflow(github_url: str, input_files: List[str], run_id: str | None = N
         "dag_yaml": "",
         "verified_dag": {},
         "config": {},
-        "notebooks": []
+        "notebooks": [],
+        "edited_notebooks": []
     }
 
     # Define all steps with their functions
@@ -353,7 +355,8 @@ def run_workflow(github_url: str, input_files: List[str], run_id: str | None = N
         ("generate_dag_yaml", generate_dag_yaml),
         ("human_verification_of_dag", human_verification_of_dag),
         ("config_agent", run_config_agent),
-        ("notebook_agent", run_notebook_agent)
+        ("notebook_agent", run_notebook_agent),
+        ("code_editor_agent",run_code_editor_agent)
     ]
 
     # Load state up to the start_from step
@@ -392,3 +395,15 @@ if __name__ == "__main__":
     )
     print("Final Config:", result["config"])
     print("Final Notebooks:", result["notebooks"])
+
+# python3 workflow.py \
+#   --github-url "https://github.paypal.com/GADS-Consumer-ML/ql-store-recommendation-prod.git" \
+#   --input-files "research/pipeline/00_driver.ipynb" "research/pipeline/01_bq_feat.ipynb" "research/pipeline/01_varmart_feat.ipynb" "research/pipeline/02_combine.ipynb" "research/pipeline/03_prepare_training_data.ipynb" "research/pipeline/04_training.ipynb" "research/pipeline/05_scoring_oot.ipynb" "research/pipeline/06_evaluation.ipynb" \
+#   --run-id 4 \
+#   --start-from config_agent \
+
+
+
+
+
+

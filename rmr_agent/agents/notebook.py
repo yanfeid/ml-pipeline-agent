@@ -1,44 +1,103 @@
-# section_name = "section name here"
-
-# # General params
-# project_id = config.get('general', 'dataproc_project_name')
-# storage_bucket = config.get('general', 'dataproc_storage_bucket')
-
-# # section specific params
-# model_name = config.get(section_name, 'model_name')
-
-# # dependencies from other sections
-# param = config.get('some previous section', 'param_name')
-
-# ### research code below...
-
 import os
+import re
 import configparser
 from typing import Dict, Any
 import yaml
+import json
 
-def notebook_agent(verified_dag: Dict[str, Any]) -> Dict[str, str]:
+ # === EXTRACT CODE FROM CLEAN_CODE ===
+def extract_code_from_json(json_file, verified_dag):
+    """
+    Read JSON file,
+    Extract code based on DAG YAML file
+    Args:
+        json_file: Json file, a dict, typically summarize.json
+        verified_dag: A dictionary after yaml.safe_load(f)
+    Returns:
+        Dict[str, str]: A dictionary mapping section names to generated file paths.
+    """
+    # Read Json
+    # with open(json_file, "r", encoding="utf-8") as f:
+    #     data = json.load(f)
+    
+    cleaned_code = json_file.get("cleaned_code", {})
+
+    # Read DAG YAML
+    # with open(dag_yaml, "r", encoding="utf-8") as f:
+    #     dag_data = yaml.safe_load(f)
+
+    extracted_code = {}
+
+    for node in verified_dag["nodes"]:
+        # Get node's name（
+        node_name, node_info = list(node.items())[0]
+        
+        full_file_path = node_info["file_name"]  # full path
+        file_prefix = os.path.splitext(full_file_path.split("/")[-1])[0]  # extract the path without Filename Extension
+        line_range_str = node_info["line_range"]
+
+        # parse line_range "Lines X-Y"
+        match = re.search(r"Lines (\d+)-(\d+)", line_range_str)
+        # match = re.search(r"(?:Lines\s+)?(\d+)-(\d+)", line_range_str)
+
+        if not match:
+            print(f"Warning: Invalid line range format for {node_name}: {line_range_str}")
+            continue
+        start_line, end_line = int(match.group(1)), int(match.group(2))
+
+        # search for the matching files in JSON
+        matched_file = None
+        for json_file_path in cleaned_code.keys():
+            json_file_prefix = os.path.splitext(json_file_path.split("/")[-1])[0]  # delete the extension name(because we converted ipynb to py file)
+            if json_file_prefix == file_prefix:  
+                matched_file = json_file_path
+                break
+
+        if matched_file:
+            code_content = cleaned_code[matched_file]
+            lines = code_content.split("\n")  # split the code based on it's row
+            selected_lines = lines[start_line-1:end_line]  # select code
+
+            extracted_code[node_name] = {
+                "code": "\n".join(selected_lines),
+            }
+        else:
+            print(f"Warning: {file_prefix} not found in JSON cleaned_code")
+
+    return extracted_code
+
+# BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  # rmr_agent directory
+# CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod","1")
+# dag_yaml = os.path.join(CHECKPOINTS_DIR, "dag_copy.yaml")
+# JSON_FILE = os.path.join(CHECKPOINTS_DIR, "summarize.json")
+# extracted_code = extract_code_from_json(JSON_FILE, dag_yaml)
+
+# for node, data in extracted_code.items():
+#     print(f"\n# Extracted code for {node}:\n{data['code']}")
+
+ # === NOTEBOOK AGENT CODE ===
+def notebook_agent(verified_dag, json_file):
     """
     Generates Python files in the 'notebooks/' directory based on solution.ini sections.
-    
     Args:
-        verified_dag (Dict[str, Any]): The parsed DAG structure (only needed for dependencies).
-    
+        verified_dag: A dictionary after yaml.safe_load(f)
     Returns:
         Dict[str, str]: A dictionary mapping section names to generated file paths.
     """
 
-
-
     # === Step 1: Calculate BASE_DIR，ensure code could run in any env ===
     BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  # rmr_agent directory
     NOTEBOOKS_DIR = os.path.join(BASE_DIR, "notebooks")
-    CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod","1")
-    ENV_FILE = os.path.join(CHECKPOINTS_DIR, "environment.ini")
-    SOL_FILE = os.path.join(CHECKPOINTS_DIR, "solution.ini")
+    # CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod","1")
+    CONFIG_DIR = os.path.join(BASE_DIR, "config")
+
+    ENV_FILE = os.path.join(CONFIG_DIR, "environment.ini")
+    SOL_FILE = os.path.join(CONFIG_DIR, "solution.ini")
+    
+    # JSON_FILE = os.path.join(CHECKPOINTS_DIR, "summarize.json")
 
     os.makedirs(NOTEBOOKS_DIR, exist_ok=True)
-    print(f"✅ Created notebooks directory: {NOTEBOOKS_DIR}")
+    print(f"Created notebooks directory: {NOTEBOOKS_DIR}")
 
     # === Step 2: read environment.ini 和 solution.ini ===
     config = configparser.ConfigParser()
@@ -66,9 +125,10 @@ def notebook_agent(verified_dag: Dict[str, Any]) -> Dict[str, str]:
         print(f"  Processing edge: from {from_section} → to {to_section}")
 
         if from_section and to_section:
-            dependencies[to_section] = from_section
+            dependencies.setdefault(to_section, []).append(from_section)
             if "attributes" in edge:
-                edge_attributes.setdefault(to_section, {}).update(edge["attributes"])
+                edge_attributes.setdefault(to_section, {}).setdefault(from_section, {}).update(edge["attributes"])
+
 
     print(f"\n Final dependencies mapping: {dependencies}")
     print(f" Final edge attributes mapping: {edge_attributes}\n")
@@ -90,72 +150,147 @@ def notebook_agent(verified_dag: Dict[str, Any]) -> Dict[str, str]:
         print(f"  Checking edge attributes for {node_name}: {edge_attributes.get(node_name, 'None')}")
 
         with open(file_path, "w", encoding="utf-8") as f:
-            # === Section Name ===
-            f.write(f"# Section Name\n")
-            f.write(f"section_name = \"{section_name}\"\n\n")
+            # === Standard Code for RMR ===
+            f.write("""## gsutil authentication
+%ppauth
+                    
+from rmr_config.simple_config import Config
+from rmr_config.state_manager import StateManager
+import os, sys, ast, json
+from datetime import datetime
 
-            # === General Parameters from environment.ini ===
+if "working_path" not in globals():
+    from pathlib import Path
+    path = Path(os.getcwd())
+    working_path = path.parent.absolute()
+
+folder = os.getcwd()
+username = os.environ['NB_USER']
+params_path = os.path.join(working_path, 'config')
+config = Config(params_path)
+local_base_path = config.get("general","local_output_base_path")
+os.makedirs(local_base_path, exist_ok=True)
+
+# set working directory
+os.chdir(working_path)
+if not config:
+    raise ValueError('config is not correctly setup')
+                
+print(f'username={username}, working_path={working_path}')
+                    
+""")
+
+
+            # === Section Name ===
+            formatted_section_name = section_name.replace(" ", "_").lower()
+            f.write(f"# Section Name\n")
+            f.write(f"section_name = \"{formatted_section_name}\"\n\n")
+
+            # === General Parameters from environment.ini === 
+            # mo_name driver_dataset dataproc_project_name dataproc_storage_bucket gcs_base_path queue_name check_point state_file 
             f.write("# General Parameters (from environment.ini)\n")
+
+            required_keys = [
+                "mo_name",
+                "driver_dataset",
+                "dataproc_project_name",
+                "dataproc_storage_bucket",
+                "gcs_base_path",
+                "queue_name",
+                "check_point",
+                "state_file"
+            ]
+
             if "general" in config:
-                for key in config.options("general"):
-                    f.write(f"{key} = \"{config.get('general', key)}\"\n")
+                for key in required_keys:
+                    f.write(f"{key} = config.get('general', '{key}')\n")
 
             f.write("\n")
+
 
             # === Section-Specific Parameters from solution.ini ===
             f.write("# Section-Specific Parameters (from solution.ini)\n")
             for key in config.options(section_name):
-                f.write(f"{key} = \"{config.get(section_name, key)}\"\n")
+                f.write(f"{key} = config.get('section_name', '{key}')\n")
 
             f.write("\n")
 
             # === Dependencies from DAG ===
-            f.write("# Dependencies from Other Sections\n")
+            f.write("# Dependencies from Previous Sections\n")
 
-            prev_section = dependencies.get(node_name, None)
+            for from_node in dependencies.get(node_name, []):
+                f.write(f"# Previous section: {from_node}\n")
+                print(f"Processing Node: {node_name}, depends on: {from_node}")
 
-            if prev_section:
-                f.write(f"# Previous section: {prev_section}\n")
-
-                # Debug: ensure edge_attributes[node_name] exist
-                if node_name in edge_attributes:
+                attributes = edge_attributes.get(node_name, {}).get(from_node, {})
+                if attributes:
                     f.write("# Edge Attributes from DAG\n")
-                    for key, value in edge_attributes[node_name].items():
-                        f.write(f"{key} = \"{value}\"\n")
-                        print(f"  Writing edge attribute: {key} = {value}")
+                    for key in attributes.keys():
+                        f.write(f"{key} = config.get('{from_node}', '{key}')\n")
+                        print(f"Writing edge attribute: {key} = config.get('{from_node}', '{key}')")
 
-                # get params from `solution.ini`
-                if prev_section in config:
-                    for key in config.options(prev_section):
-                        f.write(f"{key} = \"{config.get(prev_section, key)}\"\n")
+            f.write("\n")
+
+            # === Research Code ===
+            extracted_code = extract_code_from_json(json_file,verified_dag)
+    
+            if section_name.lower() == "general": 
+                print(f"🚀 Skipping general section: {section_name}")
+                continue
+
+            # match extracted_code
+            # if section_name in extracted_code:
+            #     print(f"MATCH FOUND: {section_name}")
+            match_key = next(
+                (k for k in extracted_code if k.lower().replace(" ", "_") == section_name),
+                None
+            )
+
+            if match_key:
+                print(f"MATCH FOUND: {match_key}")
+
+                research_code_lines = extracted_code[match_key]["code"].split("\n")  # 👈 用 match_key 而不是 section_name
+                cleaned_code_list = []
+                for line in research_code_lines:
+                    cleaned_line = line.split("|", 1)[-1].strip()
+                    cleaned_code_list.append(cleaned_line)
+
+                research_code = "\n".join(cleaned_code_list)
+                f.write("\n" + "# === Research Code ===\n")
+                f.write(research_code + "\n")
+                f.write("\nprint('Script initialized')\n")
+                print(f"Research code inserted into {file_path}")
             else:
-                f.write("# No dependencies (first section)\n")
+                print(f"⚠️ WARNING: No research code found for {section_name}")
 
-            # === Research Code Placeholder ===
-            f.write("\n# Research code goes here\n")
-            f.write("def research_function():\n")
-            f.write("    print('Running research code for', section_name)\n")
-
+            print("All notebooks generated successfully!")
         print(f" Created: {file_path}")
-
-    print("🎉 All sections processed. Python files are ready in notebooks/")
+    print("All sections processed. Python files are ready in notebooks/")
     
     return  generated_files
-  # return notebooks
+  # might return a dict
 
 
-
+# #==========================simple test====================================
 
 if __name__ == "__main__":
     # set up path
     BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
     NOTEBOOKS_DIR = os.path.join(BASE_DIR, "notebooks")
 
-    with open("dag.yaml", "r") as file:
-        test_dag = yaml.safe_load(file)
+       
+ 
+    CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod","1")
+    dag_yaml = os.path.join(CHECKPOINTS_DIR, "dag_copy.yaml")
+    json_path= os.path.join(CHECKPOINTS_DIR,"summarize.json" )
+    
+    with open(json_path, "r", encoding="utf-8") as f:
+        json_file = json.load(f)
+    
+    with open(dag_yaml, "r", encoding="utf-8") as f:
+        verified_dag = yaml.safe_load(f)
 
-    # run notebook_agent to generate notebooks
-    generated_files = notebook_agent(test_dag)
+    generated_files = notebook_agent(verified_dag, json_file)
 
     # check notebooks
     if os.path.exists(NOTEBOOKS_DIR):

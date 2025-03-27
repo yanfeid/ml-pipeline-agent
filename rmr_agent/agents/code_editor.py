@@ -1,61 +1,195 @@
-from llms import LLMClient  # Importing the LLM client 1
 
-def process_file(file_path, llm_model: str = "gpt-4o"):
-    """
-    Reads a Python file, calls LLM to replace hardcoded values with configuration variables, 
-    and writes back the modified version.
+from llms import LLMClient  
+import os
+import ast
 
-    :param file_path: Path to the Python file to modify.
-    :param llm_model: The name of the LLM model to use.
-    """
-    # Initialize the LLM client
+def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
     llm_client = LLMClient(model_name=llm_model)
 
-    # Read the original Python code
-    with open(file_path, "r", encoding="utf-8") as file:
-        original_code = file.read()
+    # Read the original Python script
+    with open(python_file_path, "r", encoding="utf-8") as f:
+        python_code = f.read()
+    
+#     print('pythoncode',python_code)
 
     # Construct the LLM prompt
     prompt_editor = f"""
-    You are an AI agent that processes Python scripts containing configuration parameters.
-    Your task is to analyze the provided Python code, detect any hardcoded values (such as 
-    strings, numbers, or paths), and replace them with the corresponding predefined 
-    configuration variables when applicable.
+    You are an AI agent tasked with refactoring Python research scripts to ensure that configuration values are used consistently.
 
-    - Identify all configuration variables already defined in the script.
-    - Only modify the research code part(below the research code comments), do not modify other code
-    - Find occurrences of hardcoded values that match or should be mapped to these variables.
-    - Replace hardcoded values with their corresponding configuration variables.
-    - Avoid duplicated code and make sure the research code is clean
-    - Ensure the modified script remains functionally equivalent and syntactically correct.
+    Your instructions:
+    1. In the **=== Research Code ===** section (indicated by comments), remove any parameter declarations that are already defined earlier in the script. These predefined parameters have values starting with config.get.
+    2. Clean up the **=== Research Code ===** section by organizing the code, fixing indentation, and eliminating duplicated parameter declarations.
+    3. Ensure the research code just uses the correct variable name loaded from config, avoid hard-coded.
+    4. Return the complete modified Python script without any explanations or additional comments. 
+    5. Do **not** include any Markdown formatting such as ```python or ``` — return only the raw Python code.
 
-    Below is the Python script that requires modification:
-
-    ```python
-    {original_code}
-    ```
-
-    Please return the modified Python script without any additional explanations.
+    Here is the Python script:
+    {python_code}
     """
-
+ 
+    print('prompt DEBUG',prompt_editor)
+ 
     # Call the LLM to process the code
-    modified_code = llm_client.call_llm(
+    response = llm_client.call_llm(
         prompt=prompt_editor,
-        max_tokens=500,
+        max_tokens=3500,
         temperature=0,
         repetition_penalty=1.0,
         top_p=1
     )
 
+    print("👉 raw response:", response)
+
+    modified_code = response.choices[0].message.content
     # Write the modified code back to the file
-    with open(file_path, "w", encoding="utf-8") as file:
+    with open(python_file_path, "w", encoding="utf-8") as file:
         file.write(modified_code)
 
-    print(f"Updated {file_path}: Hardcoded values replaced with configuration variables.")
+    print(f"Updated {python_file_path}: Hardcoded values replaced with configuration variables.")
 
 # Example usage
-if __name__ == "__main__":
-    llm_model = "gpt-4o"  # Define your LLM model name
+# if __name__ == "__main__":
 
-# might need to use forloop
-    process_file("research_code.py", llm_model)
+#     BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
+#     notebooks_dir = os.path.join(BASE_DIR, "notebooks")
+
+#     for filename in os.listdir(notebooks_dir):
+#         if filename.endswith(".py"):
+#             python_file_path = os.path.join(notebooks_dir, filename)
+#             print(f"\n🛠️ Processing: {filename}")
+
+#             try:
+#                 modified_code = code_editor(python_file_path)
+#                 print("✅ Modified script:")
+#                 print(modified_code)
+#             except Exception as e:
+#                 print(f"❌ Error processing {filename}: {e}")
+
+#     print("\n✅ All scripts in notebooks/ processed.")
+
+
+    # BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/agents"
+    # python_file_path = os.path.join(BASE_DIR, "test11.py")
+
+    # modified_code = code_editor(python_file_path, dag_yaml_path, llm_model)
+
+    # print("✅ Modified script:")
+
+    # ================== assets extraction part ======================
+
+    # Construct the LLM prompt
+    prompt_editor = f"""
+    You are given some research code that contains hardcoded column lists used for data processing.
+    Your task is to refactor this code by extracting all column lists and organizing them into a Python dictionary, where each key corresponds to a specific column category, and the value is a list of column names.
+
+    The target categories are fixed and must be:
+    - candidate
+    - categorical
+    - feature
+    - meta
+    - var_analysis
+    - vc_candidate
+
+    If a column list does not clearly fit into one of the above categories, place it under the "other" category.
+
+    Your response must meet **all** of the following rules:
+    1. Return only a **valid Python dictionary** (not wrapped in markdown or code blocks).
+    2. Do **not include any explanation**, comment, formatting, or extra text.
+    3. The dictionary keys must match the categories exactly as written above.
+    4. If a category has no columns, use an empty list as its value.
+    5. All column names must be strings inside the lists.
+
+    Example format (your output mightlook like this):
+
+    {{
+        "candidate": ["col1", "col2"],
+        "categorical": [],
+        "feature": ["f1", "f2"],
+        "meta": ["id", "timestamp"],
+        "var_analysis": [],
+        "vc_candidate": [],
+        "other": ["unexpected_col1"]
+    }}
+
+    Return only the dictionary.
+
+    Here is the research code:
+    {python_code}
+    """
+ 
+    # print('prompt DEBUG',prompt_editor)
+ 
+    # Call the LLM to process the code
+    response = llm_client.call_llm(
+        prompt=prompt_editor,
+        max_tokens=3500,
+        temperature=0,
+        repetition_penalty=1.0,
+        top_p=1
+    )
+
+    llm_output = response.choices[0].message.content
+
+    print("🧾 LLM raw output:\n", llm_output)
+
+    try:
+        column_lists = ast.literal_eval(llm_output)
+    except Exception as e:
+        raise ValueError(f"Failed to parse LLM response. Error: {e}\nContent:\n{llm_output}")
+
+    known_categories = [
+        'candidate',
+        'categorical',
+        'feature',
+        'meta',
+        'var_analysis',
+        'vc_candidate'
+    ]
+
+    final_columns = {key: [] for key in known_categories}
+    final_columns['other'] = []
+
+    for key, columns in column_lists.items():
+        if key in known_categories:
+            final_columns[key] = columns
+        else:
+            final_columns['other'].extend(columns)
+
+
+    os.makedirs('../assets', exist_ok=True)
+
+    for category, columns in final_columns.items():
+        file_path = os.path.join('../assets', f'{category}.txt')
+        with open(file_path, 'w', encoding='utf-8') as f:
+            for col in columns:
+                f.write(f"{col}\n")
+
+
+
+
+
+
+if __name__ == "__main__":
+    # BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/agents"
+    # python_file_path = os.path.join(BASE_DIR, "test11.py")
+
+    # modified_code = code_editor_agent(python_file_path)
+
+    # print("Modified script:",modified_code)
+
+
+    BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
+    notebooks_dir = os.path.join(BASE_DIR, "notebooks")
+    for filename in os.listdir(notebooks_dir):
+        if filename.endswith(".py"):
+            python_file_path = os.path.join(notebooks_dir, filename)
+            print(f"\n🛠️ Processing: {filename}")
+
+            try:
+                modified_code = code_editor_agent(python_file_path)
+                print("✅ Modified script:")
+                print(modified_code)
+            except Exception as e:
+                print(f"❌ Error processing {filename}: {e}")
+
+    print("\n✅ All scripts in notebooks/ processed.")
