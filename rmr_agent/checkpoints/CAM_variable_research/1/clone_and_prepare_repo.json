@@ -1,0 +1,24 @@
+{
+  "github_url": "https://github.paypal.com/matjacobs/CAM_variable_research",
+  "local_repo_path": "rmr_agent/repos/CAM_variable_research",
+  "files": [
+    "rmr_agent/repos/CAM_variable_research/0_cam_etl.py",
+    "rmr_agent/repos/CAM_variable_research/1_1_cam_precheck.py",
+    "rmr_agent/repos/CAM_variable_research/1_2_cam_postcheck.py",
+    "rmr_agent/repos/CAM_variable_research/2_1_cam_exist_var_shifu_multisegment.py",
+    "rmr_agent/repos/CAM_variable_research/2_2_cam_new_var_selection_shifu.py",
+    "rmr_agent/repos/CAM_variable_research/2_3_cam_all_var_shifu_multisegment.py",
+    "rmr_agent/repos/CAM_variable_research/2_4_cam_shifu_all_in_one.py",
+    "rmr_agent/repos/CAM_variable_research/3_1_model_redefine.py",
+    "rmr_agent/repos/CAM_variable_research/3_2_gcp_training.py",
+    "rmr_agent/repos/CAM_variable_research/3_3_gcp_training.py",
+    "rmr_agent/repos/CAM_variable_research/3_4_gcp_training.py",
+    "rmr_agent/repos/CAM_variable_research/3_5_gcp_training.py",
+    "rmr_agent/repos/CAM_variable_research/3_6_gcp_training.py",
+    "rmr_agent/repos/CAM_variable_research/3_7_gcp_training.py",
+    "rmr_agent/repos/CAM_variable_research/4_pack_scoring.py",
+    "rmr_agent/repos/CAM_variable_research/5_eval.py",
+    "rmr_agent/repos/CAM_variable_research/analysis.py",
+    "rmr_agent/repos/CAM_variable_research/model_redefine.py"
+  ]
+}

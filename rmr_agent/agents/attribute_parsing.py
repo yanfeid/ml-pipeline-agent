@@ -1,10 +1,14 @@
+import os
+import json
+import yaml
+import configparser
 from pathlib import Path
 import litellm
-from llms import LLMClient
-from utils import convert_to_dict
+from rmr_agent.llms import LLMClient
+from rmr_agent.utils import convert_to_dict
 
 
-def update_attributes_with_existing_config(attribute_yaml, config_path):
+def update_attributes_with_existing_config(attribute_text, config_path):
     path_obj = Path(config_path)
     config_text = path_obj.read_text()
     #print(config_text)
@@ -29,46 +33,103 @@ def update_attributes_with_existing_config(attribute_yaml, config_path):
     return updated_attributes
 
 
-def get_component_location(component_identification_dict):
-    output_str = "" 
-    for component in component_identification_dict.keys():
-        output_str += f"{component}:\n"
-        output_str += f"  - File name: {component_identification_dict[component].get('file_name', 'None')}\n"
-        output_str += f"  - Line range: {component_identification_dict[component].get('line_range', 'None')}\n"
-    return output_str
+def read_config_file(file_path):
+    """
+    Open a configuration file (e.g., .yaml, .json, .ini) and return its content as a string.
+    
+    Args:
+        file_path (str): The path to the configuration file.
+        
+    Returns:
+        str: The content of the file as a string.
+    """
+    file_extension = os.path.splitext(file_path)[1].lower()
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            if file_extension == '.json':
+                # For JSON files
+                config_content = json.dumps(json.load(f), indent=2)
+            elif file_extension in ['.yaml', '.yml']:
+                # For YAML files
+                config_content = yaml.dump(yaml.safe_load(f), default_flow_style=False)
+            elif file_extension == '.ini':
+                # For INI files
+                config = configparser.ConfigParser()
+                config.read_file(f)
+                config_content = '\n'.join([f'[{section}]\n' + '\n'.join(f'{key}={value}' for key, value in config.items(section)) for section in config.sections()])
+            else:
+                # If file is not recognized, just return its content as plain text
+                config_content = f.read()
+
+        return config_content
+    
+    except Exception as e:
+        print(f"Error reading {file_path}: {e}")
+        return None
 
 
 
-def parse_attribute_identification(component_identification_dict, attribute_text):
-    location_str = get_component_location(component_identification_dict)
-    parse_prompt = f"""Parse the following ML component line range and attribute identification response and return a JSON object with the following structure:
+
+
+def check_if_need_config_fill(attribute_text):
+    try:
+        # Convert the JSON response into a Python dictionary
+        attribute_identification_dict = convert_to_dict(attribute_text)
+
+        if attribute_identification_dict == None:
+            raise ValueError("No JSON object found in the LLM attribute identification response")
+        
+        # Check if any component in the dictionary has 'needs_config_fill' set to True
+        for component_name, component_data in attribute_identification_dict.items():
+            # If 'needs_config_fill' is present and True, return True
+            if component_data.get('needs_config_fill', False):
+                return True
+        
+        # If no component requires config fill, return False
+        return False
+    except Exception as e:
+        print(f"Error in check_if_need_config_fill: {e}")
+        return False
+
+
+
+def parse_attribute_identification(component_identification_dict, attribute_text, existing_config_file_path=""):
+    components_list = list(component_identification_dict.keys())
+    needs_config_fill = check_if_need_config_fill(attribute_text)
+    parse_prompt = f"""You are parsing a JSON string to correct its content and produce a valid JSON.
+
+### Instructions:
+    - Include all components from the provided Components List and exclude any additional components not listed.
+    - Extract only input and output variables that are static and configurable, excluding any variables with values that are function calls, method calls, list comprehensions, or other dynamic expressions.
+    - Exclude long column lists, such as categorical, numerical, meta, or candidate columns, from being treated as variables. The target (or label) column list, weight column list, are okay to included as variables however. Also, lists used directly in data operations (e.g., join keys, filter keys, grouping keys, indexing or sort keys) are fine to include if necessary.
+    - Produce only valid JSON in your response
+
+### Output format (JSON):
 {{
     "Component Name": {{
-        "file_name": "The exact file_name as specified (e.g., 'research/driver_creation.ipynb')",
-        "line_range": "The exact line range as specified (e.g., 'Lines 258-311')",
         "inputs": [
-            "Full input item line including its variable name and value",
-            "Another input item text"
+            {{"name": "variable_name_1", "value": "variable value 1"}},
+            {{"name": "variable_name_2", "value": "variable value 2"}},
         ],
         "outputs": [
-            "Full output item line including its variable name and value",
-            "Another output item text"
+            {{"name": "variable_name_1", "value": "variable value 1"}},
+            {{"name": "variable_name_2", "value": "variable value 2"}},
         ]
     }}
 }}
 
-### Make Sure To:
-1. Keep the line range exactly as specified in the text.
-2. Extract all input and output items with their variable names and descriptions.
-3. Exclude input/output attributes that contain function/method calls or list comprehension expressions. 
-4. Ignore any additional text that appears after the last component.
+### Components List:
+{components_list}
 
-### Component Locations:
-{location_str}
-
-### Component Input and Output Attributes:
+### Components With Their Identified Input and Output Variables:
 {attribute_text}
 """
+    if needs_config_fill and existing_config_file_path:
+        # to do - use config file path
+        config_content = read_config_file(existing_config_file_path)
+        config_fill_prompt = f"""\n### Config values to use to fill in the variable values:\n{config_content}"""
+        parse_prompt += config_fill_prompt
     
     llm_client = LLMClient(model_name="gpt-4o")
     response: litellm.types.utils.ModelResponse = llm_client.call_llm(
@@ -81,4 +142,13 @@ def parse_attribute_identification(component_identification_dict, attribute_text
     choices: litellm.types.utils.Choices = response.choices
     parsed_attributes_text = choices[0].message.content or ""
     parsed_attributes_dict = convert_to_dict(parsed_attributes_text)
+    # Add file name and line range to the result to bring all the node information together. Delete any extra components hallucinated by LLM. 
+    for component in parsed_attributes_dict.keys():
+        if component not in component_identification_dict:
+            print(f"Found an extra component {component} added by LLM during attribute identification parsing. Deleting it")
+            del parsed_attributes_dict[component]
+            continue
+        parsed_attributes_dict[component]["file_name"] = component_identification_dict[component].get('file_name', 'None')
+        parsed_attributes_dict[component]["line_range"] = component_identification_dict[component].get('line_range', 'None')
+
     return parsed_attributes_text, parsed_attributes_dict

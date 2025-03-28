@@ -36,7 +36,7 @@ def load_step_output(checkpoint_base_path: str, repo_name: str, step: str, run_i
             output = json.load(f)
         print(f"Loaded {step} output from {checkpoint_path}")
         return output
-    return {}
+    raise FileNotFoundError(f"Checkpoint not found for step {step}")
 
 def save_step_output(checkpoint_base_path: str, repo_name: str, step: str, run_id: str, output: Dict[str, Any]):
     os.makedirs(f"{checkpoint_base_path}/{repo_name}/{run_id}", exist_ok=True)

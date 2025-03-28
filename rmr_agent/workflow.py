@@ -6,7 +6,8 @@ import requests
 import argparse
 import subprocess
 from typing import Dict, Any, List
-from utils import (
+from concurrent.futures import ThreadPoolExecutor
+from rmr_agent.utils import (
     clone_repo, parse_github_url, convert_notebooks,
     get_next_run_id, load_step_output, save_step_output,
     save_ini_file
@@ -41,20 +42,28 @@ def summarize(state: WorkflowState) -> Dict[str, Any]:
     if "summaries" in state and state["summaries"]:
         print("Skipping summarize: 'summaries' already in state")
         return {}
-    from agents.summarization import summarize_code
+    from rmr_agent.agents.summarization import summarize_code
     full_file_list = state["files"]
     summaries = {}
     cleaned_code = {}
-    for file in full_file_list:
-        if is_cancelled(state):
-            print("Workflow cancelled during code summarization")
-            return {}
-        clean_code, summary_text = summarize_code(file, full_file_list)
-        summaries[file] = summary_text
-        cleaned_code[file] = clean_code
-        print(f"Generated summary for {file}")
+    
+    with ThreadPoolExecutor() as executor:
+        # Map processing across threads using a lambda
+        results = executor.map(
+            lambda file: (file, *summarize_code(file, full_file_list)),
+            full_file_list
+        )
+        
+        for file, clean_code, summary_text in results:
+            if is_cancelled(state):
+                print("Workflow cancelled during code summarization")
+                return {}
+            summaries[file] = summary_text
+            cleaned_code[file] = clean_code
+            print(f"Generated summary for {file}")
+
     return {
-        "summaries": summaries, 
+        "summaries": summaries,
         "cleaned_code": cleaned_code
     }
 
@@ -62,34 +71,50 @@ def run_component_identification(state: WorkflowState) -> Dict[str, Any]:
     if "component_identification" in state and state["component_identification"]:
         print("Skipping run_component_identification: 'component_identification' already in state")
         return {}
-    from agents.component_identification import component_identification_agent
+    from rmr_agent.agents.component_identification import component_identification_agent
     full_file_list = state["files"]
     summaries = state["summaries"]
     component_identification = []
-    for file in full_file_list:
-        if is_cancelled(state):
-            print("Workflow cancelled during component identification")
-            return {}
-        nodes = component_identification_agent(file, full_file_list, code_summary=summaries[file])
-        component_identification.append(nodes)
-        print(f"Identified components for {file}")
+    
+    with ThreadPoolExecutor() as executor:
+        # Map processing across threads using a lambda
+        results = executor.map(
+            lambda file: (file, component_identification_agent(file, full_file_list, code_summary=summaries[file])),
+            full_file_list
+        )
+        
+        for file, component_id_str in results:
+            if is_cancelled(state):
+                print("Workflow cancelled during component identification")
+                return {}
+            component_identification.append(component_id_str)
+            print(f"Identified components for {file}")
+
     return {"component_identification": component_identification}
 
 def run_component_parsing(state: WorkflowState) -> Dict[str, Any]:
     if "component_parsing" in state and state["component_parsing"]:
         print("Skipping run_component_parsing: 'component_parsing' already in state")
         return {}
-    from agents.component_parsing import parse_component_identification
+    from rmr_agent.agents.component_parsing import parse_component_identification
     full_file_list = state["files"]
     component_identification = state["component_identification"]
     component_parsing = []
-    for file, component_identification_text in zip(full_file_list, component_identification):
-        if is_cancelled(state):
-            print("Workflow cancelled during component parsing")
-            return {}
-        parsed_component_identification_text, parsed_component_identification_dict = parse_component_identification(component_identification_text, file)
-        component_parsing.append(parsed_component_identification_dict)
-        print(f"Parsed the component identification response for {file}")
+    
+    with ThreadPoolExecutor() as executor:
+        # Map processing across threads using a lambda
+        results = executor.map(
+            lambda pair: (pair[0], *parse_component_identification(pair[1], pair[0])),
+            zip(full_file_list, component_identification)
+        )
+        
+        for file, parsed_component_id_text, parsed_component_id_dict in results:
+            if is_cancelled(state):
+                print("Workflow cancelled during component parsing")
+                return {}
+            component_parsing.append(parsed_component_id_dict)
+            print(f"Parsed the component identification response for {file}")
+
     return {"component_parsing": component_parsing}
 
 def human_verification_of_components(state: WorkflowState) -> Dict[str, Any]:
@@ -155,18 +180,26 @@ def run_attribute_identification(state: WorkflowState) -> Dict[str, Any]:
     if 'attribute_identification' in state and state['attribute_identification']:
         print("Skipping run_attribute_identification: 'attribute_identification' already in state")
         return {}
-    from agents.attribute_identification import attribute_identification_agent
+    from rmr_agent.agents.attribute_identification import attribute_identification_agent
     full_file_list = state["files"]
     verified_components = state['verified_components']
     cleaned_code = state['cleaned_code']
     attribute_identification = []
-    for file, component_dict in zip(full_file_list, verified_components):
-        if is_cancelled(state):
-            print("Workflow cancelled during attribute identification")
-            return {}
-        attribution_text = attribute_identification_agent(file, component_dict, cleaned_code[file])
-        attribute_identification.append(attribution_text)
-        print(f"Identified attributes for components in {file}")
+    
+    with ThreadPoolExecutor() as executor:
+        # Map processing across threads using a lambda
+        results = executor.map(
+            lambda pair: (pair[0], attribute_identification_agent(pair[0], pair[1], cleaned_code[pair[0]])),
+            zip(full_file_list, verified_components)
+        )
+        
+        for file, attribution_text in results:
+            if is_cancelled(state):
+                print("Workflow cancelled during attribute identification")
+                return {}
+            attribute_identification.append(attribution_text)
+            print(f"Identified attributes for components in {file}")
+
     return {"attribute_identification": attribute_identification}
 
 def run_attribute_parsing(state: WorkflowState) -> Dict[str, Any]:
@@ -174,23 +207,31 @@ def run_attribute_parsing(state: WorkflowState) -> Dict[str, Any]:
     if 'attribute_parsing' in state and state['attribute_parsing']:
         print("Skipping run_attribute_parsing: 'attribute_parsing' already in state")
         return {}
-    from agents.attribute_parsing import parse_attribute_identification
+    from rmr_agent.agents.attribute_parsing import parse_attribute_identification
     verified_components = state['verified_components']
     attribute_identification = state['attribute_identification']
     attribute_parsing = []
-    for component_dict, attributes_text in zip(verified_components, attribute_identification):
-        if is_cancelled(state):
-            print("Workflow cancelled during attribute parsing")
-            return {}
-        parsed_attributes_text, parsed_attributes_dict = parse_attribute_identification(component_dict, attributes_text)
-        attribute_parsing.append(parsed_attributes_dict)
+    
+    with ThreadPoolExecutor() as executor:
+        # Map processing across threads using a lambda
+        results = executor.map(
+            lambda x: (x[0], *parse_attribute_identification(x[0], x[1])),
+            zip(verified_components, attribute_identification)
+        )
+        
+        for component_dict, parsed_attributes_text, parsed_attributes_dict in results:
+            if is_cancelled(state):
+                print("Workflow cancelled during attribute parsing")
+                return {}
+            attribute_parsing.append(parsed_attributes_dict)
+
     return {"attribute_parsing": attribute_parsing}
 
 def run_node_aggregator(state: WorkflowState) -> Dict[str, Any]:
     if "node_aggregator" in state and state["node_aggregator"]:
         print("Skipping run_node_aggregator: 'node_aggregator' already in state")
         return {}
-    from agents.node_aggregator import node_aggregator_agent
+    from rmr_agent.agents.node_aggregator import node_aggregator_agent
     nodes_yaml = node_aggregator_agent(state["attribute_parsing"])
     nodes_yaml_path = f"{CHECKPOINT_BASE_PATH}/{state['repo_name']}/{state['run_id']}/nodes.yaml"
     try:
@@ -206,7 +247,7 @@ def run_edge_identification(state: WorkflowState) -> Dict[str, Any]:
     if "edges" in state and state["edges"]:
         print("Skipping run_edge_identification: 'edges' already in state")
         return {}
-    from agents.edge_identification import edge_identification_agent
+    from rmr_agent.agents.edge_identification import edge_identification_agent
     edges = edge_identification_agent(state["node_aggregator"])
     return {"edges": edges}
 
@@ -214,7 +255,7 @@ def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
     if "dag_yaml" in state and state["dag_yaml"]:
         print("Skipping generate_dag_yaml: 'dag_yaml' already in state")
         return {}
-    from agents.dag import generage_dag_yaml
+    from rmr_agent.agents.dag import generage_dag_yaml
     dag_yaml_str = generage_dag_yaml(aggregated_nodes=state["node_aggregator"], edges=state["edges"])
     dag_yaml_path = f"{CHECKPOINT_BASE_PATH}/{state['repo_name']}/{state['run_id']}/dag.yaml"
     try:
@@ -263,52 +304,76 @@ def run_notebook_agent(state: WorkflowState) -> Dict[str, Any]:
     notebooks = notebook_agent(yaml.safe_load(state["dag_yaml"]),state["summaries"])
     return {"notebooks": notebooks}
 
-def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:
-    if "edited_notebooks" in state and state["edited_notebooks"]:
-        print("Skipping run_notebook_agent: 'notebooks' already in state")
-        return {}
+
+# Define steps requiring human input
+HUMAN_STEPS = {"human_verification_of_components", "human_verification_of_dag"}
+
+# Define all steps (without human verification functions, as they'll be API-driven)
+STEPS = [
+    ("clone_and_prepare_repo", clone_and_prepare_repo),
+    ("summarize", summarize),
+    ("component_identification", run_component_identification),
+    ("component_parsing", run_component_parsing),
+    ("human_verification_of_components", None),  # Placeholder
+    ("attribute_identification", run_attribute_identification),
+    ("attribute_parsing", run_attribute_parsing),
+    ("node_aggregator", run_node_aggregator),
+    ("edge_identification", run_edge_identification),
+    ("generate_dag_yaml", generate_dag_yaml),
+    ("human_verification_of_dag", None),  # Placeholder
+    ("config_agent", run_config_agent),
+    ("notebook_agent", run_notebook_agent)
+]
+
+INITIAL_STATE = {
+    # status related
+    "step": "",
+    "status": "",
+    "error": None,
     
-    from agents.code_editor import code_editor_agent
-    edited_notebooks = {}
-
-    for name, path in state["notebooks"].items():
-        edited_notebooks[name] = code_editor_agent(path)
-    return {"edited_notebooks": edited_notebooks}
-
+    # workflow related
+    "github_url": "",
+    "input_files": "",
+    "repo_name": "",
+    "run_id": "",
+    "local_repo_path": "",
+    "existing_config_path": "",
+    "files": [],
+    "summaries": {},
+    "cleaned_code": {},
+    "component_identification": [],
+    "component_parsing": [],
+    "verified_components": [],
+    "attribute_identification": [],
+    "attribute_parsing": [],
+    "node_aggregator": [],
+    "edges": [],
+    "dag_yaml": "",
+    "verified_dag": {},
+    "config": {},
+    "notebooks": [],
+    "pr_url": ""
+}
 
 def build_workflow():
     workflow = StateGraph(WorkflowState)
-    workflow.add_node("clone_and_prepare_repo", clone_and_prepare_repo)
-    workflow.add_node("summarize", summarize)
-    workflow.add_node("component_identification", run_component_identification)
-    workflow.add_node("component_parsing", run_component_parsing)
-    workflow.add_node("human_verification_of_components", human_verification_of_components)
-    workflow.add_node("attribute_identification", run_attribute_identification)
-    workflow.add_node("attribute_parsing", run_attribute_parsing)
-    workflow.add_node("node_aggregator", run_node_aggregator)
-    workflow.add_node("edge_identification", run_edge_identification)
-    workflow.add_node("generate_dag_yaml", generate_dag_yaml)
-    workflow.add_node("human_verification_of_dag", human_verification_of_dag)
-    workflow.add_node("config_agent", run_config_agent)
-    workflow.add_node("notebook_agent", run_notebook_agent)
-    workflow.add_node("code_editor_agent", run_code_editor_agent)
-
-    workflow.add_edge("clone_and_prepare_repo", "summarize")
-    workflow.add_edge("summarize", "component_identification")
-    workflow.add_edge("component_identification", "component_parsing")
-    workflow.add_edge("component_parsing", "human_verification_of_components")
-    workflow.add_edge("human_verification_of_components", "attribute_identification")
-    workflow.add_edge("attribute_identification", "node_aggregator")
-    workflow.add_edge("node_aggregator", "edge_identification")
-    workflow.add_edge("edge_identification", "generate_dag_yaml")
-    workflow.add_edge("generate_dag_yaml", "human_verification")
-    workflow.add_edge("human_verification_of_dag", "config_agent")
-    workflow.add_edge("config_agent", "notebook_agent")
-    workflow.add_edge("notebook_agent", "code_editor_agent")
-    workflow.add_edge("code_editor_agent",END)
-
-
-    workflow.set_entry_point("clone_and_prepare_repo")
+    
+    # Add all nodes using a for loop
+    for step_name, step_function in STEPS:
+        workflow.add_node(step_name, step_function)
+    
+    # Add edges using a for loop - just a sequential workflow
+    for i in range(len(STEPS) - 1):
+        current_step = STEPS[i][0]
+        next_step = STEPS[i + 1][0]
+        workflow.add_edge(current_step, next_step)
+    
+    # Add final edge to END
+    workflow.add_edge(STEPS[-1][0], END)
+    
+    # Set entry point
+    workflow.set_entry_point(STEPS[0][0])
+    
     return workflow.compile()
 
 # For testing locally
@@ -316,63 +381,31 @@ def run_workflow(github_url: str, input_files: List[str], run_id: str | None = N
     _, repo_name = parse_github_url(github_url)
     if not run_id:
         run_id = get_next_run_id(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name)
+    start_idx = 0 if not start_from else next(i for i, (s, _) in enumerate(STEPS) if s == start_from)
+    step_name = STEPS[start_idx][0]
+    status = "initializing"
     
-    initial_state = {
-        "github_url": github_url,
-        "input_files": input_files,
-        "repo_name": repo_name,
-        "run_id": run_id,
-        "local_repo_path": "",
-        "existing_config_path": existing_config_path,
-        "files": [],
-        "summaries": {},
-        "cleaned_code": {},
-        "component_identification": [],
-        "component_parsing": [],
-        "verified_components": [],
-        "attribute_identification": [],
-        "attribute_parsing": [],
-        "node_aggregator": [],
-        "edges": [],
-        "dag_yaml": "",
-        "verified_dag": {},
-        "config": {},
-        "notebooks": [],
-        "edited_notebooks": []
-    }
-
-    # Define all steps with their functions
-    steps = [
-        ("clone_and_prepare_repo", clone_and_prepare_repo),
-        ("summarize", summarize),
-        ("component_identification", run_component_identification),
-        ("component_parsing", run_component_parsing),
-        ("human_verification_of_components", human_verification_of_components),
-        ("attribute_identification", run_attribute_identification),
-        ("attribute_parsing", run_attribute_parsing),
-        ("node_aggregator", run_node_aggregator),
-        ("edge_identification", run_edge_identification),
-        ("generate_dag_yaml", generate_dag_yaml),
-        ("human_verification_of_dag", human_verification_of_dag),
-        ("config_agent", run_config_agent),
-        ("notebook_agent", run_notebook_agent),
-        ("code_editor_agent",run_code_editor_agent)
-    ]
+    state = INITIAL_STATE.copy()
+    state["step"] = step_name
+    state["status"] = status
+    state["github_url"] = github_url
+    state["input_files"] = input_files
+    state["repo_name"] = repo_name
+    state["run_id"] = run_id
 
     # Load state up to the start_from step
-    current_state = initial_state.copy()
-    start_idx = 0 if not start_from else next(i for i, (step, _) in enumerate(steps) if step == start_from)
-    for step_name, _ in steps[:start_idx]:
+    start_idx = 0 if not start_from else next(i for i, (step, _) in enumerate(STEPS) if step == start_from)
+    for step_name, _ in STEPS[:start_idx]:
         step_output = load_step_output(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name, run_id=run_id, step=step_name)
-        current_state.update(step_output)
+        state.update(step_output)
 
     # Run from start_from onward
-    for step_name, step_func in steps[start_idx:]:
-        update = step_func(current_state)
-        current_state.update(update)
+    for step_name, step_func in STEPS[start_idx:]:
+        update = step_func(state)
+        state.update(update)
         save_step_output(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name, run_id=run_id, step=step_name, output=update)
 
-    return current_state
+    return state
 
 
 
