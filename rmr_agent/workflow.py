@@ -296,13 +296,26 @@ def run_config_agent(state: WorkflowState) -> Dict[str, Any]:
     return {"config": config}
 
 def run_notebook_agent(state: WorkflowState) -> Dict[str, Any]:
-    print("DEBUG - verified_dag type:", type(state["dag_yaml"]))
+    print("DEBUG - json type:", (state["cleaned_code"]))
     if "notebooks" in state and state["notebooks"]:
         print("Skipping run_notebook_agent: 'notebooks' already in state")
         return {}
+
     from agents.notebook import notebook_agent
-    notebooks = notebook_agent(yaml.safe_load(state["dag_yaml"]),state["summaries"])
+    notebooks = notebook_agent(yaml.safe_load(state["dag_yaml"]),state["cleaned_code"])
     return {"notebooks": notebooks}
+
+def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:
+    if "edited_notebooks" in state and state["edited_notebooks"]:
+        print("Skipping run_notebook_agent: 'notebooks' already in state")
+        return {}
+    
+    from agents.code_editor import code_editor_agent
+    edited_notebooks = {}
+
+    for name, path in state["notebooks"].items():
+        edited_notebooks[name] = code_editor_agent(path)
+    return {"edited_notebooks": edited_notebooks}
 
 
 # Define steps requiring human input
@@ -322,7 +335,8 @@ STEPS = [
     ("generate_dag_yaml", generate_dag_yaml),
     ("human_verification_of_dag", None),  # Placeholder
     ("config_agent", run_config_agent),
-    ("notebook_agent", run_notebook_agent)
+    ("notebook_agent", run_notebook_agent),
+    ("code_editor_agent", run_code_editor_agent)
 ]
 
 INITIAL_STATE = {
@@ -352,6 +366,7 @@ INITIAL_STATE = {
     "verified_dag": {},
     "config": {},
     "notebooks": [],
+    "edited_notebooks": [],
     "pr_url": ""
 }
 

@@ -1,10 +1,11 @@
-## gsutil authentication
-%ppauth
-
 from rmr_config.simple_config import Config
 from rmr_config.state_manager import StateManager
-import os, sys, ast, json
+import os
+import sys
+import ast
+import json
 from datetime import datetime
+import yaml
 
 if "working_path" not in globals():
     from pathlib import Path
@@ -15,7 +16,7 @@ folder = os.getcwd()
 username = os.environ['NB_USER']
 params_path = os.path.join(working_path, 'config')
 config = Config(params_path)
-local_base_path = config.get("general","local_output_base_path")
+local_base_path = config.get("general", "local_output_base_path")
 os.makedirs(local_base_path, exist_ok=True)
 
 # set working directory
@@ -39,32 +40,25 @@ check_point = config.get('general', 'check_point')
 state_file = config.get('general', 'state_file')
 
 # Section-Specific Parameters (from solution.ini)
-bq_prefix = config.get('section_name', 'bq_prefix')
 file_path = config.get('section_name', 'file_path')
+bq_prefix = config.get('section_name', 'bq_prefix')
+training_exclude_merch = config.get('section_name', 'training_exclude_merch')
+train_start_date = config.get('section_name', 'train_start_date')
+oot_start_date = config.get('section_name', 'oot_start_date')
+val_start_date = config.get('section_name', 'val_start_date')
+training_hot_positive_attributed_txn_sampling_alpha = config.get('section_name', 'training_hot_positive_attributed_txn_sampling_alpha')
+training_attributed_txn_upsampling_rate = config.get('section_name', 'training_attributed_txn_upsampling_rate')
+removing_highly_active_user_threshold = config.get('section_name', 'removing_highly_active_user_threshold')
+removing_highly_active_user_merchant_threshold = config.get('section_name', 'removing_highly_active_user_merchant_threshold')
+removing_highly_active_user_merchant_date_threshold = config.get('section_name', 'removing_highly_active_user_merchant_date_threshold')
+training_hot_positive_organic_txn_sampling_alpha = config.get('section_name', 'training_hot_positive_organic_txn_sampling_alpha')
+save_label_mixing_rate = config.get('section_name', 'save_label_mixing_rate')
+ratio_for_hard_negtive = config.get('section_name', 'ratio_for_hard_negtive')
 hard_negative_impression_time_window = config.get('section_name', 'hard_negative_impression_time_window')
 negative_sampling_avoid_delay_postive_feedback_window = config.get('section_name', 'negative_sampling_avoid_delay_postive_feedback_window')
-oot_start_date = config.get('section_name', 'oot_start_date')
-ratio_for_hard_negtive = config.get('section_name', 'ratio_for_hard_negtive')
-removing_highly_active_user_merchant_date_threshold = config.get('section_name', 'removing_highly_active_user_merchant_date_threshold')
-removing_highly_active_user_merchant_threshold = config.get('section_name', 'removing_highly_active_user_merchant_threshold')
-removing_highly_active_user_threshold = config.get('section_name', 'removing_highly_active_user_threshold')
-save_label_mixing_rate = config.get('section_name', 'save_label_mixing_rate')
-train_start_date = config.get('section_name', 'train_start_date')
-training_attributed_txn_upsampling_rate = config.get('section_name', 'training_attributed_txn_upsampling_rate')
-training_exclude_merch = config.get('section_name', 'training_exclude_merch')
 training_hot_negative_sampling_alpha = config.get('section_name', 'training_hot_negative_sampling_alpha')
-training_hot_positive_attributed_txn_sampling_alpha = config.get('section_name', 'training_hot_positive_attributed_txn_sampling_alpha')
-training_hot_positive_organic_txn_sampling_alpha = config.get('section_name', 'training_hot_positive_organic_txn_sampling_alpha')
 uniform_negative_postive_ratio = config.get('section_name', 'uniform_negative_postive_ratio')
-val_start_date = config.get('section_name', 'val_start_date')
-driver_oot = config.get('section_name', 'driver_oot')
-driver_simu = config.get('section_name', 'driver_simu')
-driver_simu_consumer = config.get('section_name', 'driver_simu_consumer')
-
-# Dependencies from Previous Sections
-
-# === Research Code ===
-import yaml
+final_driver_table = config.get('section_name', 'final_driver_table')
 
 def load_yaml_file(file_path):
     try:
@@ -78,8 +72,8 @@ file_path = '../config/base_config.yaml'
 config = load_yaml_file(file_path)
 if config is not None:
     bq_prefix = config['general_config']['bq_project_dataset_prefix']
+bq_prefix
 
-## eligible merchants
 q = f"""
 DROP TABLE IF EXISTS {bq_prefix}live_unique_merchants_train;
 CREATE TABLE {bq_prefix}live_unique_merchants_train AS
@@ -115,8 +109,8 @@ ON
 b.encryptedid = d.encrypt_id
 where rcvr_id not in ({config['driver_config']['training_exclude_merch']})
 """
-# %ppbq $q
-q=f"""
+
+q = f"""
 drop table if exists {bq_prefix}driver_00 ;
 create table {bq_prefix}driver_00 as
 SELECT
@@ -145,8 +139,9 @@ and cust_id<>'no_cust_id'
 and pp_merchant_id is not null
 and saves_imp_unique_cnt>0;
 """
-# %ppbq $q
-q=f"""drop table if exists {bq_prefix}driver_0 ;
+
+q = f"""
+drop table if exists {bq_prefix}driver_0 ;
 create table {bq_prefix}driver_0 as
 with temp as (
 select cust_id,count(distinct placement) as cnt_placement
@@ -166,8 +161,9 @@ where cnt_placement=1
 )
 and (save>0 or leap_aft_txn>0);
 """
-# %ppbq $q
-q=f"""drop table if exists {bq_prefix}driver_1;
+
+q = f"""
+drop table if exists {bq_prefix}driver_1;
 create table {bq_prefix}driver_1 as
 SELECT
 a.payment_transid,
@@ -184,9 +180,9 @@ and customer_counterparty in (select distinct rcvr_id from {bq_prefix}live_uniqu
 and transaction_created_date >= {config['driver_config']['train_start_date']}
 and transaction_status='S';
 """
-# %ppbq $q
-# # Positive Samples
-q=f"""drop table if exists {bq_prefix}driver_positive_train_attributed;
+
+q = f"""
+drop table if exists {bq_prefix}driver_positive_train_attributed;
 create table {bq_prefix}driver_positive_train_attributed as
 WITH t1 as (
 SELECT * FROM {bq_prefix}driver_0
@@ -231,8 +227,9 @@ case when run_date<{config['driver_config']['val_start_date']} then 'train' else
 FROM t6
 CROSS JOIN UNNEST(GENERATE_ARRAY(1,{config['driver_config']['training_attributed_txn_upsampling_rate']})) AS repeat
 """
-# %ppbq $q
-q=f"""drop table if exists {bq_prefix}driver_positive_train_organic_0;
+
+q = f"""
+drop table if exists {bq_prefix}driver_positive_train_organic_0;
 create table {bq_prefix}driver_positive_train_organic_0 as
 SELECT cust_id,rcvr_id,run_date,gpt_1st_category_l2_index
 FROM {bq_prefix}driver_1
@@ -268,8 +265,9 @@ HAVING count(distinct payment_transid)<{config['driver_config']['removing_highly
 )
 );
 """
-# %ppbq $q
-q=f"""drop table if exists {bq_prefix}driver_positive_train_organic;
+
+q = f"""
+drop table if exists {bq_prefix}driver_positive_train_organic;
 create table {bq_prefix}driver_positive_train_organic as
 WITH t1 as (
 SELECT *
@@ -308,8 +306,9 @@ SELECT cust_id,rcvr_id,run_date,gpt_1st_category_l2_index,merchant_ratio,merchan
 case when run_date<{config['driver_config']['val_start_date']} then 'train' else 'val' end as split
 FROM t6;
 """
-# %ppbq $q
-q=f"""drop table if exists {bq_prefix}driver_positive;
+
+q = f"""
+drop table if exists {bq_prefix}driver_positive;
 create table {bq_prefix}driver_positive as
 SELECT cust_id,rcvr_id,run_date,gpt_1st_category_l2_index,pos_tag_type,split
 FROM {bq_prefix}driver_positive_train_attributed
@@ -341,4 +340,64 @@ AND CONCAT(cust_id,rcvr_id) not in (select distinct concat(cust_id,rcvr_id)
 from {bq_prefix}driver_0 where save>0)
 AND run_date>={config['driver_config']['oot_start_date']};
 """
-#
+
+q = f"""
+drop table if exists {bq_prefix}driver_positive_training_split_0;
+create table {bq_prefix}driver_positive_training_split_0 as
+with t1 as(
+select a.cust_id, avg(rand()) as random
+from (
+select *
+from {bq_prefix}driver_positive
+where split in ('train','val')) a
+join {bq_prefix}driver_0 b
+on a.cust_id=b.cust_id
+and a.run_date>=b.run_date
+and a.run_date<=DATE_ADD(b.run_date,INTERVAL 7 DAY)
+and b.save=0
+and b.leap_aft_txn=0
+and a.rcvr_id<>b.rcvr_id
+where a.split in ('train','val')
+group by 1
+)
+select a.*,
+case when t1.cust_id is not null then 'y' else 'n' end as has_hard_negative,
+case when t1.cust_id is not null and random<{config['driver_config']['ratio_for_hard_negtive']} then 'hard_negative' else 'uniform_negative' end as negative_type,
+from (
+select * from {bq_prefix}driver_positive
+where split in ('train','val')
+) a
+left join t1
+on a.cust_id=t1.cust_id;
+"""
+
+q = f"""
+drop table if exists {bq_prefix}driver_positive_training_split;
+create table {bq_prefix}driver_positive_training_split as
+with t1 as (
+select cust_id,run_date,count(*) as day_pos_cnt
+from {bq_prefix}driver_positive_training_split_0
+group by 1,2
+)
+select a.*,t1.day_pos_cnt
+from {bq_prefix}driver_positive_training_split_0 a
+join t1
+on a.cust_id=t1.cust_id
+and a.run_date=t1.run_date;
+"""
+
+q = f"""
+drop table if exists {bq_prefix}driver_training_hard_negative;
+create table {bq_prefix}driver_training_hard_negative as
+select a.*,b.rcvr_id as hard_negative_id,b.run_date as hard_negative_impression_date
+from (select * from {bq_prefix}driver_positive_training_split
+where negative_type='hard_negative'
+) a
+join {bq_prefix}driver_0 b
+on a.cust_id=b.cust_id
+and a.run_date>=b.run_date
+and a.run_date<=DATE_ADD(b.run_date,INTERVAL 7 DAY)
+and a.rcvr_id<>b.rcvr_id
+and b.save=0
+and b.leap_aft_txn=0;
+"""

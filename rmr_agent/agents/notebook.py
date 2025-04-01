@@ -5,6 +5,10 @@ from typing import Dict, Any
 import yaml
 import json
 
+
+def clean_prefix(path: str) -> str:
+    return os.path.splitext(os.path.basename(path))[0].strip().lower()
+
  # === EXTRACT CODE FROM CLEAN_CODE ===
 def extract_code_from_json(json_file, verified_dag):
     """
@@ -16,29 +20,31 @@ def extract_code_from_json(json_file, verified_dag):
     Returns:
         Dict[str, str]: A dictionary mapping section names to generated file paths.
     """
-    # Read Json
-    # with open(json_file, "r", encoding="utf-8") as f:
-    #     data = json.load(f)
     
-    cleaned_code = json_file.get("cleaned_code", {})
-
-    # Read DAG YAML
-    # with open(dag_yaml, "r", encoding="utf-8") as f:
-    #     dag_data = yaml.safe_load(f)
+    # cleaned_code = json_file.get("cleaned_code", {})
+    cleaned_code = json_file
 
     extracted_code = {}
+
+    
+
+    print("📂 Available cleaned_code keys:")
+    for path in cleaned_code.keys():
+        print(f"  - {repr(path)}")
+
 
     for node in verified_dag["nodes"]:
         # Get node's name（
         node_name, node_info = list(node.items())[0]
-        
+      
         full_file_path = node_info["file_name"]  # full path
-        file_prefix = os.path.splitext(full_file_path.split("/")[-1])[0]  # extract the path without Filename Extension
+        file_prefix = os.path.splitext(os.path.basename(full_file_path))[0]  # extract the path without Filename Extension
         line_range_str = node_info["line_range"]
 
-        # parse line_range "Lines X-Y"
-        match = re.search(r"Lines (\d+)-(\d+)", line_range_str)
-        # match = re.search(r"(?:Lines\s+)?(\d+)-(\d+)", line_range_str)
+        # print(f"📌 Processing node: {node_name}")
+        # print(f"🧩 file_name: {node_info['file_name']}")
+        # print(f"🧩 file_prefix: {os.path.splitext(os.path.basename(node_info['file_name']))[0]}")
+        match = re.search(r"(\d+)-(\d+)", line_range_str)
 
         if not match:
             print(f"Warning: Invalid line range format for {node_name}: {line_range_str}")
@@ -47,22 +53,30 @@ def extract_code_from_json(json_file, verified_dag):
 
         # search for the matching files in JSON
         matched_file = None
+        dag_prefix = clean_prefix(file_prefix)
+
+        print(f"\n🔍 Searching match for DAG prefix: '{dag_prefix}'")
+        print("📂 Available cleaned_code prefixes:")
+
         for json_file_path in cleaned_code.keys():
-            json_file_prefix = os.path.splitext(json_file_path.split("/")[-1])[0]  # delete the extension name(because we converted ipynb to py file)
-            if json_file_prefix == file_prefix:  
+            json_file_prefix = clean_prefix(json_file_path)
+            print(f"  - {json_file_prefix}")
+            
+            if json_file_prefix == dag_prefix:
                 matched_file = json_file_path
+                print(f"✅ Match found: {json_file_path}")
                 break
 
         if matched_file:
             code_content = cleaned_code[matched_file]
-            lines = code_content.split("\n")  # split the code based on it's row
-            selected_lines = lines[start_line-1:end_line]  # select code
+            lines = code_content.split("\n")
+            selected_lines = lines[start_line-1:end_line]
 
             extracted_code[node_name] = {
                 "code": "\n".join(selected_lines),
             }
         else:
-            print(f"Warning: {file_prefix} not found in JSON cleaned_code")
+            print(f"⚠️ Warning: No match found for '{dag_prefix}' in cleaned_code.")
 
     return extracted_code
 
@@ -245,6 +259,7 @@ print(f'username={username}, working_path={working_path}')
                 (k for k in extracted_code if k.lower().replace(" ", "_") == section_name),
                 None
             )
+         
 
             if match_key:
                 print(f"MATCH FOUND: {match_key}")
@@ -280,15 +295,19 @@ if __name__ == "__main__":
 
        
  
-    CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod","1")
-    dag_yaml = os.path.join(CHECKPOINTS_DIR, "dag_copy.yaml")
+    CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod","4")
+    dag_yaml = os.path.join(CHECKPOINTS_DIR, "dag.yaml")
     json_path= os.path.join(CHECKPOINTS_DIR,"summarize.json" )
+    dag_state = os.path.join(CHECKPOINTS_DIR,"generate_dag_yaml.json")
     
     with open(json_path, "r", encoding="utf-8") as f:
         json_file = json.load(f)
     
     with open(dag_yaml, "r", encoding="utf-8") as f:
         verified_dag = yaml.safe_load(f)
+
+    # with open(dag_state, "r", encoding="utf-8") as f:
+    #     dag_file = json.load(f)
 
     generated_files = notebook_agent(verified_dag, json_file)
 

@@ -6,20 +6,17 @@ import ast
 def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
     llm_client = LLMClient(model_name=llm_model)
 
-    # Read the original Python script
+    # ==================    Params Replacement Part ======================
     with open(python_file_path, "r", encoding="utf-8") as f:
         python_code = f.read()
-    
-#     print('pythoncode',python_code)
 
-    # Construct the LLM prompt
     prompt_editor = f"""
     You are an AI agent tasked with refactoring Python research scripts to ensure that configuration values are used consistently.
 
     Your instructions:
-    1. In the **=== Research Code ===** section (indicated by comments), remove any parameter declarations that are already defined earlier in the script. These predefined parameters have values starting with config.get.
-    2. Clean up the **=== Research Code ===** section by organizing the code, fixing indentation, and eliminating duplicated parameter declarations.
-    3. Ensure the research code just uses the correct variable name loaded from config, avoid hard-coded.
+    1. In the **=== Research Code ===** section, remove any parameter declarations that are already defined earlier in the script. These predefined parameters have values starting with config.get.
+    2. Ensure the research code just uses the correct variable name loaded from config in previous sections, avoid hard-coded.
+    3. Ensure all parameters are declared properly and the code remains fully configurable.
     4. Return the complete modified Python script without any explanations or additional comments. 
     5. Do **not** include any Markdown formatting such as ```python or ``` — return only the raw Python code.
 
@@ -32,13 +29,13 @@ def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
     # Call the LLM to process the code
     response = llm_client.call_llm(
         prompt=prompt_editor,
-        max_tokens=3500,
+        max_tokens=4096,
         temperature=0,
         repetition_penalty=1.0,
         top_p=1
     )
 
-    print("👉 raw response:", response)
+    # print("👉 raw response:", response)
 
     modified_code = response.choices[0].message.content
     # Write the modified code back to the file
@@ -47,35 +44,39 @@ def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
 
     print(f"Updated {python_file_path}: Hardcoded values replaced with configuration variables.")
 
-# Example usage
-# if __name__ == "__main__":
+    # ==================    Code Cleanning Part ======================
 
-#     BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
-#     notebooks_dir = os.path.join(BASE_DIR, "notebooks")
+    prompt_editor = f"""
+    You are an AI agent responsible for cleaning and formatting messy Python code.
 
-#     for filename in os.listdir(notebooks_dir):
-#         if filename.endswith(".py"):
-#             python_file_path = os.path.join(notebooks_dir, filename)
-#             print(f"\n🛠️ Processing: {filename}")
+    Your instructions:
+    1. Format the code using standard Jupyter Notebook style (PEP 8-compliant).
+    2. Fix indentation and spacing to ensure the code runs smoothly in a notebook environment.
+    3. Return only the cleaned Python code — no explanations or extra comments.
+    4. Do not include any Markdown formatting such as ```python or ``` — output raw Python code only.
 
-#             try:
-#                 modified_code = code_editor(python_file_path)
-#                 print("✅ Modified script:")
-#                 print(modified_code)
-#             except Exception as e:
-#                 print(f"❌ Error processing {filename}: {e}")
+    Here is the Python script:
+    {modified_code}
+    """
 
-#     print("\n✅ All scripts in notebooks/ processed.")
+    # Call the LLM to process the code
+    response = llm_client.call_llm(
+        prompt=prompt_editor,
+        max_tokens=4096,
+        temperature=0,
+        repetition_penalty=1.0,
+        top_p=1
+    )
+
+    final_code = response.choices[0].message.content
+    # Write the modified code back to the file
+    with open(python_file_path, "w", encoding="utf-8") as file:
+        file.write(final_code)
+
+    print(f"Updated {python_file_path}: Code has been cleaned.")
 
 
-    # BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/agents"
-    # python_file_path = os.path.join(BASE_DIR, "test11.py")
-
-    # modified_code = code_editor(python_file_path, dag_yaml_path, llm_model)
-
-    # print("✅ Modified script:")
-
-    # ================== assets extraction part ======================
+    # ================== Assets Extraction Part ======================
 
     # Construct the LLM prompt
     prompt_editor = f"""
@@ -114,7 +115,7 @@ def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
     Return only the dictionary.
 
     Here is the research code:
-    {python_code}
+    {final_code}
     """
  
     # print('prompt DEBUG',prompt_editor)
@@ -122,15 +123,13 @@ def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
     # Call the LLM to process the code
     response = llm_client.call_llm(
         prompt=prompt_editor,
-        max_tokens=3500,
+        max_tokens=2048,
         temperature=0,
         repetition_penalty=1.0,
         top_p=1
     )
 
     llm_output = response.choices[0].message.content
-
-    print("🧾 LLM raw output:\n", llm_output)
 
     try:
         column_lists = ast.literal_eval(llm_output)
@@ -164,32 +163,22 @@ def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
             for col in columns:
                 f.write(f"{col}\n")
 
+    return  column_lists
 
 
+# if __name__ == "__main__":
+#     BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
+#     notebooks_dir = os.path.join(BASE_DIR, "notebooks")
+#     for filename in os.listdir(notebooks_dir):
+#         if filename.endswith(".py"):
+#             python_file_path = os.path.join(notebooks_dir, filename)
+#             print(f"\n🛠️ Processing: {filename}")
 
+#             try:
+#                 modified_code = code_editor_agent(python_file_path)
+#                 print("✅ Modified script:")
+#                 print(modified_code)
+#             except Exception as e:
+#                 print(f"❌ Error processing {filename}: {e}")
 
-
-if __name__ == "__main__":
-    # BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/agents"
-    # python_file_path = os.path.join(BASE_DIR, "test11.py")
-
-    # modified_code = code_editor_agent(python_file_path)
-
-    # print("Modified script:",modified_code)
-
-
-    BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
-    notebooks_dir = os.path.join(BASE_DIR, "notebooks")
-    for filename in os.listdir(notebooks_dir):
-        if filename.endswith(".py"):
-            python_file_path = os.path.join(notebooks_dir, filename)
-            print(f"\n🛠️ Processing: {filename}")
-
-            try:
-                modified_code = code_editor_agent(python_file_path)
-                print("✅ Modified script:")
-                print(modified_code)
-            except Exception as e:
-                print(f"❌ Error processing {filename}: {e}")
-
-    print("\n✅ All scripts in notebooks/ processed.")
+#     print("\n✅ All scripts in notebooks/ processed.")

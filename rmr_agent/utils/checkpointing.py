@@ -31,6 +31,8 @@ def get_run_identifier(repo_name: str) -> str:
 
 def load_step_output(checkpoint_base_path: str, repo_name: str, step: str, run_id: str) -> Dict[str, Any]:
     checkpoint_path = f"{checkpoint_base_path}/{repo_name}/{run_id}/{step}.json"
+    print(f"Attempting to load checkpoint JSON from: {checkpoint_path}")
+
     if os.path.exists(checkpoint_path):
         with open(checkpoint_path, "r") as f:
             output = json.load(f)
