@@ -12,7 +12,7 @@
       train_downsampling_factor: '900'
       validation_downsampling_factor_start: '900'
       validation_downsampling_factor_end: '950'
-      test_downsampling_factor: '950'
+      test_downsampling_factor_start: '950'
     outputs:
       bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3
       bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3
@@ -57,8 +57,6 @@
       n_trials: '250'
     outputs:
       model_artifact_path: /projects/dnaomi/bt-retry-global-v2/models/final/bt_retry_v2.txt
-      metric_values: evaluated metrics
-      feature_importance: sorted feature importance
 - Hyperparameter Tuning:
     file_name: rmr_agent/repos/bt-retry-v2/model-dev/train.py
     line_range: 300-367
@@ -69,12 +67,7 @@
       studies_dir: ../reports/studies/
       n_trials: '250'
       objective_metric_name: partial_aucpr_geq90
-      optuna_study_path: ../reports/studies/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control.pkl
-      stdout_path: ../reports/studies/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control-stdout.txt
-      stderr_path: ../reports/studies/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control-stdout.txt
-    outputs:
-      study: optuna.study.Study
-      metrics: metrics[objective_metric_name]
+    outputs: {}
 - Model Evaluation:
     file_name: rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py
     line_range: 1-383
@@ -84,11 +77,11 @@
       v1_model_path: /projects/dnaomi/bt-retry-global/models/lgbm/original_lgbm/original_model.txt
       v2_features_path: /projects/dnaomi/bt-retry-global-refresh/metadata/v2_features_final_2.txt
       v2_model_path: /projects/dnaomi/bt-retry-global-refresh/models/final/bt_retry_v2.txt
-      target_col: retry_is_success
       metric_functions: '[''precision_at_95'', ''precision_at_99'', ''precision_at_995'',
         ''savings_at_95'', ''savings_at_99'', ''savings_at_995'', ''partial_aucpr_geq90'']'
       metric_names: '[''precision_at_95'', ''precision_at_99'', ''precision_at_995'',
         ''savings_at_95'', ''savings_at_99'', ''savings_at_995'', ''partial_aucpr_geq90'']'
+      target_col: retry_is_success
     outputs:
       v1_metrics: calculated metrics for V1 model
       v2_metrics: calculated metrics for V2 model
@@ -108,6 +101,7 @@
     line_range: 1-140
     inputs:
       models_dir: /home/dnaomi/bt-retry-global-refresh/models/ume/
+      model_dir: /home/dnaomi/bt-retry-global-refresh/models/ume/
       model_ume_name: bt_retry_v2
       valid_sample_path: /home/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
       features_path: /projects/dnaomi/bt-retry-global-refresh/metadata/v2_features_final_2.txt
