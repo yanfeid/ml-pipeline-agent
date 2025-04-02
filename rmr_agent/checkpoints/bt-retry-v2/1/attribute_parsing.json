@@ -44,7 +44,7 @@
             "value": "950"
           },
           {
-            "name": "test_downsampling_factor",
+            "name": "test_downsampling_factor_start",
             "value": "950"
           }
         ],
@@ -203,14 +203,6 @@
           {
             "name": "model_artifact_path",
             "value": "/projects/dnaomi/bt-retry-global-v2/models/final/bt_retry_v2.txt"
-          },
-          {
-            "name": "metric_values",
-            "value": "evaluated metrics"
-          },
-          {
-            "name": "feature_importance",
-            "value": "sorted feature importance"
           }
         ],
         "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/train.py",
@@ -241,30 +233,9 @@
           {
             "name": "objective_metric_name",
             "value": "partial_aucpr_geq90"
-          },
-          {
-            "name": "optuna_study_path",
-            "value": "../reports/studies/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control.pkl"
-          },
-          {
-            "name": "stdout_path",
-            "value": "../reports/studies/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control-stdout.txt"
-          },
-          {
-            "name": "stderr_path",
-            "value": "../reports/studies/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control/bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control-stdout.txt"
           }
         ],
-        "outputs": [
-          {
-            "name": "study",
-            "value": "optuna.study.Study"
-          },
-          {
-            "name": "metrics",
-            "value": "metrics[objective_metric_name]"
-          }
-        ],
+        "outputs": [],
         "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/train.py",
         "line_range": "300-367"
       }
@@ -293,10 +264,6 @@
             "value": "/projects/dnaomi/bt-retry-global-refresh/models/final/bt_retry_v2.txt"
           },
           {
-            "name": "target_col",
-            "value": "retry_is_success"
-          },
-          {
             "name": "metric_functions",
             "value": [
               "precision_at_95",
@@ -319,6 +286,10 @@
               "savings_at_995",
               "partial_aucpr_geq90"
             ]
+          },
+          {
+            "name": "target_col",
+            "value": "retry_is_success"
           }
         ],
         "outputs": [
@@ -374,6 +345,10 @@
         "inputs": [
           {
             "name": "models_dir",
+            "value": "/home/dnaomi/bt-retry-global-refresh/models/ume/"
+          },
+          {
+            "name": "model_dir",
             "value": "/home/dnaomi/bt-retry-global-refresh/models/ume/"
           },
           {

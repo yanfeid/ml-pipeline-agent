@@ -1,11 +1,22 @@
 # Base image
-FROM dockerhub.paypalcorp.com/python:3.9
-
-# Set working directory
-WORKDIR /rmr_agent
+FROM python:3.12.6
 
 # Certificates 
 ENV CURL_CA_BUNDLE=''
+
+# Project label
+LABEL project="rmr-agent-service"
+
+# Set the working directory
+WORKDIR /rmr_agent
+
+# Copy and install dependencies
+COPY requirements.txt ./
+RUN pip install --upgrade pip --index-url https://artifactory.paypalcorp.com/artifactory/api/pypi/paypal-python-all/simple  \
+    && pip install -r requirements.txt --index-url https://artifactory.paypalcorp.com/artifactory/api/pypi/paypal-python-all/simple
+
+# Copy the the entire project directory including the app code
+COPY . .
 
 # Set environment variables
 ARG azure_client_id
@@ -19,14 +30,8 @@ ENV AZURE_CLIENT_SECRET ${azure_client_secret}
 ENV AZURE_SCOPE ${azure_scope}
 ENV GPT_ENDPOINT ${gpt_endpoint}
 
-
-# Install dependencies (including from your enterprise Artifactory)
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --trusted-host artifactory.paypalcorp.com -i https://artifactory.paypalcorp.com/artifactory/api/pypi/paypal-python-all/simple rmr_agent==0.1.0
-
-
-# Expose the port your app will run on
+# Expose the port the app will run on
 EXPOSE 8000
 
-# Run the FastAPI app with Uvicorn
-CMD ["rmr_agent", "--host", "0.0.0.0", "--port", "8000"]
+# Run application
+CMD ["python", "run_api.py"]

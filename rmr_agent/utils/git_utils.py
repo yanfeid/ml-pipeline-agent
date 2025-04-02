@@ -103,6 +103,21 @@ def get_github_token():
     print('GitHub Token found')
     return token
 
+def get_github_username():
+    # Load from .env 
+    load_env_file()
+    username = os.environ.get('GITHUB_USERNAME')
+    if not username:
+        env_path = Path('.env')
+        guidance = (
+            "GitHub username not found in environment variables. To fix this:\n"
+            "1. Create or edit your .env file at {}\n"
+            "2. Add the line: GITHUB_USERNAME=your_username_here\n"
+        ).format(env_path.absolute())
+        raise EnvironmentError(guidance)
+    print('GitHub Username found')
+    return username
+
 
 SECONDS_24h = 86400
 
@@ -249,7 +264,8 @@ def clone_repo(github_url: str, local_base_dir: str = "rmr_agent/repos") -> str:
     # extract repo owner and repo name from url
     repo_owner, repo_name = parse_github_url(github_url)
 
-    # extract github token from environment variables
+    # extract github username and token from environment variables
+    account = get_github_username()
     token = get_github_token()
 
     local_repo_path = os.path.join(local_base_dir, repo_name)
@@ -260,7 +276,7 @@ def clone_repo(github_url: str, local_base_dir: str = "rmr_agent/repos") -> str:
     # clone repo to local directory. This also authenticates with git and safely caches credentials for 24H
     print(f"Changing working directory to {local_base_dir} to clone the repo")
     with temporary_working_directory(local_base_dir):
-        gh = GitHub(repo_owner=repo_owner, repo_name=repo_name, account='matjacobs', token=token) # hard coding to my username and PAT for now
+        gh = GitHub(repo_owner=repo_owner, repo_name=repo_name, account=account, token=token) 
         gh.run_command(["git", "checkout", "-b", "rmr_agent"])
     print(f"Changing working directory back to {os.getcwd()}")
     
