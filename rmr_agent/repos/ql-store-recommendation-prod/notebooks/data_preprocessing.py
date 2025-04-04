@@ -1,3 +1,7 @@
+## gsutil authentication
+%ppauth
+
+
 from rmr_config.simple_config import Config
 from rmr_config.state_manager import StateManager
 import os
@@ -5,11 +9,13 @@ import sys
 import ast
 import json
 from datetime import datetime
-from pathlib import Path
+
 
 if "working_path" not in globals():
+    from pathlib import Path
     path = Path(os.getcwd())
     working_path = path.parent.absolute()
+
 
 folder = os.getcwd()
 username = os.environ['NB_USER']
@@ -18,6 +24,7 @@ config = Config(params_path)
 local_base_path = config.get("general", "local_output_base_path")
 os.makedirs(local_base_path, exist_ok=True)
 
+
 # set working directory
 os.chdir(working_path)
 if not config:
@@ -25,10 +32,12 @@ if not config:
 
 print(f'username={username}, working_path={working_path}')
 
+
 # Section Name
 section_name = "data_preprocessing"
 
-# General Parameters (from environment.ini)
+
+# General Parameters 
 mo_name = config.get('general', 'mo_name')
 driver_dataset = config.get('general', 'driver_dataset')
 dataproc_project_name = config.get('general', 'dataproc_project_name')
@@ -38,26 +47,28 @@ queue_name = config.get('general', 'queue_name')
 check_point = config.get('general', 'check_point')
 state_file = config.get('general', 'state_file')
 
+
 # Section-Specific Parameters (from solution.ini)
-directory = config.get('section_name', 'directory')
-parquet_files = config.get('section_name', 'parquet_files')
-state_to_abbreviation = config.get('section_name', 'state_to_abbreviation')
-categorical_features = config.get('section_name', 'categorical_features')
-numeric_features = config.get('section_name', 'numeric_features')
-sequence_features = config.get('section_name', 'sequence_features')
-tokenizer_params = config.get('section_name', 'tokenizer_params')
-chunk_size = config.get('section_name', 'chunk_size')
-model_version_base = config.get('section_name', 'model_version_base')
-exported_feature_transformer = config.get('section_name', 'exported_feature_transformer')
-output_dir = config.get('section_name', 'output_dir')
-rcvr_id_tokenizer_path = config.get('section_name', 'rcvr_id_tokenizer_path')
-categorical_feature_encoders_path = config.get('section_name', 'categorical_feature_encoders_path')
-numerical_feature_scalars_path = config.get('section_name', 'numerical_feature_scalars_path')
+model_version_base = config.get(section_name, 'model_version_base')
+exported_feature_transformer = config.get(section_name, 'exported_feature_transformer')
+directory = config.get(section_name, 'directory')
+parquet_files = config.get(section_name, 'parquet_files')
+state_to_abbreviation = config.get(section_name, 'state_to_abbreviation')
+categorical_features = config.get(section_name, 'categorical_features')
+numeric_features = config.get(section_name, 'numeric_features')
+rcvr_id_tokenizer_params = config.get(section_name, 'rcvr_id_tokenizer_params')
+output_dir = config.get(section_name, 'output_dir')
+chunk_size = config.get(section_name, 'chunk_size')
+rcvr_id_tokenizer_path = config.get(section_name, 'rcvr_id_tokenizer_path')
+categorical_feature_encoders_path = config.get(section_name, 'categorical_feature_encoders_path')
+numerical_feature_scalars_path = config.get(section_name, 'numerical_feature_scalars_path')
+
 
 # Dependencies from Previous Sections
 # Previous section: feature_consolidation
 # Edge Attributes from DAG
 gs = config.get('feature_consolidation', 'gs')
+
 
 # === Research Code ===
 import pickle
@@ -69,19 +80,24 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 from itertools import chain
 
+
 today_date = datetime.now().date().strftime("%Y%m%d")
 model_version = "din_" + str(today_date)
 model_version_base = os.path.join('../artifacts/', model_version)
 if not os.path.exists(model_version_base):
     os.mkdir(model_version_base)
+
 exported_feature_transformer = os.path.join(model_version_base, 'exported_feature_transformer')
 if not os.path.exists(exported_feature_transformer):
     os.mkdir(exported_feature_transformer)
+
 with open('../_current_model_version', 'wb') as f:
     pickle.dump(model_version, f)
 
 categorical_feature_encoders = {}
 numerical_feature_scalars = {}
+directory = config.get(section_name, 'directory')
+parquet_files = [f for f in os.listdir(directory) if f.endswith(".parquet")]
 dfs = []
 
 for file in tqdm(parquet_files, total=len(parquet_files)):
@@ -90,6 +106,7 @@ for file in tqdm(parquet_files, total=len(parquet_files)):
     dfs.append(f)
 
 data = pd.concat(dfs, ignore_index=True)
+state_to_abbreviation = config.get(section_name, 'state_to_abbreviation')
 state_map = {}
 
 for state in np.unique(data['sndr_prmry_addr_state'].values).tolist():
@@ -118,7 +135,7 @@ for state in state_map:
 
 categorical_feature_encoders['sndr_prmry_addr_state'] = state_encoder_dict
 
-for feat in ['sndr_consu_engagmnt_seg_key', 'sndr_ebay_member_y_n', 'gender', 'sndr_prmry_cc_type_code', 'sndr_consu_age_band_key', 'sndr_consu_dmgrphc_seg_key']:
+for feat in config.get(section_name, 'categorical_features'):
     lbe = LabelEncoder()
     data[feat] = lbe.fit_transform(data[feat].values)
     labels = lbe.transform(lbe.classes_)
@@ -126,6 +143,8 @@ for feat in ['sndr_consu_engagmnt_seg_key', 'sndr_ebay_member_y_n', 'gender', 's
     for i in range(len(lbe.classes_)):
         encoder_dict[lbe.classes_[i]] = labels[i]
     categorical_feature_encoders[feat] = encoder_dict
+
+numeric_features = config.get(section_name, 'numeric_features')
 
 for feat in tqdm(numeric_features, total=len(numeric_features)):
     scaler = StandardScaler()
@@ -137,7 +156,6 @@ data['sndr_most_recent_100_merch_category'].fillna('', inplace=True)
 df_seq = data['sndr_most_recent_100_merch_category'].apply(lambda x: [] if not x else list(map(int, x.split(','))))
 df_pad = pad_sequences(df_seq, maxlen=100, truncating='pre', padding='pre', value=0)
 data['hist_gpt_1st_category_l2_index'] = df_pad.tolist()
-
 data['sndr_most_recent_100_merch_list'].replace(['0'], pd.NA, inplace=True)
 data['sndr_most_recent_100_merch_list'].fillna('', inplace=True)
 rcvr_id_tokenizer = Tokenizer(num_words=1000, oov_token='<OOV>')
@@ -158,7 +176,9 @@ def write_chunk_to_parquet(df_chunk, chunk_index, output_dir):
     filename = os.path.join(output_dir, f'part_{chunk_index}.parquet')
     df_chunk.to_parquet(filename, index=False)
 
+output_dir = config.get(section_name, 'output_dir')
 os.makedirs(output_dir, exist_ok=True)
+chunk_size = config.get(section_name, 'chunk_size')
 num_chunks = (len(data) // chunk_size) + 1
 
 for i in range(num_chunks):
@@ -178,5 +198,9 @@ with open(export_path, 'wb') as f:
 export_path = os.path.join(exported_feature_transformer, 'numerical_feature_scalars')
 with open(export_path, 'wb') as f:
     pickle.dump(numerical_feature_scalars, f)
+
+path = os.path.join(exported_feature_transformer, 'rcvr_id_tokenizer')
+path = os.path.join(exported_feature_transformer, 'categorical_feature_encoders')
+path = os.path.join(exported_feature_transformer, 'numerical_feature_scalars')
 
 print('Script initialized')

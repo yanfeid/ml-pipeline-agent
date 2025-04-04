@@ -30,24 +30,52 @@ def extract_ini_content(response):
     return response_text
 
 # ========== **Filter duplicate lines** ==========
-def filter_duplicate_lines(ini_str):
-    """ Filter duplicated lines in ini
-    Keep the first occurrence of each line and remove duplicates.
+def filter_duplicate_value_lines(ini_str):
+    """
+    Filter duplicated lines by value (after '=') across sections,
+    but completely preserve lines under [general] section.
+    Also always preserve lines with empty value (e.g., key=),
+    and blank lines.
 
     :param ini_str: The original ini-format string
     :return: The filtered ini string
     """
-    seen_lines = set()
+    seen_values = set()
     filtered_lines = []
 
+    current_section = None
+    preserve_section = "general"  # section to skip filtering
+
     for line in ini_str.splitlines():
-        if line == "":  # keep blank line
+        stripped = line.strip()
+
+        # Detect section headers
+        if stripped.startswith("[") and stripped.endswith("]"):
+            current_section = stripped.strip("[]").lower()
             filtered_lines.append(line)
-        elif line not in seen_lines:  # filter duplicated row
-            seen_lines.add(line)
+            continue
+
+        if stripped == "":
+            filtered_lines.append(line)
+            continue
+
+        if "=" in line:
+            key, value = line.split("=", 1)
+            value = value.strip()
+
+            if current_section == preserve_section:
+                filtered_lines.append(line)
+            elif value == "":
+                filtered_lines.append(line)
+            elif value not in seen_values:
+                seen_values.add(value)
+                filtered_lines.append(line)
+        else:
+            # Non key=value line, keep it
             filtered_lines.append(line)
 
     return "\n".join(filtered_lines)
+
 
 # ========== **Replace hard-coded params with general configurable params in env.ini** ==========
 def parse_env_ini(env_ini):
@@ -93,7 +121,6 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     """
 
     # Load YAML structure directly from verified_dag
-    yaml_data = verified_dag
     llm_client = LLMClient(model_name=llm_model)
 
     # ========== **Step 1: AI agent generates environment.ini content** ==========
@@ -168,7 +195,7 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     ### YAML Content
     The YAML content is provided below:
     ```yaml
-    {yaml.dump(yaml_data, default_flow_style=False)}
+    {yaml.dump(verified_dag, default_flow_style=False)}
     ```
 
     Now, generate a properly formatted `environment.ini` configuration file as a string.
@@ -266,7 +293,7 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
 
     ### Below is the YAML content and the environment.ini content:
     ```yaml
-    {yaml.dump(yaml_data, default_flow_style=False)}
+    {yaml.dump(verified_dag, default_flow_style=False)}
     ```environment.ini
     {environment_ini_str}
 
@@ -287,7 +314,7 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
 
     try:
         env_vars = parse_env_ini(environment_ini_str)
-        solution_ini_str = replace_with_env_vars(filter_duplicate_lines(extract_ini_content(response_solution)),env_vars)
+        solution_ini_str = replace_with_env_vars(filter_duplicate_value_lines(extract_ini_content(response_solution)),env_vars)
 
         result = {
             "environment_ini": environment_ini_str,
@@ -322,3 +349,14 @@ if __name__ == "__main__":
 
     print(f"[✓] INI files saved to: {CONFIG_DIR}")
     print(f"[✓] Checkpoint directory used: {CHECKPOINT_DIR}")
+
+    # export PYTHONPATH=/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent
+
+    # Python-dotenv could not parse statement starting at line 1
+    # Python-dotenv could not parse statement starting at line 2
+    # Python-dotenv could not parse statement starting at line 3
+    # Python-dotenv could not parse statement starting at line 4
+    # Python-dotenv could not parse statement starting at line 1
+    # Python-dotenv could not parse statement starting at line 2
+    # Python-dotenv could not parse statement starting at line 3
+    # Python-dotenv could not parse statement starting at line 4

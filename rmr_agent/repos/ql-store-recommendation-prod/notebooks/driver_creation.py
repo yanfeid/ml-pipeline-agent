@@ -1,3 +1,7 @@
+## gsutil authentication
+%ppauth
+
+
 from rmr_config.simple_config import Config
 from rmr_config.state_manager import StateManager
 import os
@@ -5,12 +9,13 @@ import sys
 import ast
 import json
 from datetime import datetime
-import yaml
+
 
 if "working_path" not in globals():
     from pathlib import Path
     path = Path(os.getcwd())
     working_path = path.parent.absolute()
+
 
 folder = os.getcwd()
 username = os.environ['NB_USER']
@@ -19,17 +24,18 @@ config = Config(params_path)
 local_base_path = config.get("general", "local_output_base_path")
 os.makedirs(local_base_path, exist_ok=True)
 
-# set working directory
+
 os.chdir(working_path)
 if not config:
     raise ValueError('config is not correctly setup')
 
+
 print(f'username={username}, working_path={working_path}')
 
-# Section Name
+
 section_name = "driver_creation"
 
-# General Parameters (from environment.ini)
+
 mo_name = config.get('general', 'mo_name')
 driver_dataset = config.get('general', 'driver_dataset')
 dataproc_project_name = config.get('general', 'dataproc_project_name')
@@ -39,26 +45,33 @@ queue_name = config.get('general', 'queue_name')
 check_point = config.get('general', 'check_point')
 state_file = config.get('general', 'state_file')
 
-# Section-Specific Parameters (from solution.ini)
-file_path = config.get('section_name', 'file_path')
-bq_prefix = config.get('section_name', 'bq_prefix')
-training_exclude_merch = config.get('section_name', 'training_exclude_merch')
-train_start_date = config.get('section_name', 'train_start_date')
-oot_start_date = config.get('section_name', 'oot_start_date')
-val_start_date = config.get('section_name', 'val_start_date')
-training_hot_positive_attributed_txn_sampling_alpha = config.get('section_name', 'training_hot_positive_attributed_txn_sampling_alpha')
-training_attributed_txn_upsampling_rate = config.get('section_name', 'training_attributed_txn_upsampling_rate')
-removing_highly_active_user_threshold = config.get('section_name', 'removing_highly_active_user_threshold')
-removing_highly_active_user_merchant_threshold = config.get('section_name', 'removing_highly_active_user_merchant_threshold')
-removing_highly_active_user_merchant_date_threshold = config.get('section_name', 'removing_highly_active_user_merchant_date_threshold')
-training_hot_positive_organic_txn_sampling_alpha = config.get('section_name', 'training_hot_positive_organic_txn_sampling_alpha')
-save_label_mixing_rate = config.get('section_name', 'save_label_mixing_rate')
-ratio_for_hard_negtive = config.get('section_name', 'ratio_for_hard_negtive')
-hard_negative_impression_time_window = config.get('section_name', 'hard_negative_impression_time_window')
-negative_sampling_avoid_delay_postive_feedback_window = config.get('section_name', 'negative_sampling_avoid_delay_postive_feedback_window')
-training_hot_negative_sampling_alpha = config.get('section_name', 'training_hot_negative_sampling_alpha')
-uniform_negative_postive_ratio = config.get('section_name', 'uniform_negative_postive_ratio')
-final_driver_table = config.get('section_name', 'final_driver_table')
+
+file_path = config.get(section_name, 'file_path')
+bq_project_dataset_prefix = config.get(section_name, 'bq_project_dataset_prefix')
+training_exclude_merch = config.get(section_name, 'training_exclude_merch')
+train_start_date = config.get(section_name, 'train_start_date')
+oot_start_date = config.get(section_name, 'oot_start_date')
+training_hot_positive_attributed_txn_sampling_alpha = config.get(section_name, 'training_hot_positive_attributed_txn_sampling_alpha')
+training_attributed_txn_upsampling_rate = config.get(section_name, 'training_attributed_txn_upsampling_rate')
+removing_highly_active_user_threshold = config.get(section_name, 'removing_highly_active_user_threshold')
+removing_highly_active_user_merchant_threshold = config.get(section_name, 'removing_highly_active_user_merchant_threshold')
+removing_highly_active_user_merchant_date_threshold = config.get(section_name, 'removing_highly_active_user_merchant_date_threshold')
+training_hot_positive_organic_txn_sampling_alpha = config.get(section_name, 'training_hot_positive_organic_txn_sampling_alpha')
+val_start_date = config.get(section_name, 'val_start_date')
+save_label_mixing_rate = config.get(section_name, 'save_label_mixing_rate')
+ratio_for_hard_negtive = config.get(section_name, 'ratio_for_hard_negtive')
+hard_negative_impression_time_window = config.get(section_name, 'hard_negative_impression_time_window')
+negative_sampling_avoid_delay_postive_feedback_window = config.get(section_name, 'negative_sampling_avoid_delay_postive_feedback_window')
+training_hot_negative_sampling_alpha = config.get(section_name, 'training_hot_negative_sampling_alpha')
+uniform_negative_postive_ratio = config.get(section_name, 'uniform_negative_postive_ratio')
+driver_dev = config.get(section_name, 'driver_dev')
+driver_oot = config.get(section_name, 'driver_oot')
+driver_simu = config.get(section_name, 'driver_simu')
+driver_simu_consumer = config.get(section_name, 'driver_simu_consumer')
+
+
+import yaml
+
 
 def load_yaml_file(file_path):
     try:
@@ -68,11 +81,13 @@ def load_yaml_file(file_path):
     except FileNotFoundError:
         return None
 
+
 file_path = '../config/base_config.yaml'
 config = load_yaml_file(file_path)
 if config is not None:
     bq_prefix = config['general_config']['bq_project_dataset_prefix']
-bq_prefix
+    bq_prefix
+
 
 q = f"""
 DROP TABLE IF EXISTS {bq_prefix}live_unique_merchants_train;
@@ -109,6 +124,8 @@ ON
 b.encryptedid = d.encrypt_id
 where rcvr_id not in ({config['driver_config']['training_exclude_merch']})
 """
+# %ppbq $q
+
 
 q = f"""
 drop table if exists {bq_prefix}driver_00 ;
@@ -139,6 +156,8 @@ and cust_id<>'no_cust_id'
 and pp_merchant_id is not null
 and saves_imp_unique_cnt>0;
 """
+# %ppbq $q
+
 
 q = f"""
 drop table if exists {bq_prefix}driver_0 ;
@@ -161,6 +180,8 @@ where cnt_placement=1
 )
 and (save>0 or leap_aft_txn>0);
 """
+# %ppbq $q
+
 
 q = f"""
 drop table if exists {bq_prefix}driver_1;
@@ -180,6 +201,8 @@ and customer_counterparty in (select distinct rcvr_id from {bq_prefix}live_uniqu
 and transaction_created_date >= {config['driver_config']['train_start_date']}
 and transaction_status='S';
 """
+# %ppbq $q
+
 
 q = f"""
 drop table if exists {bq_prefix}driver_positive_train_attributed;
@@ -227,6 +250,8 @@ case when run_date<{config['driver_config']['val_start_date']} then 'train' else
 FROM t6
 CROSS JOIN UNNEST(GENERATE_ARRAY(1,{config['driver_config']['training_attributed_txn_upsampling_rate']})) AS repeat
 """
+# %ppbq $q
+
 
 q = f"""
 drop table if exists {bq_prefix}driver_positive_train_organic_0;
@@ -265,6 +290,8 @@ HAVING count(distinct payment_transid)<{config['driver_config']['removing_highly
 )
 );
 """
+# %ppbq $q
+
 
 q = f"""
 drop table if exists {bq_prefix}driver_positive_train_organic;
@@ -306,6 +333,8 @@ SELECT cust_id,rcvr_id,run_date,gpt_1st_category_l2_index,merchant_ratio,merchan
 case when run_date<{config['driver_config']['val_start_date']} then 'train' else 'val' end as split
 FROM t6;
 """
+# %ppbq $q
+
 
 q = f"""
 drop table if exists {bq_prefix}driver_positive;
@@ -340,6 +369,8 @@ AND CONCAT(cust_id,rcvr_id) not in (select distinct concat(cust_id,rcvr_id)
 from {bq_prefix}driver_0 where save>0)
 AND run_date>={config['driver_config']['oot_start_date']};
 """
+# %ppbq $q
+
 
 q = f"""
 drop table if exists {bq_prefix}driver_positive_training_split_0;
@@ -370,6 +401,8 @@ where split in ('train','val')
 left join t1
 on a.cust_id=t1.cust_id;
 """
+# %ppbq $q
+
 
 q = f"""
 drop table if exists {bq_prefix}driver_positive_training_split;
@@ -385,6 +418,8 @@ join t1
 on a.cust_id=t1.cust_id
 and a.run_date=t1.run_date;
 """
+# %ppbq $q
+
 
 q = f"""
 drop table if exists {bq_prefix}driver_training_hard_negative;
@@ -397,7 +432,4 @@ join {bq_prefix}driver_0 b
 on a.cust_id=b.cust_id
 and a.run_date>=b.run_date
 and a.run_date<=DATE_ADD(b.run_date,INTERVAL 7 DAY)
-and a.rcvr_id<>b.rcvr_id
-and b.save=0
-and b.leap_aft_txn=0;
-"""
+and a.rcvr_id<>b

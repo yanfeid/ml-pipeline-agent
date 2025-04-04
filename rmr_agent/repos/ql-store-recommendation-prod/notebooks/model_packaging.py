@@ -1,3 +1,7 @@
+## gsutil authentication
+%ppauth
+
+
 from rmr_config.simple_config import Config
 from rmr_config.state_manager import StateManager
 import os
@@ -5,16 +9,9 @@ import sys
 import ast
 import json
 from datetime import datetime
-from pathlib import Path
-from tensorflow.python.keras.models import save_model
-from pyScoring.graph import Graph
-from pyScoring.onnx.support.tf2.tf2_to_onnx import tf_model_to_onnx_node, tf_model_to_onnx_as_spec
-from pyScoring.node import ReNameBuilder, LookupBuilder, ScalerBuilder
-import pickle
-import numpy as np
-import onnxruntime as ort
 
 if "working_path" not in globals():
+    from pathlib import Path
     path = Path(os.getcwd())
     working_path = path.parent.absolute()
 
@@ -25,13 +22,16 @@ config = Config(params_path)
 local_base_path = config.get("general", "local_output_base_path")
 os.makedirs(local_base_path, exist_ok=True)
 
+
 os.chdir(working_path)
 if not config:
     raise ValueError('config is not correctly setup')
 
 print(f'username={username}, working_path={working_path}')
 
+
 section_name = "model_packaging"
+
 
 mo_name = config.get('general', 'mo_name')
 driver_dataset = config.get('general', 'driver_dataset')
@@ -42,21 +42,41 @@ queue_name = config.get('general', 'queue_name')
 check_point = config.get('general', 'check_point')
 state_file = config.get('general', 'state_file')
 
-categorical_feature_encoders = config.get('section_name', 'categorical_feature_encoders')
-numerical_feature_scalars = config.get('section_name', 'numerical_feature_scalars')
-onnx_spec_path = config.get('section_name', 'onnx_spec_path')
-oot_scoring_directory = config.get('section_name', 'oot_scoring_directory')
-onnx_model_path = config.get('section_name', 'onnx_model_path')
-renamed_onnx_model_path = config.get('section_name', 'renamed_onnx_model_path')
-prod_model_path = config.get('section_name', 'prod_model_path')
-test_data_json_path = config.get('section_name', 'test_data_json_path')
-onnx_output_path = config.get('section_name', 'onnx_output_path')
+
+model = config.get(section_name, 'model')
+exported_model_base = config.get(section_name, 'exported_model_base')
+input_mappings = config.get(section_name, 'input_mappings')
+output_mappings = config.get(section_name, 'output_mappings')
+categorical_feature_encoders = config.get(section_name, 'categorical_feature_encoders')
+numerical_feature_scalars = config.get(section_name, 'numerical_feature_scalars')
+test_cust = config.get(section_name, 'test_cust')
+test_date = config.get(section_name, 'test_date')
+test_df = config.get(section_name, 'test_df')
+test_data_local = config.get(section_name, 'test_data_local')
+test_data_tf = config.get(section_name, 'test_data_tf')
+onnx_output_path = config.get(section_name, 'onnx_output_path')
+saved_model_path = config.get(section_name, 'saved_model_path')
+output_file = config.get(section_name, 'output_file')
+onnx_spec = config.get(section_name, 'onnx_spec')
+prod_model = config.get(section_name, 'prod_model')
+path = config.get(section_name, 'path')
+test_data = config.get(section_name, 'test_data')
+results_ort = config.get(section_name, 'results_ort')
+
 
 h5_model_path = config.get('model_training', 'h5_model_path')
 tf_model_path = config.get('model_training', 'tf_model_path')
 
+
+from tensorflow.python.keras.models import save_model
+h5_model_path = os.path.join(exported_model_base, 'din.h5')
 save_model(model, h5_model_path)
+tf_model_path = os.path.join(exported_model_base, 'din_saved_model')
 model.save(tf_model_path)
+
+from pyScoring.graph import Graph
+from pyScoring.onnx.support.tf2.tf2_to_onnx import tf_model_to_onnx_node, tf_model_to_onnx_as_spec
+from pyScoring.node import ReNameBuilder, LookupBuilder, ScalerBuilder
 
 onnx_spec = tf_model_to_onnx_as_spec(
     tf_model=model,
@@ -67,14 +87,15 @@ onnx_spec = tf_model_to_onnx_as_spec(
     output_mappings={model.output.name[:-2]: 'out'}
 )
 assert len(onnx_spec.outputs) == 1
-onnx_spec.save(onnx_spec_path)
+onnx_spec.save(exported_model_base)
 onnx_spec
 
-if not os.path.exists(oot_scoring_directory):
-    os.mkdir(oot_scoring_directory)
+if not os.path.exists(os.path.join(exported_model_base, 'oot_scoring')):
+    os.mkdir(os.path.join(exported_model_base, 'oot_scoring'))
 
-file = onnx_model_path
-rename_file = renamed_onnx_model_path
+file = os.path.join(exported_model_base, 'tf_2_onnx_model.m')
+rename_file = os.path.join(exported_model_base, 'oot_scoring/din_expand_seq.m')
+
 
 def is_ascii(s):
     try:
@@ -83,11 +104,12 @@ def is_ascii(s):
     except UnicodeEncodeError:
         return False
 
+
 for cat_feat in categorical_feature_encoders:
     for key in categorical_feature_encoders[cat_feat].keys():
         categorical_feature_encoders[cat_feat] = {k: v for k, v in categorical_feature_encoders[cat_feat].items() if is_ascii(key)}
 
-with open(numerical_feature_scalars, "rb") as f:
+with open(os.path.join(exported_feature_transformer, 'numerical_feature_scalars'), "rb") as f:
     numerical_feature_scalars = pickle.load(f)
 
 g = Graph()
@@ -97,10 +119,7 @@ node = ReNameBuilder('output', base_model_node[0].outputs[0]).build()
 g.add_node(node)
 
 for key in categorical_feature_encoders:
-    node = LookupBuilder(
-        key, f'{key}_raw',
-        {str(k): v for k, v in categorical_feature_encoders[key].items()}
-    ).set_default(0).build()
+    node = LookupBuilder(key, f'{key}_raw', {str(k): v for k, v in categorical_feature_encoders[key].items()}).set_default(0).build()
     g.add_node(node)
 
 for key in numerical_feature_scalars:
@@ -114,7 +133,9 @@ for key in numerical_feature_scalars:
     g.add_node(node)
 
 prod_model = g.generate_model_by_graph(model_name='din_prod', optimization=True)
-prod_model.save(prod_model_path)
+prod_model.save(exported_model_base)
+path = exported_model_base + '/din_prod.m'
+
 
 test_df = data[(data['cust_id'] == test_cust) & (data['run_date'] == test_date)]
 
@@ -132,11 +153,18 @@ test_data = {"data": {"names": inputs, "ndarray": [test_data_local[feat][0] for 
 if not os.path.exists('./testdata'):
     os.mkdir('./testdata')
 
-output_file = test_data_json_path
+output_file = './testdata/testdata.json'
+
 with open(output_file, 'w') as file:
     json.dump(test_data, file)
 
+
+saved_model_path = os.path.join(exported_model_base, 'din_saved_model')
+onnx_output_path = os.path.join(exported_model_base, 'din.onnx')
+
+import onnxruntime as ort
 sess = ort.InferenceSession(onnx_output_path, providers=["CPUExecutionProvider"])
+
 test_df = data[(data['cust_id'] == test_cust) & (data['run_date'] == test_date)]
 
 test_data_tf = {}

@@ -1,3 +1,7 @@
+## gsutil authentication
+%ppauth
+
+
 from rmr_config.simple_config import Config
 from rmr_config.state_manager import StateManager
 import os
@@ -5,11 +9,13 @@ import sys
 import ast
 import json
 from datetime import datetime
-from pathlib import Path
+
 
 if "working_path" not in globals():
+    from pathlib import Path
     path = Path(os.getcwd())
     working_path = path.parent.absolute()
+
 
 folder = os.getcwd()
 username = os.environ['NB_USER']
@@ -18,17 +24,21 @@ config = Config(params_path)
 local_base_path = config.get("general", "local_output_base_path")
 os.makedirs(local_base_path, exist_ok=True)
 
+
 # set working directory
 os.chdir(working_path)
 if not config:
     raise ValueError('config is not correctly setup')
 
+
 print(f'username={username}, working_path={working_path}')
+
 
 # Section Name
 section_name = "model_training"
 
-# General Parameters (from environment.ini)
+
+# General Parameters 
 mo_name = config.get('general', 'mo_name')
 driver_dataset = config.get('general', 'driver_dataset')
 dataproc_project_name = config.get('general', 'dataproc_project_name')
@@ -38,37 +48,37 @@ queue_name = config.get('general', 'queue_name')
 check_point = config.get('general', 'check_point')
 state_file = config.get('general', 'state_file')
 
+
 # Section-Specific Parameters (from solution.ini)
-model_version_file = config.get('section_name', 'model_version_file')
-data_directory = config.get('section_name', 'data_directory')
-numeric_names = config.get('section_name', 'numeric_names')
-rcvr_id_names = config.get('section_name', 'rcvr_id_names')
-gpt_cate_names = config.get('section_name', 'gpt_cate_names')
-batch_size = config.get('section_name', 'batch_size')
-learning_rate = config.get('section_name', 'learning_rate')
-dnn_use_bn = config.get('section_name', 'dnn_use_bn')
-dnn_hidden_units = config.get('section_name', 'dnn_hidden_units')
-dnn_activation = config.get('section_name', 'dnn_activation')
-att_hidden_size = config.get('section_name', 'att_hidden_size')
-att_activation = config.get('section_name', 'att_activation')
-att_weight_normalization = config.get('section_name', 'att_weight_normalization')
-l2_reg_dnn = config.get('section_name', 'l2_reg_dnn')
-l2_reg_embedding = config.get('section_name', 'l2_reg_embedding')
-dnn_dropout = config.get('section_name', 'dnn_dropout')
-seed = config.get('section_name', 'seed')
-epochs = config.get('section_name', 'epochs')
-model_version_base = config.get('section_name', 'model_version_base')
-exported_feature_transformer = config.get('section_name', 'exported_feature_transformer')
-exported_model_base = config.get('section_name', 'exported_model_base')
-h5_model_path = config.get('section_name', 'h5_model_path')
-tf_model_path = config.get('section_name', 'tf_model_path')
+model_version_base = config.get(section_name, 'model_version_base')
+exported_feature_transformer = config.get(section_name, 'exported_feature_transformer')
+numeric_names = config.get(section_name, 'numeric_names')
+rcvr_id_names = config.get(section_name, 'rcvr_id_names')
+gpt_cate_names = config.get(section_name, 'gpt_cate_names')
+batch_size = config.get(section_name, 'batch_size')
+learning_rate = config.get(section_name, 'learning_rate')
+dnn_use_bn = config.get(section_name, 'dnn_use_bn')
+dnn_hidden_units = config.get(section_name, 'dnn_hidden_units')
+dnn_activation = config.get(section_name, 'dnn_activation')
+att_hidden_size = config.get(section_name, 'att_hidden_size')
+att_activation = config.get(section_name, 'att_activation')
+att_weight_normalization = config.get(section_name, 'att_weight_normalization')
+l2_reg_dnn = config.get(section_name, 'l2_reg_dnn')
+l2_reg_embedding = config.get(section_name, 'l2_reg_embedding')
+dnn_dropout = config.get(section_name, 'dnn_dropout')
+seed = config.get(section_name, 'seed')
+epochs = config.get(section_name, 'epochs')
+h5_model_path = config.get(section_name, 'h5_model_path')
+tf_model_path = config.get(section_name, 'tf_model_path')
+
 
 # Dependencies from Previous Sections
 # Previous section: data_preprocessing
 # Edge Attributes from DAG
-transformed_data_path = config.get('data_preprocessing', 'transformed_data_path')
+directory = config.get('data_preprocessing', 'transformed_data_path')
 
-# === Research Code ===
+
+# Research Code
 import pickle
 from tqdm import tqdm
 import yaml
@@ -79,9 +89,11 @@ from tensorflow.python.keras.optimizers import adam_v2
 from deepctr.feature_column import SparseFeat, VarLenSparseFeat, DenseFeat, get_feature_names
 from deepctr.models import DIN
 
+
 gpus = tf.config.experimental.list_physical_devices('GPU')
 for i in range(len(gpus)):
     tf.config.experimental.set_memory_growth(gpus[i], True)
+
 
 def load_yaml_file(file_path):
     try:
@@ -90,6 +102,7 @@ def load_yaml_file(file_path):
         return yaml_content
     except FileNotFoundError:
         return None
+
 
 file_path = '../config/base_config.yaml'  # Path to your YAML file
 config = load_yaml_file(file_path)
@@ -105,6 +118,7 @@ if config is not None:
     if not os.path.exists(exported_model_base):
         os.mkdir(exported_model_base)
 
+
 directory = '../data/ql_store_rmr_driver_dev_features_transformed'
 parquet_files = [f for f in os.listdir(directory) if f.endswith(".parquet")]
 dfs = []
@@ -114,13 +128,46 @@ for file in tqdm(parquet_files, total=len(parquet_files)):
     dfs.append(f)
 data = pd.concat(dfs, ignore_index=True)
 
+
 with open(os.path.join(exported_feature_transformer, 'categorical_feature_encoders'), "rb") as f:
     categorical_feature_encoders = pickle.load(f)
 with open(os.path.join(exported_feature_transformer, 'rcvr_id_tokenizer'), "rb") as f:
     rcvr_id_tokenizer = pickle.load(f)
 
+
 data_train = data[data['split'] == 'train'].copy()
 data_val = data[data['split'] == 'val'].copy()
+
+
+numeric_names = [
+    "sndr_rcvr_txn_num_30d", "sndr_rcvr_txn_num_180d", "sndr_rcvr_txn_num_365d", "sndr_rcvr_txn_amt_30d", "sndr_rcvr_txn_amt_180d",
+    "sndr_rcvr_txn_amt_365d", "sndr_last_5_txn_avg_amt", "sndr_last_10_txn_avg_amt", "sndr_rcvr_category_breadth_30d", "sndr_rcvr_category_breadth_180d",
+    "sndr_rcvr_category_breadth_365d", "sndr_rcvr_category_txn_num_30d", "sndr_rcvr_category_txn_num_180d", "sndr_rcvr_category_txn_num_365d",
+    "sndr_rcvr_category_txn_amt_30d", "sndr_rcvr_category_txn_amt_180d", "sndr_rcvr_category_txn_amt_365d", "sndr_rcvr_category_avg_txn_amt_30d",
+    "sndr_rcvr_category_avg_txn_amt_180d", "sndr_rcvr_category_avg_txn_amt_365d", "sndr_1st_freq_merchant_category_cnt_30d",
+    "sndr_2nd_freq_merchant_category_cnt_30d", "sndr_3rd_freq_merchant_category_cnt_30d", "sndr_1st_freq_merchant_category_cnt_180d",
+    "sndr_2nd_freq_merchant_category_cnt_180d", "sndr_3rd_freq_merchant_category_cnt_180d", "sndr_1st_freq_merchant_category_cnt_365d",
+    "sndr_2nd_freq_merchant_category_cnt_365d", "sndr_3rd_freq_merchant_category_cnt_365d", "rcvr_avg_price_30d", "rcvr_price_10_penentile_30d",
+    "rcvr_price_30_penentile_30d", "rcvr_price_50_penentile_30d", "rcvr_price_70_penentile_30d", "rcvr_price_90_penentile_30d", "rcvr_rcvd_txn_num_30d",
+    "rcvr_rcvd_distinct_consumer_num_30d", "rcvr_rcvd_txn_amt_30d", "sndr_last_1_txn_avg_amt_rcvr_avg_price_diff",
+    "sndr_last_1_txn_avg_amt_rcvr_median_price_diff", "sndr_last_5_txn_avg_amt_rcvr_avg_price_diff", "sndr_last_5_txn_avg_amt_rcvr_median_price_diff",
+    "sndr_last_10_txn_avg_amt_rcvr_avg_price_diff", "sndr_last_10_txn_avg_amt_rcvr_median_price_diff", "sndr_rcvr_num_save_7day",
+    "sndr_rcvr_num_save_30day", "sndr_rcvr_num_save_180day", "sndr_num_save_7day", "sndr_num_save_30day", "sndr_num_save_180day",
+    "sndr_rcvr_num_sameindustry_save_7day", "sndr_rcvr_num_sameindustry_save_30day", "sndr_rcvr_num_sameindustry_save_180day",
+    "rcvr_save_cnt_30d", "rcvr_save_cnt_deals_explore_tertiary_30d", "rcvr_save_cnt_ql_home_30d", "rcvr_save_cnt_rewards_zone_new_30d",
+    "rcvr_save_cnt_reboarding_30d", "rcvr_save_cnt_high_engaged_30d", "rcvr_save_cnt_mid_engaged_30d", "rcvr_save_cnt_low_engaged_30d",
+    "rcvr_save_cnt_likely_to_churn_30d", "rcvr_save_cnt_new_not_active_30d", "rcvr_save_cnt_never_active_30d", "rcvr_save_cnt_churned_30d",
+    "rcvr_save_cnt_re_engaged_30d", "rcvr_save_cnt_new_active_30d", "sndr_days_on_file", "sndr_days_appweb_visit", "rcvr_tpv_score"
+] + [f"embedding_{i+1}" for i in range(32)]
+
+
+rcvr_id_names = ['rcvr_id']
+gpt_cate_names = [
+    'gpt_1st_category_l2_index', 'sndr_1st_freq_merchant_category_30d', 'sndr_2nd_freq_merchant_category_30d', 'sndr_3rd_freq_merchant_category_30d',
+    'sndr_1st_freq_merchant_category_180d', 'sndr_2nd_freq_merchant_category_180d', 'sndr_3rd_freq_merchant_category_180d',
+    'sndr_1st_freq_merchant_category_365d', 'sndr_2nd_freq_merchant_category_365d', 'sndr_3rd_freq_merchant_category_365d'
+]
+
 
 def get_xy_fd_share_embdding(data, numeric_names, rcvr_id_names, gpt_cate_names):
     feature_columns = []
@@ -152,9 +199,11 @@ def get_xy_fd_share_embdding(data, numeric_names, rcvr_id_names, gpt_cate_names)
     y = data['target'].values
     return x, y, dnn_feature_columns, behavior_feature_list
 
+
 x_train, y_train, dnn_feature_columns, behavior_feature_list = get_xy_fd_share_embdding(data_train, numeric_names, rcvr_id_names, gpt_cate_names)
 x_val, y_val, _, _ = get_xy_fd_share_embdding(data_val, numeric_names, rcvr_id_names, gpt_cate_names)
 feature_names = get_feature_names(dnn_feature_columns)
+
 
 def data_generator(x_data, y_data, batch_size):
     keys = list(x_data.keys())
@@ -168,8 +217,10 @@ def data_generator(x_data, y_data, batch_size):
             y_batch = np.array([y_data[i] for i in batch_indices])
             yield x_batch, y_batch
 
+
 # Parameters
 batch_size = config['training_config']['DIN']['batch_size']
+
 
 # Create training and validation datasets
 train_dataset = tf.data.Dataset.from_generator(
@@ -188,9 +239,11 @@ val_dataset = tf.data.Dataset.from_generator(
     )
 ).shuffle(len(x_val))
 
+
 steps_per_epoch = len(y_train) // batch_size
 validation_steps = len(y_val) // batch_size
 strategy = tf.distribute.MirroredStrategy([])  # single machine multiple gpu
+
 
 with strategy.scope():
     adam = adam_v2.Adam(learning_rate=config['training_config']['DIN']['learning_rate'])
@@ -210,6 +263,7 @@ with strategy.scope():
     )
     model.compile(adam, loss="binary_crossentropy", metrics=[tf.keras.metrics.AUC()])
 
+
 early_stopping = tf.keras.callbacks.EarlyStopping(
     monitor='val_loss',
     patience=3,
@@ -217,6 +271,7 @@ early_stopping = tf.keras.callbacks.EarlyStopping(
     restore_best_weights=True,
     verbose=1
 )
+
 
 history = model.fit(
     train_dataset,
@@ -226,5 +281,6 @@ history = model.fit(
     validation_steps=validation_steps,
     callbacks=[early_stopping]
 )
+
 
 print('Script initialized')

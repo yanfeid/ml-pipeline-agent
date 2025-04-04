@@ -3,6 +3,7 @@ import nbformat
 from nbformat.v4 import new_notebook, new_code_cell
 from typing import List
 
+# need to add the logic to spit into chunks separated by two blank lines
 def convert_py_scripts(
     input_files: List[str],
     local_repo_path: str,
@@ -38,19 +39,30 @@ def convert_py_scripts(
             # Group lines into cells (split by empty lines)
             cells = []
             buffer = []
+            empty_line_count = 0
+
             for line in lines:
-                if line.strip() == "" and buffer:
-                    cells.append(new_code_cell("".join(buffer)))
-                    buffer = []
+                if line.strip() == "":
+                    empty_line_count += 1
+                else:
+                    empty_line_count = 0
+
+                if empty_line_count >= 2:
+                    if buffer:
+                        cells.append(new_code_cell("".join(buffer).rstrip()))
+                        buffer = []
+                    empty_line_count = 0  # 
                 else:
                     buffer.append(line)
+
             if buffer:
-                cells.append(new_code_cell("".join(buffer)))
+                cells.append(new_code_cell("".join(buffer).rstrip()))
 
             nb = new_notebook(cells=cells, metadata={"language": "python"})
 
             with open(output_ipynb_path, "w", encoding="utf-8") as f:
                 nbformat.write(nb, f)
+
 
             # Delete original .py file if overwrite is True
             if overwrite:

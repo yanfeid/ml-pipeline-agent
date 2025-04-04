@@ -1,3 +1,7 @@
+## gsutil authentication
+%ppauth
+
+
 from rmr_config.simple_config import Config
 from rmr_config.state_manager import StateManager
 import os
@@ -5,12 +9,13 @@ import sys
 import ast
 import json
 from datetime import datetime
-from pathlib import Path
-import yaml
+
 
 if "working_path" not in globals():
+    from pathlib import Path
     path = Path(os.getcwd())
     working_path = path.parent.absolute()
+
 
 folder = os.getcwd()
 username = os.environ['NB_USER']
@@ -19,17 +24,21 @@ config = Config(params_path)
 local_base_path = config.get("general", "local_output_base_path")
 os.makedirs(local_base_path, exist_ok=True)
 
-# Set working directory
+
+# set working directory
 os.chdir(working_path)
 if not config:
     raise ValueError('config is not correctly setup')
 
+
 print(f'username={username}, working_path={working_path}')
+
 
 # Section Name
 section_name = "feature_engineering"
 
-# General Parameters (from environment.ini)
+
+# General Parameters 
 mo_name = config.get('general', 'mo_name')
 driver_dataset = config.get('general', 'driver_dataset')
 dataproc_project_name = config.get('general', 'dataproc_project_name')
@@ -39,34 +48,20 @@ queue_name = config.get('general', 'queue_name')
 check_point = config.get('general', 'check_point')
 state_file = config.get('general', 'state_file')
 
+
 # Section-Specific Parameters (from solution.ini)
-driver_simu_txn_365d = config.get(section_name, 'driver_simu_txn_365d')
-driver_simu_txn_365d_agg = config.get(section_name, 'driver_simu_txn_365d_agg')
-driver_consumer_base = config.get(section_name, 'driver_consumer_base')
-driver_consumer_base_txn_5k_merch_category = config.get(section_name, 'driver_consumer_base_txn_5k_merch_category')
-driver_consumer_base_last_10_txn = config.get(section_name, 'driver_consumer_base_last_10_txn')
-driver_consumer_base_all_history_array_0 = config.get(section_name, 'driver_consumer_base_all_history_array_0')
-driver_consumer_base_all_history_array = config.get(section_name, 'driver_consumer_base_all_history_array')
-driver_combine_category = config.get(section_name, 'driver_combine_category')
-driver_combine_category_agg_0 = config.get(section_name, 'driver_combine_category_agg_0')
-driver_combine_category_agg_1 = config.get(section_name, 'driver_combine_category_agg_1')
-driver_combine_category_agg_2 = config.get(section_name, 'driver_combine_category_agg_2')
-driver_combine_category_agg_3 = config.get(section_name, 'driver_combine_category_agg_3')
-driver_combine_category_agg_4 = config.get(section_name, 'driver_combine_category_agg_4')
-driver_combine_category_agg_5 = config.get(section_name, 'driver_combine_category_agg_5')
-driver_merchant_base = config.get(section_name, 'driver_merchant_base')
-driver_merchant_base_txn_30d = config.get(section_name, 'driver_merchant_base_txn_30d')
-driver_merchant_base_txn_30d_filter_sndr = config.get(section_name, 'driver_merchant_base_txn_30d_filter_sndr')
-driver_merchant_base_price_agg = config.get(section_name, 'driver_merchant_base_price_agg')
-driver_merchant_base_sales_agg = config.get(section_name, 'driver_merchant_base_sales_agg')
-driver_elig_save_365d_category = config.get(section_name, 'driver_elig_save_365d_category')
-driver_elig_save_agg_00 = config.get(section_name, 'driver_elig_save_agg_00')
-driver_elig_save_agg_0 = config.get(section_name, 'driver_elig_save_agg_0')
-driver_elig_save_agg_1 = config.get(section_name, 'driver_elig_save_agg_1')
-driver_elig_save_agg_2 = config.get(section_name, 'driver_elig_save_agg_2')
-driver_elig_save_agg_3 = config.get(section_name, 'driver_elig_save_agg_3')
-driver_merchant_base_click_save = config.get(section_name, 'driver_merchant_base_click_save')
-driver_consumer_base_gender = config.get(section_name, 'driver_consumer_base_gender')
+final_table = config.get(section_name, 'final_table')
+
+
+# Dependencies from Previous Sections=====
+
+
+# === Research Code ===
+# %reload_ext cloudmagics.bigquery
+# %config PPMagics.domain="ccg24-hrzana-gds-pacman"
+# %config PPMagics.autolimit = 0
+import yaml
+
 
 def load_yaml_file(file_path):
     try:
@@ -76,10 +71,12 @@ def load_yaml_file(file_path):
     except FileNotFoundError:
         return None
 
+
 file_path = '../config/base_config.yaml'
 config = load_yaml_file(file_path)
 if config is not None:
     bq_prefix = config['general_config']['bq_project_dataset_prefix']
+    bq_prefix
     q = f"""
     drop table if exists {bq_prefix}driver_simu_txn_365d;
     create table {bq_prefix}driver_simu_txn_365d as
@@ -106,6 +103,7 @@ if config is not None:
     and a.run_date > b.transaction_created_date
     qualify row_number() over (partition by payment_transid order by transaction_created_ts desc) = 1;
     """
+    # %ppbq $q
     q = f"""
     drop table if exists {bq_prefix}driver_simu_txn_365d_agg;
     create table {bq_prefix}driver_simu_txn_365d_agg as
@@ -121,6 +119,7 @@ if config is not None:
     from {bq_prefix}driver_simu_txn_365d
     group by 1, 2, 3;
     """
+    # %ppbq $q
     q = f"""
     drop table if exists {bq_prefix}driver_consumer_base;
     create table {bq_prefix}driver_consumer_base as
@@ -132,6 +131,7 @@ if config is not None:
     from {bq_prefix}driver_simu
     group by 1, 2, 3, 4, 5;
     """
+    # %ppbq $q
     q = f"""
     drop table if exists {bq_prefix}driver_consumer_base_txn_5k_merch_category;
     create table {bq_prefix}driver_consumer_base_txn_5k_merch_category as
@@ -159,6 +159,7 @@ if config is not None:
     join {bq_prefix}live_unique_merchants_train c
     on b.customer_counterparty = c.rcvr_id;
     """
+    # %ppbq $q
     q = f"""
     drop table if exists {bq_prefix}driver_consumer_base_last_10_txn;
     create table {bq_prefix}driver_consumer_base_last_10_txn as
@@ -241,8 +242,42 @@ if config is not None:
     from {bq_prefix}driver_consumer_base_txn_5k_merch_category where recency_rank = 10
     ) last_10 on a.cust_id = last_10.cust_id and a.run_date = last_10.run_date;
     """
+    # %ppbq $q
     q = f"""
     drop table if exists {bq_prefix}driver_consumer_base_all_history_array_0;
     create table {bq_prefix}driver_consumer_base_all_history_array_0 as
-    select cust_id, run_date, customer
+    select cust_id, run_date, customer_counterparty, transaction_created_date, transaction_created_ts, gpt_1st_category_l2_index
+    from
+    (select cust_id, run_date, customer_counterparty, transaction_created_date, transaction_created_ts, gpt_1st_category_l2_index
+    from {bq_prefix}driver_consumer_base_txn_5k_merch_category
+    )
+    qualify row_number() over (partition by cust_id, run_date order by transaction_created_ts desc) <= 100;
     """
+    # %ppbq $q
+    q = f"""
+    drop table if exists {bq_prefix}driver_consumer_base_all_history_array;
+    create table {bq_prefix}driver_consumer_base_all_history_array as
+    select cust_id, run_date,
+    ARRAY_TO_STRING(ARRAY_AGG(COALESCE(customer_counterparty, '0') ORDER BY transaction_created_ts), ',') AS sndr_most_recent_100_merch_list,
+    ARRAY_TO_STRING(ARRAY_AGG(COALESCE(cast(gpt_1st_category_l2_index as string), '0') ORDER BY transaction_created_ts), ',') AS sndr_most_recent_100_merch_category
+    from {bq_prefix}driver_consumer_base_all_history_array_0
+    group by 1, 2;
+    """
+    # %ppbq $q
+    # # Category aggregation
+    q = f"""
+    drop table if exists {bq_prefix}driver_combine_category;
+    create table {bq_prefix}driver_combine_category as
+    select a.*, b.gpt_1st_category_l2_index as rcvr_gpt_1st_category_l2_index
+    from {bq_prefix}driver_simu a
+    left join {bq_prefix}live_unique_merchants_train b
+    on a.rcvr_id = b.rcvr_id;
+    """
+    # %ppbq $q
+    q = f"""
+    drop table if exists {bq_prefix}driver_combine_category_agg_0;
+    create table {bq_prefix}driver_combine_category_agg_0 as
+    select cust_id, run_date, gpt_1st_category_l2_index,
+    COUNT(DISTINCT IF((transaction_created_date > run_date_30d), customer_counterparty, NULL)) AS sndr_category_breadth_30d,
+    COUNT(DISTINCT IF((transaction_created_date > run_date_180d), customer_counterparty, NULL)) AS sndr_category_breadth_180d,
+    COUNT(DISTINCT IF((transaction_created_date > run_date_365d), customer

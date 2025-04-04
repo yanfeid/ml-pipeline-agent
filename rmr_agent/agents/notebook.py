@@ -9,8 +9,12 @@ import json
 def clean_prefix(path: str) -> str:
     return os.path.splitext(os.path.basename(path))[0].strip().lower()
 
+
+def normalize_node_name(name):
+    return re.sub(r'\s+', '_', name.strip().lower())
+
  # === EXTRACT CODE FROM CLEAN_CODE ===
-def extract_code_from_json(json_file, verified_dag):
+def extract_code_from_json(cleaned_code, verified_dag):
     """
     Read JSON file,
     Extract code based on DAG YAML file
@@ -22,16 +26,7 @@ def extract_code_from_json(json_file, verified_dag):
     """
     
     # cleaned_code = json_file.get("cleaned_code", {})
-    cleaned_code = json_file
-
     extracted_code = {}
-
-    
-
-    print("📂 Available cleaned_code keys:")
-    for path in cleaned_code.keys():
-        print(f"  - {repr(path)}")
-
 
     for node in verified_dag["nodes"]:
         # Get node's name（
@@ -41,9 +36,6 @@ def extract_code_from_json(json_file, verified_dag):
         file_prefix = os.path.splitext(os.path.basename(full_file_path))[0]  # extract the path without Filename Extension
         line_range_str = node_info["line_range"]
 
-        # print(f"📌 Processing node: {node_name}")
-        # print(f"🧩 file_name: {node_info['file_name']}")
-        # print(f"🧩 file_prefix: {os.path.splitext(os.path.basename(node_info['file_name']))[0]}")
         match = re.search(r"(\d+)-(\d+)", line_range_str)
 
         if not match:
@@ -55,12 +47,12 @@ def extract_code_from_json(json_file, verified_dag):
         matched_file = None
         dag_prefix = clean_prefix(file_prefix)
 
-        print(f"\n🔍 Searching match for DAG prefix: '{dag_prefix}'")
-        print("📂 Available cleaned_code prefixes:")
+        # print(f"\n🔍 Searching match for DAG prefix: '{dag_prefix}'")
+        # print("📂 Available cleaned_code prefixes:")
 
         for json_file_path in cleaned_code.keys():
             json_file_prefix = clean_prefix(json_file_path)
-            print(f"  - {json_file_prefix}")
+            # print(f"  - {json_file_prefix}")
             
             if json_file_prefix == dag_prefix:
                 matched_file = json_file_path
@@ -90,7 +82,7 @@ def extract_code_from_json(json_file, verified_dag):
 #     print(f"\n# Extracted code for {node}:\n{data['code']}")
 
  # === NOTEBOOK AGENT CODE ===
-def notebook_agent(verified_dag, json_file):
+def notebook_agent(verified_dag, cleaned_code, local_repo_path):
     """
     Generates Python files in the 'notebooks/' directory based on solution.ini sections.
     Args:
@@ -100,15 +92,10 @@ def notebook_agent(verified_dag, json_file):
     """
 
     # === Step 1: Calculate BASE_DIR，ensure code could run in any env ===
-    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  # rmr_agent directory
-    NOTEBOOKS_DIR = os.path.join(BASE_DIR, "notebooks")
-    # CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod","1")
-    CONFIG_DIR = os.path.join(BASE_DIR, "config")
-
+    NOTEBOOKS_DIR = os.path.join(local_repo_path, "notebooks")
+    CONFIG_DIR = os.path.join(local_repo_path, "config")
     ENV_FILE = os.path.join(CONFIG_DIR, "environment.ini")
     SOL_FILE = os.path.join(CONFIG_DIR, "solution.ini")
-    
-    # JSON_FILE = os.path.join(CHECKPOINTS_DIR, "summarize.json")
 
     os.makedirs(NOTEBOOKS_DIR, exist_ok=True)
     print(f"Created notebooks directory: {NOTEBOOKS_DIR}")
@@ -131,12 +118,9 @@ def notebook_agent(verified_dag, json_file):
     dependencies = {}
     edge_attributes = {}
 
-    print("\n🔍 Debugging edges processing:")
     for edge in edges:
         from_section = edge.get("from").strip().lower().replace(" ", "_")
         to_section = edge.get("to").strip().lower().replace(" ", "_")
-
-        print(f"  Processing edge: from {from_section} → to {to_section}")
 
         if from_section and to_section:
             dependencies.setdefault(to_section, []).append(from_section)
@@ -202,7 +186,7 @@ print(f'username={username}, working_path={working_path}')
 
             # === General Parameters from environment.ini === 
             # mo_name driver_dataset dataproc_project_name dataproc_storage_bucket gcs_base_path queue_name check_point state_file 
-            f.write("# General Parameters (from environment.ini)\n")
+            f.write("# General Parameters \n")
 
             required_keys = [
                 "mo_name",
@@ -225,46 +209,58 @@ print(f'username={username}, working_path={working_path}')
             # === Section-Specific Parameters from solution.ini ===
             f.write("# Section-Specific Parameters (from solution.ini)\n")
             for key in config.options(section_name):
-                f.write(f"{key} = config.get('section_name', '{key}')\n")
+                f.write(f"{key} = config.get(section_name, '{key}')\n")
 
             f.write("\n")
 
             # === Dependencies from DAG ===
-            f.write("# Dependencies from Previous Sections\n")
+            node_dict = {}
+            for item in verified_dag.get("nodes", []):
+                if isinstance(item, dict):
+                    for raw_name, data in item.items():
+                        norm_name = normalize_node_name(raw_name)
+                        node_dict[norm_name] = data
+            
+            norm_node_name = normalize_node_name(node_name)
+            current_node_params = node_dict.get(norm_node_name, {}).get("inputs", {})
+            # print("🎯 Current normalized node:", norm_node_name)
+            # print("🧩 Current params:", current_node_params)
 
+            f.write("# Dependencies from Previous Sections=====\n")
             for from_node in dependencies.get(node_name, []):
                 f.write(f"# Previous section: {from_node}\n")
-                print(f"Processing Node: {node_name}, depends on: {from_node}")
 
-                attributes = edge_attributes.get(node_name, {}).get(from_node, {})
-                if attributes:
+                dep_attributes = edge_attributes.get(node_name, {}).get(from_node, {})
+                if dep_attributes:
                     f.write("# Edge Attributes from DAG\n")
-                    for key in attributes.keys():
-                        f.write(f"{key} = config.get('{from_node}', '{key}')\n")
-                        print(f"Writing edge attribute: {key} = config.get('{from_node}', '{key}')")
+                    for dep_key, dep_val in dep_attributes.items():
+                        matched_key = None
+                        for curr_key, curr_val in current_node_params.items():
+                            if curr_val == dep_val:
+                                matched_key = curr_key
+                                break
+
+                        final_key = matched_key if matched_key else dep_key
+                        f.write(f"{final_key} = config.get('{from_node}', '{dep_key}')\n")
+                        print(f"Writing edge attribute: {final_key} = config.get('{from_node}', '{dep_key}')")
 
             f.write("\n")
 
-            # === Research Code ===
-            extracted_code = extract_code_from_json(json_file,verified_dag)
+            # === Research Code === 
+            extracted_code = extract_code_from_json(cleaned_code,verified_dag)
     
             if section_name.lower() == "general": 
                 print(f"🚀 Skipping general section: {section_name}")
                 continue
 
-            # match extracted_code
-            # if section_name in extracted_code:
-            #     print(f"MATCH FOUND: {section_name}")
             match_key = next(
                 (k for k in extracted_code if k.lower().replace(" ", "_") == section_name),
                 None
             )
-         
-
             if match_key:
                 print(f"MATCH FOUND: {match_key}")
 
-                research_code_lines = extracted_code[match_key]["code"].split("\n")  # 👈 用 match_key 而不是 section_name
+                research_code_lines = extracted_code[match_key]["code"].split("\n")  
                 cleaned_code_list = []
                 for line in research_code_lines:
                     cleaned_line = line.split("|", 1)[-1].strip()
@@ -293,15 +289,16 @@ if __name__ == "__main__":
     BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
     NOTEBOOKS_DIR = os.path.join(BASE_DIR, "notebooks")
 
-       
- 
+    local_repo_path = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/ql-store-recommendation-prod"
+
     CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod","4")
     dag_yaml = os.path.join(CHECKPOINTS_DIR, "dag.yaml")
     json_path= os.path.join(CHECKPOINTS_DIR,"summarize.json" )
-    dag_state = os.path.join(CHECKPOINTS_DIR,"generate_dag_yaml.json")
     
     with open(json_path, "r", encoding="utf-8") as f:
         json_file = json.load(f)
+
+    json = json_file.get('cleaned_code')
     
     with open(dag_yaml, "r", encoding="utf-8") as f:
         verified_dag = yaml.safe_load(f)
@@ -309,7 +306,7 @@ if __name__ == "__main__":
     # with open(dag_state, "r", encoding="utf-8") as f:
     #     dag_file = json.load(f)
 
-    generated_files = notebook_agent(verified_dag, json_file)
+    generated_files = notebook_agent(verified_dag, json, local_repo_path)
 
     # check notebooks
     if os.path.exists(NOTEBOOKS_DIR):

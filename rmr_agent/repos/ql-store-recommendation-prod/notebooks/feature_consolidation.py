@@ -1,3 +1,7 @@
+## gsutil authentication
+%ppauth
+
+
 from rmr_config.simple_config import Config
 from rmr_config.state_manager import StateManager
 import os
@@ -18,17 +22,18 @@ config = Config(params_path)
 local_base_path = config.get("general", "local_output_base_path")
 os.makedirs(local_base_path, exist_ok=True)
 
-# Set working directory
+# set working directory
 os.chdir(working_path)
 if not config:
     raise ValueError('config is not correctly setup')
 
 print(f'username={username}, working_path={working_path}')
 
+
 # Section Name
 section_name = "feature_consolidation"
 
-# General Parameters (from environment.ini)
+# General Parameters 
 mo_name = config.get('general', 'mo_name')
 driver_dataset = config.get('general', 'driver_dataset')
 dataproc_project_name = config.get('general', 'dataproc_project_name')
@@ -39,28 +44,21 @@ check_point = config.get('general', 'check_point')
 state_file = config.get('general', 'state_file')
 
 # Section-Specific Parameters (from solution.ini)
-config_file_path = config.get('section_name', 'config_file_path')
-bq_project_dataset_prefix = config.get('section_name', 'bq_project_dataset_prefix')
-driver_dev_table = config.get('section_name', 'driver_dev_table')
-driver_simu_txn_365d_agg_table = config.get('section_name', 'driver_simu_txn_365d_agg_table')
-driver_consumer_base_last_10_txn_table = config.get('section_name', 'driver_consumer_base_last_10_txn_table')
-driver_consumer_base_all_history_array_table = config.get('section_name', 'driver_consumer_base_all_history_array_table')
-driver_combine_category_agg_3_table = config.get('section_name', 'driver_combine_category_agg_3_table')
-driver_combine_category_agg_5_table = config.get('section_name', 'driver_combine_category_agg_5_table')
-driver_merchant_base_price_agg_table = config.get('section_name', 'driver_merchant_base_price_agg_table')
-driver_merchant_base_sales_agg_table = config.get('section_name', 'driver_merchant_base_sales_agg_table')
-driver_elig_save_agg_00_table = config.get('section_name', 'driver_elig_save_agg_00_table')
-driver_elig_save_agg_0_table = config.get('section_name', 'driver_elig_save_agg_0_table')
-driver_elig_save_agg_3_table = config.get('section_name', 'driver_elig_save_agg_3_table')
-driver_merchant_base_click_save_table = config.get('section_name', 'driver_merchant_base_click_save_table')
-driver_consumer_base_gender_table = config.get('section_name', 'driver_consumer_base_gender_table')
-ql_store_honey_merch_quality_scores_external_table = config.get('section_name', 'ql_store_honey_merch_quality_scores_external_table')
-driver_simu_consumer_varmart_external_table = config.get('section_name', 'driver_simu_consumer_varmart_external_table')
-store_recommendation_kg_embedding_32_v2_table = config.get('section_name', 'store_recommendation_kg_embedding_32_v2_table')
-driver_dev_features_table = config.get('section_name', 'driver_dev_features_table')
-driver_oot_features_table = config.get('section_name', 'driver_oot_features_table')
-driver_oot_features_expand_seq_table = config.get('section_name', 'driver_oot_features_expand_seq_table')
-export_data_uri = config.get('section_name', 'export_data_uri')
+driver_simu_txn_365d_agg = config.get(section_name, 'driver_simu_txn_365d_agg')
+driver_consumer_base_last_10_txn = config.get(section_name, 'driver_consumer_base_last_10_txn')
+driver_consumer_base_all_history_array = config.get(section_name, 'driver_consumer_base_all_history_array')
+driver_combine_category_agg_3 = config.get(section_name, 'driver_combine_category_agg_3')
+driver_combine_category_agg_5 = config.get(section_name, 'driver_combine_category_agg_5')
+driver_merchant_base_price_agg = config.get(section_name, 'driver_merchant_base_price_agg')
+driver_merchant_base_sales_agg = config.get(section_name, 'driver_merchant_base_sales_agg')
+driver_elig_save_agg_00 = config.get(section_name, 'driver_elig_save_agg_00')
+driver_elig_save_agg_0 = config.get(section_name, 'driver_elig_save_agg_0')
+driver_elig_save_agg_3 = config.get(section_name, 'driver_elig_save_agg_3')
+driver_merchant_base_click_save = config.get(section_name, 'driver_merchant_base_click_save')
+pypl_bods_gds_pacman_prod_ql_store_honey_merch_quality_scores_external = config.get(section_name, 'pypl-bods.gds_pacman_prod.ql_store_honey_merch_quality_scores_external')
+driver_simu_consumer_varmart_external = config.get(section_name, 'driver_simu_consumer_varmart_external')
+pypl_bods_gds_pacman_prod_store_recommendation_kg_embedding_32_v2 = config.get(section_name, 'pypl-bods.gds_pacman_prod.store_recommendation_kg_embedding_32_v2')
+gs = config.get(section_name, 'gs')
 
 # Dependencies from Previous Sections
 # Previous section: driver_creation
@@ -68,10 +66,11 @@ export_data_uri = config.get('section_name', 'export_data_uri')
 driver_dev = config.get('driver_creation', 'driver_dev')
 # Previous section: feature_engineering
 # Edge Attributes from DAG
-final_table = config.get('feature_engineering', 'final_table')
+driver_consumer_base_gender = config.get('feature_engineering', 'final_table')
 # Previous section: data_pulling
 # Edge Attributes from DAG
 data_loc = config.get('data_pulling', 'data_loc')
+
 
 # === Research Code ===
 # %reload_ext cloudmagics.bigquery
@@ -87,7 +86,8 @@ def load_yaml_file(file_path):
     except FileNotFoundError:
         return None
 
-config = load_yaml_file(config_file_path)
+file_path = '../config/base_config.yaml'
+config = load_yaml_file(file_path)
 if config is not None:
     bq_prefix = config['general_config']['bq_project_dataset_prefix']
     bq_prefix
@@ -197,4 +197,11 @@ SELECT
     COALESCE(embedding_10, 0) AS embedding_10,
     COALESCE(embedding_11, 0) AS embedding_11,
     COALESCE(embedding_12, 0) AS embedding_12,
-    COALES
+    COALESCE(embedding_13, 0) AS embedding_13,
+    COALESCE(embedding_14, 0) AS embedding_14,
+    COALESCE(embedding_15, 0) AS embedding_15,
+    COALESCE(embedding_16, 0) AS embedding_16,
+    COALESCE(embedding_17, 0) AS embedding_17,
+    COALESCE(embedding_18, 0) AS embedding_18,
+    COALESCE(embedding_19, 0) AS embedding_19,
+   

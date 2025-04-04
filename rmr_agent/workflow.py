@@ -287,7 +287,7 @@ def run_config_agent(state: WorkflowState) -> Dict[str, Any]:
     from agents.ini_config import config_agent
     config = config_agent(state["dag_yaml"]) 
 
-    config_dir = os.path.join(BASE_DIR, "config")
+    config_dir = os.path.join(state["local_repo_path"], "config")
     os.makedirs(config_dir, exist_ok=True)
 
     save_ini_file("environment.ini", config["environment_ini"], config_dir)
@@ -302,7 +302,7 @@ def run_notebook_agent(state: WorkflowState) -> Dict[str, Any]:
         return {}
 
     from agents.notebook import notebook_agent
-    notebooks = notebook_agent(yaml.safe_load(state["dag_yaml"]),state["cleaned_code"])
+    notebooks = notebook_agent(yaml.safe_load(state["dag_yaml"]),state["cleaned_code"],state["local_repo_path"])
     return {"notebooks": notebooks}
 
 def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:

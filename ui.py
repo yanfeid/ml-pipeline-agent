@@ -5,6 +5,12 @@ import sys
 import time
 import yaml
 from rmr_agent.utils import parse_github_url 
+# functions for dag visualization
+from pyvis.network import Network
+import streamlit.components.v1 as components
+import tempfile
+
+
 
 BASE_URL = "http://localhost:8000"
 CHECKPOINT_BASE_PATH = "rmr_agent/checkpoints"
@@ -99,7 +105,71 @@ def get_default_line_range(selected_components, cleaned_code):
         return f"1-{len(cleaned_code)}"
     return "Specify line range here (e.g. 1-40)"
 
+def parse_dag_edges_from_yaml(dag_yaml):
+    data = yaml.safe_load(dag_yaml)
+    if not isinstance(data, dict):
+        raise ValueError("Parsed YAML is not a dictionary.")
 
+    edges = []
+    raw_edges = data.get("edges", [])
+    for edge in raw_edges:
+        if isinstance(edge, dict) and "from" in edge and "to" in edge:
+            edges.append((edge["from"], edge["to"]))
+
+    # 提取 node 名称
+    nodes = []
+    for item in data.get("nodes", []):
+        if isinstance(item, dict):
+            nodes.extend(item.keys())
+        elif isinstance(item, str):
+            nodes.append(item)
+
+    return edges, nodes
+
+def render_dag_graph(edges, nodes):
+    net = Network(height="400px", directed=True)
+    for node in nodes:
+        net.add_node(node, label=node)
+    for src, tgt in edges:
+        net.add_edge(src, tgt)
+
+    temp_path = tempfile.NamedTemporaryFile(suffix=".html", delete=False)
+    net.save_graph(temp_path.name)
+    return temp_path.name
+
+def dag_edge_editor(edited_dag_yaml):
+    st.subheader("DAG Visualizer (Edit Edges)")
+    edges, nodes = parse_dag_edges_from_yaml(edited_dag_yaml)
+
+    html_path = render_dag_graph(edges, nodes)
+    components.html(open(html_path, "r", encoding="utf-8").read(), height=450, scrolling=True)
+
+    st.markdown("### Modify Edges")
+    col1, col2 = st.columns(2)
+    with col1:
+        src = st.selectbox("Source Node", nodes, key="src_node")
+    with col2:
+        tgt = st.selectbox("Target Node", nodes, key="tgt_node")
+
+    if st.button("Add Edge"):
+        edges.append((src, tgt))
+    
+    edge_to_remove = st.selectbox("Remove Edge", edges, format_func=lambda x: f"{x[0]} -> {x[1]}")
+    if st.button("Remove Selected Edge"):
+        edges.remove(edge_to_remove)
+
+    # Update YAML
+    edge_dict = {}
+    for s, t in edges:
+        edge_dict.setdefault(s, []).append(t)
+    
+    new_yaml = yaml.dump({
+        "nodes": nodes,
+        "edges": edge_dict
+    }, sort_keys=False)
+
+    st.text_area("Updated DAG YAML", new_yaml, height=300, key="updated_yaml_preview")
+    return new_yaml
 
 # Initialization of session state
 if "display_welcome_page" not in st.session_state:
@@ -416,12 +486,22 @@ def human_verification_of_components_ui(repo_name, run_id):
 
 def human_verification_of_dag_ui(repo_name, run_id):
     # WIP -> improve DAG editing experience. Should focus on editing edges because nodes were already verified
-    st.subheader("Please verify/edit the identified DAG")
-    dag_yaml = get_dag_yaml(repo_name, run_id) # result["dag_yaml"] # loading from checkpoint instead of from API result
+    # st.subheader("Please verify/edit the identified DAG")
+    # dag_yaml = get_dag_yaml(repo_name, run_id) # result["dag_yaml"] # loading from checkpoint instead of from API result
+    # edited_dag = st.text_area("DAG YAML", dag_yaml, height=300)
+    # if st.button("Submit DAG"):
+    #     payload = {"verified_dag": edited_dag}
+    #     st.session_state.workflow_running = True # before submit back to API, set workflow running again to continue polling
+    #     submit_human_feedback(payload=payload, repo_name=repo_name, run_id=run_id)
+    # ===== add functions for visualization=====
+    
+    dag_yaml = get_dag_yaml(repo_name, run_id)
     edited_dag = st.text_area("DAG YAML", dag_yaml, height=300)
+    updated_dag_yaml = dag_edge_editor(edited_dag)
+
     if st.button("Submit DAG"):
-        payload = {"verified_dag": edited_dag}
-        st.session_state.workflow_running = True # before submit back to API, set workflow running again to continue polling
+        payload = {"verified_dag": updated_dag_yaml}
+        st.session_state.workflow_running = True
         submit_human_feedback(payload=payload, repo_name=repo_name, run_id=run_id)
 
 
