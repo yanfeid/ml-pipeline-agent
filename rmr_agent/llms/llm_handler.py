@@ -13,6 +13,8 @@ from urllib3.exceptions import InsecureRequestWarning
 from typing import Dict, Any, Optional, List
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from dotenv import load_dotenv
+load_dotenv() 
 
 
 
@@ -47,48 +49,44 @@ def messages_to_prompt(messages: list[dict[str, str]]) -> str:
             
     return "\n\n".join(prompt_pieces)
 
+print("client_id:", os.getenv("AZURE_CLIENT_ID"))
+print("client_secret starts with:", os.getenv("AZURE_CLIENT_SECRET")[:5])
 
 
 class TokenManager:
     def __init__(self):
         self._token = None
         self._token_expiry = 0
-        self.url = 'https://login.microsoftonline.com/fb007914-6020-4374-977e-21bac5f3f4c8/oauth2/v2.0/token'
+        self.tenant_id = "fb007914-6020-4374-977e-21bac5f3f4c8"
+        self.token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
 
     def get_token(self):
-        current_time = time.time()
-        
-        # Check if token exists and is still valid
-        if self._token and current_time < self._token_expiry:
+        if self._token and time.time() < self._token_expiry:
             return self._token
 
-        # Token doesn't exist or is expired, get new one
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Cookie': 'fpc=AlGJE26qB45Lt9QvUL18hP4oYQGpAwAAAMZzLN8OAAAA; stsservicecookie=estsfd; x-ms-gateway-slice=estsfd'
-        }
         data = {
             "client_id": os.getenv("AZURE_CLIENT_ID"),
             "client_secret": os.getenv("AZURE_CLIENT_SECRET"),
-            "scope": os.getenv("AZURE_SCOPE"),
+            "scope": "https://cognitiveservices.azure.com/.default",
             "grant_type": "client_credentials"
         }
-        #print('data for getting token:', data)
-        if not data['client_id']:
-            raise ValueError("AZURE_CLIENT_ID not found in environment variables")
-        if not data['client_secret']:
-            raise ValueError("AZURE_CLIENT_SECRET not found in environment variables")
-        if not data['scope']:
-            raise ValueError("AZURE_SCOPE not found in environment variables")
-        
-        res = requests.post(self.url, data=data, verify=False)
-        #print("Requested access token:", res)
-        #print(res.text)
-        self._token = res.json()["access_token"]
-        self._token_lifetime = res.json()["expires_in"]
-        self._token_expiry = current_time + self._token_lifetime
-        
-        return self._token
+
+        if not all(data.values()):
+            missing = [k for k, v in data.items() if not v]
+            raise EnvironmentError(f"Missing env vars: {', '.join(missing)}")
+
+        res = requests.post(self.token_url, data=data, headers={"Content-Type": "application/x-www-form-urlencoded"}, verify=False)
+
+        try:
+            res.raise_for_status()
+            token_data = res.json()
+            self._token = token_data["access_token"]
+            self._token_expiry = time.time() + token_data.get("expires_in", 3600)
+            return self._token
+        except Exception:
+            raise RuntimeError(f"Failed to fetch token: {res.status_code} — {res.text}")
+
+
 
 # single instance of token manager
 token_manager = TokenManager()
@@ -221,7 +219,7 @@ class AzureGPTHandler(LLMHandler):
         headers = {
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json',
-            'Cookie': 'ApplicationGatewayAffinity=3436f7a0151f5b426de1e5ceb7acb2a2; ApplicationGatewayAffinityCORS=3436f7a0151f5b426de1e5ceb7acb2a2'
+            'Cookie': 'ApplicationGatewayAffinity=5782715754db1293aaa82867cac4107a; ApplicationGatewayAffinityCORS=5782715754db1293aaa82867cac4107a'
         }
         return headers
     
@@ -277,7 +275,7 @@ class LLMClient:
             self.url = open_url
         else:
             self.handler = AzureGPTHandler()
-            self.url = 'https://genai-cus-tdz.paypalcorp.com/solar-amps/openai/deployments/gpt-4o/chat/completions' # "http://10.183.170.134:8001/api/llm/" # "http://10.183.170.134:8001/api/llm/" # codepal LLM endpoint  # "http://host.docker.internal:8001/api/llm/"
+            self.url = "https://genai-wus2-tdz01.paypalcorp.com/brebot/openai/deployments/gpt-4o/chat/completions"  # "http://10.183.170.134:8001/api/llm/" # "http://10.183.170.134:8001/api/llm/" # codepal LLM endpoint  # "http://host.docker.internal:8001/api/llm/"
     
     def call_llm(self, 
                  prompt: str = "",
