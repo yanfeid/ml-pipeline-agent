@@ -9,6 +9,7 @@ from rmr_agent.utils import parse_github_url
 from pyvis.network import Network
 import streamlit.components.v1 as components
 import tempfile
+from streamlit import rerun
 
 
 
@@ -110,66 +111,127 @@ def parse_dag_edges_from_yaml(dag_yaml):
     if not isinstance(data, dict):
         raise ValueError("Parsed YAML is not a dictionary.")
 
-    edges = []
     raw_edges = data.get("edges", [])
+    edges = []
     for edge in raw_edges:
         if isinstance(edge, dict) and "from" in edge and "to" in edge:
-            edges.append((edge["from"], edge["to"]))
+            edges.append((edge["from"], edge["to"], edge))  # (src, tgt, full_edge_dict)
 
-    # 提取 node 名称
+    raw_nodes = data.get("nodes", [])
     nodes = []
-    for item in data.get("nodes", []):
+    for item in raw_nodes:
         if isinstance(item, dict):
-            nodes.extend(item.keys())
-        elif isinstance(item, str):
-            nodes.append(item)
+            for node_name, attrs in item.items():
+                nodes.append((node_name, attrs))
 
     return edges, nodes
 
 def render_dag_graph(edges, nodes):
-    net = Network(height="400px", directed=True)
+    net = Network(height="450px", directed=True)
     for node in nodes:
-        net.add_node(node, label=node)
+        net.add_node(
+            node,
+            label=node,
+            shape="circle",  
+            
+            color={
+                "background": "#ffffff",  
+                "border": "#000000",      
+                "highlight": {
+                    "background": "#eeeeee",  
+                    "border": "#333333"       
+                }
+            },
+            font={
+            "color": "#000000",   
+            "size": 12,           
+            "face": "Arial"       
+        }
+        )
     for src, tgt in edges:
-        net.add_edge(src, tgt)
+        net.add_edge(
+            src,
+            tgt,
+            color="#444444",
+            width=2,
+            length=300,  
+            arrows="to"
+        )
 
     temp_path = tempfile.NamedTemporaryFile(suffix=".html", delete=False)
     net.save_graph(temp_path.name)
     return temp_path.name
 
 def dag_edge_editor(edited_dag_yaml):
-    st.subheader("DAG Visualizer (Edit Edges)")
+    st.subheader("DAG Visualizer")
     edges, nodes = parse_dag_edges_from_yaml(edited_dag_yaml)
 
-    html_path = render_dag_graph(edges, nodes)
+    # Load to session state if not already
+    if "edges_state" not in st.session_state:
+        st.session_state.edges_state = edges.copy()
+    if "nodes_state" not in st.session_state:
+        st.session_state.nodes_state = nodes.copy()
+
+    node_names = [name for name, _ in st.session_state.nodes_state]
+
+    # Render DAG
+    html_path = render_dag_graph(
+        [(e[0], e[1]) for e in st.session_state.edges_state],
+        node_names
+    )
     components.html(open(html_path, "r", encoding="utf-8").read(), height=450, scrolling=True)
 
-    st.markdown("### Modify Edges")
+    # Modify edges
+    st.markdown("### Add Edge")
     col1, col2 = st.columns(2)
     with col1:
-        src = st.selectbox("Source Node", nodes, key="src_node")
+        src = st.selectbox("Source Node", node_names, key="src_node")
     with col2:
-        tgt = st.selectbox("Target Node", nodes, key="tgt_node")
+        tgt = st.selectbox("Target Node", node_names, key="tgt_node")
+
+    with st.expander("Optional: Add Edge Attributes"):
+        attr_input = st.text_area("Enter edge attributes as YAML", value="")
 
     if st.button("Add Edge"):
-        edges.append((src, tgt))
-    
-    edge_to_remove = st.selectbox("Remove Edge", edges, format_func=lambda x: f"{x[0]} -> {x[1]}")
-    if st.button("Remove Selected Edge"):
-        edges.remove(edge_to_remove)
+        try:
+            attr_dict = yaml.safe_load(attr_input) if attr_input.strip() else {}
+            new_edge = {"from": src, "to": tgt, "attributes": attr_dict or {}}
+            st.session_state.edges_state.append((src, tgt, new_edge))
+            st.success("Edge added.")
+            rerun()
+        except Exception as e:
+            st.error(f"Invalid attributes YAML: {e}")
 
-    # Update YAML
-    edge_dict = {}
-    for s, t in edges:
-        edge_dict.setdefault(s, []).append(t)
-    
+    # Remove edge
+    if st.session_state.edges_state:
+        edge_to_remove = st.selectbox(
+            "Remove Edge",
+            st.session_state.edges_state,
+            format_func=lambda e: f"{e[0]} -> {e[1]}"
+        )
+        if st.button("Remove Selected Edge"):
+            st.session_state.edges_state.remove(edge_to_remove)
+            st.success("Edge removed.")
+            rerun()
+
+    # Reconstruct YAML
+    reconstructed_nodes = [{name: attrs} for name, attrs in st.session_state.nodes_state]
+    reconstructed_edges = [edge_dict for _, _, edge_dict in st.session_state.edges_state]
+
     new_yaml = yaml.dump({
-        "nodes": nodes,
-        "edges": edge_dict
+        "nodes": reconstructed_nodes,
+        "edges": reconstructed_edges
     }, sort_keys=False)
 
-    st.text_area("Updated DAG YAML", new_yaml, height=300, key="updated_yaml_preview")
-    return new_yaml
+    st.markdown("### Preview Updated YAML")
+    st.text_area("DAG YAML", new_yaml, height=300, key="updated_yaml_preview")
+
+    # Save control
+    if st.button("Save Changes"):
+        return new_yaml
+
+    return None
+
 
 # Initialization of session state
 if "display_welcome_page" not in st.session_state:
