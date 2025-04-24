@@ -7,7 +7,6 @@
     "data_preprocessing": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/data_preprocessing.py",
     "model_training": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/model_training.py",
     "model_packaging": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/model_packaging.py",
-    "model_scoring": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/model_scoring.py",
-    "component_name": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/component_name.py"
+    "model_scoring": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/model_scoring.py"
   }
 }

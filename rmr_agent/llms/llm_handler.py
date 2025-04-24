@@ -57,8 +57,8 @@ class TokenManager:
     def __init__(self):
         self._token = None
         self._token_expiry = 0
-        self.tenant_id = "fb007914-6020-4374-977e-21bac5f3f4c8"
-        self.token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
+        self.tenant_id = os.getenv("AZURE_TENANT_ID")
+        self.token_url = os.getenv("AZURE_TOKEN_URL")
 
     def get_token(self):
         if self._token and time.time() < self._token_expiry:
@@ -67,7 +67,7 @@ class TokenManager:
         data = {
             "client_id": os.getenv("AZURE_CLIENT_ID"),
             "client_secret": os.getenv("AZURE_CLIENT_SECRET"),
-            "scope": "https://cognitiveservices.azure.com/.default",
+            "scope": os.getenv("AZURE_SCOPE"),
             "grant_type": "client_credentials"
         }
 
@@ -204,7 +204,7 @@ class AzureGPTHandler(LLMHandler):
         
         payload = {
             "messages": messages,
-            # "model": "gpt-4",  # may be configurable - for now hard coding to gpt-4o
+            # "model": os.getenv("MODEL_NAME", "gpt-4o"),  # may be configurable - for now hard coding to gpt-4o
             "temperature": kwargs.get('temperature', 0.0),  
             "max_tokens": kwargs.get('max_tokens', 2048),  
             "top_p": kwargs.get('top_p', 0.3),  
@@ -219,13 +219,13 @@ class AzureGPTHandler(LLMHandler):
         headers = {
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json',
-            'Cookie': 'ApplicationGatewayAffinity=5782715754db1293aaa82867cac4107a; ApplicationGatewayAffinityCORS=5782715754db1293aaa82867cac4107a'
+            'Cookie': os.getenv("AUTH_COOKIE")
         }
         return headers
     
     def create_params(self):
         params = {
-            "api-version": "2024-02-15-preview" # hard coding for gpt-4o for now
+            "api-version": os.getenv("AZURE_API_VERSION") 
         }
         return params
     
@@ -266,8 +266,8 @@ class AzureGPTHandler(LLMHandler):
 
 
 class LLMClient:
-    def __init__(self, model_name: str):
-        self.model_name = model_name
+    def __init__(self, model_name: Optional[str] = None):
+        self.model_name = os.getenv("MODEL_NAME")
 
         open_url = open_models.get(model_name, "")
         if open_url:
@@ -275,7 +275,7 @@ class LLMClient:
             self.url = open_url
         else:
             self.handler = AzureGPTHandler()
-            self.url = "https://genai-wus2-tdz01.paypalcorp.com/brebot/openai/deployments/gpt-4o/chat/completions"  # "http://10.183.170.134:8001/api/llm/" # "http://10.183.170.134:8001/api/llm/" # codepal LLM endpoint  # "http://host.docker.internal:8001/api/llm/"
+            self.url = os.getenv("GENAI_API_URL")# "http://10.183.170.134:8001/api/llm/" # "http://10.183.170.134:8001/api/llm/" # codepal LLM endpoint  # "http://host.docker.internal:8001/api/llm/"
     
     def call_llm(self, 
                  prompt: str = "",
@@ -322,7 +322,7 @@ class LLMClient:
 if __name__ == "__main__":
     #model_name = "deepseek"
     #model_name = "gpt-4-turbo"
-    model_name = "gpt-4o"
+    # model_name = "gpt-4o"
 
     def _history_to_messages(history):
         def get_role(history_item) -> str:
@@ -368,11 +368,11 @@ if __name__ == "__main__":
     messages = _history_to_messages(history)
     print(messages_to_prompt(messages))
 
-    input_tokens: int = litellm.utils.token_counter(messages=messages, model=model_name) # defaults to tiktoken general token counter if that model name does not match
+    input_tokens: int = litellm.utils.token_counter(messages=messages) # defaults to tiktoken general token counter if that model name does not match
     print("input tokens:", input_tokens)
     #exit()
 
-    llm_client = LLMClient(model_name=model_name)
+    llm_client = LLMClient()
     response = llm_client.call_llm(
         #messages=messages,
         prompt="hello",
