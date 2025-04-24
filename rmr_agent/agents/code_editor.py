@@ -47,17 +47,16 @@ def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
     # ==================    Code Cleanning Part ======================
 
     prompt_editor = f"""
-    You are an AI agent responsible for cleaning and formatting messy Python code. 
+    You are an AI agent responsible for cleaning and formatting messy Python code into readable, well-organized scripts or Jupyter Notebooks. 
 
     Your instructions:
     1. Do not delete any of the original code (unless there is clearly duplicated code). 
     Especially following code:
     ## gsutil authentication
     %ppauth
-    2. Format the code using standard Jupyter Notebook style (PEP 8-compliant). 
-    3. Fix indentation and spacing to comply with PEP 8 and ensure the code runs smoothly in a Jupyter Notebook environment.
-    4. Format the code into logical blocks, separated by two blank lines. Each block should reflect a meaningful code unit for conversion to Jupyter Notebook cells.
-    5. Output only the raw Python code — do not include any explanations, comments, or Markdown formatting (e.g., ```python or ``` ).
+    2. Fix indentation and spacing to comply with PEP 8 and ensure the code runs smoothly in a Jupyter Notebook environment.
+    3. Format the code into logical blocks, separated by two blank lines, avoid splitting the script into overly short chunks. Each block should reflect a meaningful code unit for conversion to Jupyter Notebook cells.
+    4. Output only the raw Python code — do not include any explanations, comments, or Markdown formatting (e.g., ```python or ``` ).
 
     Here is the Python script:
     {modified_code}

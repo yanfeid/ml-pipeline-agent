@@ -1,74 +1,60 @@
 {
   "edited_notebooks": {
     "driver_creation": {
-      "candidate": [],
-      "categorical": [],
-      "feature": [],
-      "meta": [],
-      "var_analysis": [],
-      "vc_candidate": [],
-      "other": [
-        "storeid",
-        "encryptedid",
-        "store_id",
-        "name",
-        "max_cash_back",
-        "last_ingestion_utc_time",
-        "customer_id",
-        "gpt_1st_category_l2_index",
-        "honey_store_id",
-        "honey_store_name",
-        "cashback_percent",
-        "encrypt_id",
+      "candidate": [
+        "cust_id",
         "rcvr_id",
+        "run_date",
+        "gpt_1st_category_l2_index",
+        "merchant_ratio",
+        "merchant_sampling_ratio"
+      ],
+      "categorical": [
         "placement",
         "client_os",
         "devc_type",
         "rfmbc_seg",
         "consu_dmgrphc_seg",
         "consu_age_band",
-        "consu_inc_band",
+        "consu_inc_band"
+      ],
+      "feature": [
+        "save",
+        "leap_aft_txn",
         "saves_clk_unique_cnt",
         "saves_outclick_unique_cnt",
         "saves_save_unique_cnt",
         "saves_leap_txns",
-        "saves_left_aft_txn",
-        "saves_imp_unique_cnt",
-        "cnt_placement",
+        "saves_left_aft_txn"
+      ],
+      "meta": [
+        "honey_store_id",
+        "honey_store_name",
+        "encrypt_id",
         "payment_transid",
-        "tran_customer_id",
-        "customer_counterparty",
         "transaction_created_date",
-        "transaction_status",
-        "total_cnt",
+        "transaction_status"
+      ],
+      "var_analysis": [],
+      "vc_candidate": [],
+      "other": [
+        "storeid",
+        "encryptedid",
+        "customer_id",
+        "pp_merchant_id",
+        "cnt_placement",
         "cnt",
+        "total_cnt",
         "merchant_ratio",
         "merchant_sampling_ratio",
         "pos_tag_type",
-        "split",
-        "day_pos_cnt",
-        "hard_negative_id",
-        "hard_negative_impression_date"
+        "split"
       ]
     },
     "feature_engineering": {
       "candidate": [],
       "categorical": [],
-      "feature": [],
-      "meta": [],
-      "var_analysis": [],
-      "vc_candidate": [],
-      "other": [
-        "run_date_7d",
-        "run_date_30d",
-        "run_date_180d",
-        "run_date_365d",
-        "payment_transid",
-        "transaction_created_date",
-        "transaction_usd_equiv_amt",
-        "cust_id",
-        "rcvr_id",
-        "run_date",
+      "feature": [
         "sndr_rcvr_txn_num_7d",
         "sndr_rcvr_txn_num_30d",
         "sndr_rcvr_txn_num_180d",
@@ -77,18 +63,26 @@
         "sndr_rcvr_txn_amt_30d",
         "sndr_rcvr_txn_amt_180d",
         "sndr_rcvr_txn_amt_365d",
-        "customer_counterparty",
+        "recency_rank"
+      ],
+      "meta": [
+        "cust_id",
+        "rcvr_id",
+        "run_date",
+        "run_date_7d",
+        "run_date_30d",
+        "run_date_180d",
+        "run_date_365d",
+        "payment_transid",
+        "transaction_created_date",
         "transaction_created_ts",
+        "transaction_usd_equiv_amt"
+      ],
+      "var_analysis": [],
+      "vc_candidate": [],
+      "other": [
         "gpt_1st_category_l2_index",
-        "recency_rank",
-        "sndr_last_1_txn_amt",
-        "sndr_last_5_txn_avg_amt",
-        "sndr_last_10_txn_avg_amt",
-        "sndr_most_recent_100_merch_list",
-        "sndr_most_recent_100_merch_category",
-        "rcvr_gpt_1st_category_l2_index",
-        "sndr_category_breadth_30d",
-        "sndr_category_breadth_180d"
+        "customer_counterparty"
       ]
     },
     "data_pulling": {
@@ -101,14 +95,28 @@
       "other": []
     },
     "feature_consolidation": {
-      "candidate": [],
+      "candidate": [
+        "driver_simu_txn_365d_agg",
+        "driver_consumer_base_last_10_txn",
+        "driver_consumer_base_all_history_array",
+        "driver_combine_category_agg_3",
+        "driver_combine_category_agg_5",
+        "driver_merchant_base_price_agg",
+        "driver_merchant_base_sales_agg",
+        "driver_elig_save_agg_00",
+        "driver_elig_save_agg_0",
+        "driver_elig_save_agg_3",
+        "driver_merchant_base_click_save",
+        "driver_simu_consumer_varmart_external",
+        "pypl_bods_honey_merch_quality_scores",
+        "store_recommendation_kg_embedding",
+        "gs"
+      ],
       "categorical": [
-        "sndr_most_recent_100_merch_list",
-        "sndr_most_recent_100_merch_category",
         "gender",
-        "ebay_member_y_n",
-        "prmry_cc_type_code",
-        "prmry_addr_state"
+        "sndr_ebay_member_y_n",
+        "sndr_prmry_cc_type_code",
+        "sndr_prmry_addr_state"
       ],
       "feature": [
         "sndr_rcvr_txn_num_30d",
@@ -119,6 +127,8 @@
         "sndr_rcvr_txn_amt_365d",
         "sndr_last_5_txn_avg_amt",
         "sndr_last_10_txn_avg_amt",
+        "sndr_most_recent_100_merch_list",
+        "sndr_most_recent_100_merch_category",
         "sndr_rcvr_category_breadth_30d",
         "sndr_rcvr_category_breadth_180d",
         "sndr_rcvr_category_breadth_365d",
@@ -211,7 +221,15 @@
         "embedding_16",
         "embedding_17",
         "embedding_18",
-        "embedding_19"
+        "embedding_19",
+        "embedding_20",
+        "embedding_21",
+        "embedding_22",
+        "embedding_23",
+        "embedding_24",
+        "embedding_25",
+        "embedding_26",
+        "embedding_27"
       ],
       "meta": [
         "mo_name",
@@ -222,170 +240,58 @@
         "queue_name",
         "check_point",
         "state_file",
-        "driver_dev",
-        "driver_consumer_base_gender",
+        "bq_prefix_driver_dev",
+        "bq_prefix_driver_consumer_base_gender",
         "data_loc"
       ],
       "var_analysis": [],
       "vc_candidate": [],
-      "other": [
-        "driver_simu_txn_365d_agg",
-        "driver_consumer_base_last_10_txn",
-        "driver_consumer_base_all_history_array",
-        "driver_combine_category_agg_3",
-        "driver_combine_category_agg_5",
-        "driver_merchant_base_price_agg",
-        "driver_merchant_base_sales_agg",
-        "driver_elig_save_agg_00",
-        "driver_elig_save_agg_0",
-        "driver_elig_save_agg_3",
-        "driver_merchant_base_click_save",
-        "pypl_bods_gds_pacman_prod_ql_store_honey_merch_quality_scores_external",
-        "driver_simu_consumer_varmart_external",
-        "pypl_bods_gds_pacman_prod_store_recommendation_kg_embedding_32_v2",
-        "gs"
-      ]
+      "other": []
     },
     "data_preprocessing": {
       "candidate": [],
       "categorical": [
         "sndr_prmry_addr_state",
+        "categorical_features"
+      ],
+      "feature": [
+        "numeric_features",
+        "hist_gpt_1st_category_l2_index",
+        "hist_rcvr_id",
+        "rcvr_id"
+      ],
+      "meta": [
         "sndr_most_recent_100_merch_category",
         "sndr_most_recent_100_merch_list"
       ],
-      "feature": [
-        "categorical_features",
-        "numeric_features"
-      ],
-      "meta": [],
       "var_analysis": [],
       "vc_candidate": [],
-      "other": [
-        "rcvr_id"
-      ]
+      "other": []
     },
     "model_training": {
       "candidate": [],
-      "categorical": [],
-      "feature": [
-        "sndr_rcvr_txn_num_30d",
-        "sndr_rcvr_txn_num_180d",
-        "sndr_rcvr_txn_num_365d",
-        "sndr_rcvr_txn_amt_30d",
-        "sndr_rcvr_txn_amt_180d",
-        "sndr_rcvr_txn_amt_365d",
-        "sndr_last_5_txn_avg_amt",
-        "sndr_last_10_txn_avg_amt",
-        "sndr_rcvr_category_breadth_30d",
-        "sndr_rcvr_category_breadth_180d",
-        "sndr_rcvr_category_breadth_365d",
-        "sndr_rcvr_category_txn_num_30d",
-        "sndr_rcvr_category_txn_num_180d",
-        "sndr_rcvr_category_txn_num_365d",
-        "sndr_rcvr_category_txn_amt_30d",
-        "sndr_rcvr_category_txn_amt_180d",
-        "sndr_rcvr_category_txn_amt_365d",
-        "sndr_rcvr_category_avg_txn_amt_30d",
-        "sndr_rcvr_category_avg_txn_amt_180d",
-        "sndr_rcvr_category_avg_txn_amt_365d",
-        "sndr_1st_freq_merchant_category_cnt_30d",
-        "sndr_2nd_freq_merchant_category_cnt_30d",
-        "sndr_3rd_freq_merchant_category_cnt_30d",
-        "sndr_1st_freq_merchant_category_cnt_180d",
-        "sndr_2nd_freq_merchant_category_cnt_180d",
-        "sndr_3rd_freq_merchant_category_cnt_180d",
-        "sndr_1st_freq_merchant_category_cnt_365d",
-        "sndr_2nd_freq_merchant_category_cnt_365d",
-        "sndr_3rd_freq_merchant_category_cnt_365d",
-        "rcvr_avg_price_30d",
-        "rcvr_price_10_penentile_30d",
-        "rcvr_price_30_penentile_30d",
-        "rcvr_price_50_penentile_30d",
-        "rcvr_price_70_penentile_30d",
-        "rcvr_price_90_penentile_30d",
-        "rcvr_rcvd_txn_num_30d",
-        "rcvr_rcvd_distinct_consumer_num_30d",
-        "rcvr_rcvd_txn_amt_30d",
-        "sndr_last_1_txn_avg_amt_rcvr_avg_price_diff",
-        "sndr_last_1_txn_avg_amt_rcvr_median_price_diff",
-        "sndr_last_5_txn_avg_amt_rcvr_avg_price_diff",
-        "sndr_last_5_txn_avg_amt_rcvr_median_price_diff",
-        "sndr_last_10_txn_avg_amt_rcvr_avg_price_diff",
-        "sndr_last_10_txn_avg_amt_rcvr_median_price_diff",
-        "sndr_rcvr_num_save_7day",
-        "sndr_rcvr_num_save_30day",
-        "sndr_rcvr_num_save_180day",
-        "sndr_num_save_7day",
-        "sndr_num_save_30day",
-        "sndr_num_save_180day",
-        "sndr_rcvr_num_sameindustry_save_7day",
-        "sndr_rcvr_num_sameindustry_save_30day",
-        "sndr_rcvr_num_sameindustry_save_180day",
-        "rcvr_save_cnt_30d",
-        "rcvr_save_cnt_deals_explore_tertiary_30d",
-        "rcvr_save_cnt_ql_home_30d",
-        "rcvr_save_cnt_rewards_zone_new_30d",
-        "rcvr_save_cnt_reboarding_30d",
-        "rcvr_save_cnt_high_engaged_30d",
-        "rcvr_save_cnt_mid_engaged_30d",
-        "rcvr_save_cnt_low_engaged_30d",
-        "rcvr_save_cnt_likely_to_churn_30d",
-        "rcvr_save_cnt_new_not_active_30d",
-        "rcvr_save_cnt_never_active_30d",
-        "rcvr_save_cnt_churned_30d",
-        "rcvr_save_cnt_re_engaged_30d",
-        "rcvr_save_cnt_new_active_30d",
-        "sndr_days_on_file",
-        "sndr_days_appweb_visit",
-        "rcvr_tpv_score",
-        "embedding_1",
-        "embedding_2",
-        "embedding_3",
-        "embedding_4",
-        "embedding_5",
-        "embedding_6",
-        "embedding_7",
-        "embedding_8",
-        "embedding_9",
-        "embedding_10",
-        "embedding_11",
-        "embedding_12",
-        "embedding_13",
-        "embedding_14",
-        "embedding_15",
-        "embedding_16",
-        "embedding_17",
-        "embedding_18",
-        "embedding_19",
-        "embedding_20",
-        "embedding_21",
-        "embedding_22",
-        "embedding_23",
-        "embedding_24",
-        "embedding_25",
-        "embedding_26",
-        "embedding_27",
-        "embedding_28",
-        "embedding_29",
-        "embedding_30",
-        "embedding_31",
-        "embedding_32"
-      ],
-      "meta": [],
-      "var_analysis": [],
-      "vc_candidate": [],
-      "other": [
+      "categorical": [
         "sndr_prmry_addr_state",
         "sndr_consu_engagmnt_seg_key",
         "sndr_ebay_member_y_n",
         "gender",
         "sndr_prmry_cc_type_code",
         "sndr_consu_age_band_key",
-        "sndr_consu_dmgrphc_seg_key",
+        "sndr_consu_dmgrphc_seg_key"
+      ],
+      "feature": [
         "hist_rcvr_id",
-        "hist_gpt_1st_category_l2_index",
-        "target",
-        "split"
+        "hist_gpt_1st_category_l2_index"
+      ],
+      "meta": [
+        "split",
+        "target"
+      ],
+      "var_analysis": [],
+      "vc_candidate": [],
+      "other": [
+        "rcvr_id",
+        "gpt_1st_category_l2_index"
       ]
     },
     "model_packaging": {
@@ -395,13 +301,13 @@
         "hist_rcvr_id"
       ],
       "feature": [],
-      "meta": [],
-      "var_analysis": [],
-      "vc_candidate": [],
-      "other": [
+      "meta": [
         "cust_id",
         "run_date"
-      ]
+      ],
+      "var_analysis": [],
+      "vc_candidate": [],
+      "other": []
     },
     "model_scoring": {
       "candidate": [],
@@ -410,43 +316,7 @@
       "meta": [],
       "var_analysis": [],
       "vc_candidate": [],
-      "other": [
-        "oot_data_path",
-        "eval_result_path",
-        "m_file_list",
-        "score_list",
-        "keep_cols"
-      ]
-    },
-    "component_name": {
-      "candidate": [
-        "candidate_col1",
-        "candidate_col2"
-      ],
-      "categorical": [
-        "cat_col1",
-        "cat_col2"
-      ],
-      "feature": [
-        "feature_col1",
-        "feature_col2"
-      ],
-      "meta": [
-        "meta_col1",
-        "meta_col2"
-      ],
-      "var_analysis": [
-        "var_analysis_col1",
-        "var_analysis_col2"
-      ],
-      "vc_candidate": [
-        "vc_candidate_col1",
-        "vc_candidate_col2"
-      ],
-      "other": [
-        "unexpected_col1",
-        "unexpected_col2"
-      ]
+      "other": []
     }
   }
 }
