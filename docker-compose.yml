@@ -1,0 +1,27 @@
+version: "3.8"
+services:
+  rmr-agent-api:
+    image: rmr-agent:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    networks:
+      - rmr-agent-network
+
+  rmr-agent-frontend:
+    image: rmr-agent-frontend:test
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "8501:8501"
+    networks:
+      - rmr-agent-network
+
+networks:
+  rmr-agent-network:
+    driver: bridge

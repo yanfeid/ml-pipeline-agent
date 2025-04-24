@@ -10,14 +10,14 @@
           },
           {
             "quote_or_paraphrase": "Creates a new table with detailed information about primary and retry transactions, including various attributes related to the transaction, payment method, customer, merchant, processor, and response type.",
-            "support_reason": "This step involves creating a comprehensive dataset with essential transaction details, which is part of the driver creation process."
+            "support_reason": "This step involves creating a comprehensive dataset with essential attributes, which is a key part of driver creation."
           },
           {
             "quote_or_paraphrase": "Creates separate tables for training, validation, and test datasets by randomly sampling transactions across the entire time period.",
-            "support_reason": "This step finalizes the driver dataset by splitting it into training, validation, and test sets, which is a key part of driver creation."
+            "support_reason": "This final step in the process involves splitting the data into train, validation, and test sets, which is a crucial part of the driver creation process."
           }
         ],
-        "why_this_is_separate": "The entire process from lines 4 to 1115 involves creating and preparing the driver dataset, which includes data extraction, transformation, and splitting into train, validation, and test sets. This is a distinct and comprehensive step in the ML pipeline that does not overlap with other components.",
+        "why_this_is_separate": "The entire code summary describes a sequence of operations that collectively form the driver creation process. There is no indication of distinct, non-overlapping components that would warrant splitting this into separate ML workflow nodes. The operations described are all part of the initial data loading, extraction, and preparation to create the driver dataset.",
         "file_name": "rmr_agent/repos/bt-retry-v2/etl/01_etl.py"
       }
     },
@@ -26,19 +26,19 @@
         "line_range": "1-40",
         "evidence": [
           {
-            "quote_or_paraphrase": "Defines a function to read data from a BigQuery table and write it to another BigQuery table.",
-            "support_reason": "This indicates the initial data loading and extraction process, which is a key part of driver creation."
+            "quote_or_paraphrase": "Sets up Spark configuration to use BigQuery connector.",
+            "support_reason": "This indicates the initial setup for data extraction from BigQuery, which is a key part of creating the driver dataset."
           },
           {
-            "quote_or_paraphrase": "Defines a function to read data from a BigQuery table and write it to Google Cloud Storage in Parquet format.",
-            "support_reason": "This shows the process of saving the final driver dataset to GCS, which is a typical step in driver creation."
+            "quote_or_paraphrase": "Defines a function to read data from a BigQuery table and write it to another BigQuery table.",
+            "support_reason": "This function is involved in extracting and loading data, which is essential for creating the driver dataset."
           },
           {
             "quote_or_paraphrase": "Specifies source BigQuery tables and target GCS paths for training, validation, and test datasets.",
-            "support_reason": "This confirms the creation of the driver dataset with the necessary splits for training, validation, and testing."
+            "support_reason": "This step involves specifying and creating the final driver datasets, which are saved to GCS."
           }
         ],
-        "why_this_is_separate": "The lines from 17 to 38 are focused on the creation of the driver dataset, including reading from BigQuery and writing to GCS. This is distinct from the initial configuration settings (lines 1-16) and does not overlap with other components. This process results in the final driver dataset, which is a primary element in the ML workflow.",
+        "why_this_is_separate": "The entire code summary focuses on setting up configurations, reading data from BigQuery, and writing it to GCS. These steps are all part of the Driver Creation process and do not overlap with other ML components such as Feature Engineering or Model Training. The code is clearly focused on creating the initial driver dataset, which is a distinct and independent step in the ML workflow.",
         "file_name": "rmr_agent/repos/bt-retry-v2/etl/02_bq_to_dataproc.py"
       }
     },
@@ -47,38 +47,38 @@
         "line_range": "1-299",
         "evidence": [
           {
-            "quote_or_paraphrase": "Train the model on the training data.",
-            "support_reason": "This indicates the process of fitting the model to the training dataset, which is a key aspect of model training."
+            "quote_or_paraphrase": "Train LightGBM model and evaluate metrics",
+            "support_reason": "This section explicitly mentions training the LightGBM model, which falls under the Model Training category."
           },
           {
-            "quote_or_paraphrase": "Predict probabilities on the validation data and evaluate metrics.",
-            "support_reason": "This shows that the model's performance is being evaluated on the validation dataset, which is typically part of the model training process."
+            "quote_or_paraphrase": "Train the model on the training data",
+            "support_reason": "This line indicates the actual process of fitting the model to the training data, a key aspect of Model Training."
           },
           {
-            "quote_or_paraphrase": "Define best parameters for the LightGBM model.",
-            "support_reason": "Setting the parameters for the model is a crucial step in the training process."
+            "quote_or_paraphrase": "Predict probabilities on the validation data and evaluate metrics",
+            "support_reason": "While this includes evaluation, it is part of the model training process to validate the model's performance."
           }
         ],
-        "why_this_is_separate": "This section is focused on training the LightGBM model and evaluating its performance on the validation dataset. It does not overlap with other components such as data loading, preprocessing, or hyperparameter tuning, which are handled in different sections of the code.",
+        "why_this_is_separate": "This section is distinct from other components as it specifically deals with the training of the LightGBM model. It does not overlap with data loading, preprocessing, or hyperparameter tuning sections.",
         "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/train.py"
       },
       "Hyperparameter Tuning": {
         "line_range": "300-367",
         "evidence": [
           {
-            "quote_or_paraphrase": "Set up and run hyperparameter tuning with Optuna.",
-            "support_reason": "This indicates the use of Optuna for optimizing the model's hyperparameters, which is a distinct process from model training."
+            "quote_or_paraphrase": "Set up and run hyperparameter tuning with Optuna",
+            "support_reason": "This section is dedicated to setting up and running hyperparameter tuning, which is a separate process from model training."
           },
           {
-            "quote_or_paraphrase": "Define the objective function for Optuna, including model training and metric evaluation.",
-            "support_reason": "The objective function for hyperparameter tuning involves training the model multiple times with different hyperparameters, which is a separate process from the initial model training."
+            "quote_or_paraphrase": "Define the objective function for Optuna, including model training and metric evaluation",
+            "support_reason": "This line indicates the use of Optuna for hyperparameter tuning, which involves defining an objective function that includes model training."
           },
           {
-            "quote_or_paraphrase": "Run the Optuna study to optimize hyperparameters and save the study results.",
-            "support_reason": "This confirms that the code is executing a hyperparameter optimization process, which is distinct from the initial model training."
+            "quote_or_paraphrase": "Run the Optuna study to optimize hyperparameters and save the study results",
+            "support_reason": "This line confirms the execution of the hyperparameter tuning process, which is distinct from the initial model training."
           }
         ],
-        "why_this_is_separate": "Hyperparameter tuning is a separate process from the initial model training. It involves running multiple training iterations with different hyperparameters to find the optimal set. This process is distinct and does not overlap with the initial model training or other components.",
+        "why_this_is_separate": "This section is focused on optimizing the model's hyperparameters using Optuna, which is a separate process from the initial model training. It does not overlap with the model training section and warrants its own workflow node.",
         "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/train.py"
       }
     },
@@ -87,19 +87,19 @@
         "line_range": "1-383",
         "evidence": [
           {
-            "quote_or_paraphrase": "Predicts scores using the models and evaluates metrics on the predictions.",
-            "support_reason": "This indicates that the code is calculating performance metrics based on model predictions, which is a key aspect of model evaluation."
+            "quote_or_paraphrase": "Evaluate models and calculate metrics (Lines 261-285)",
+            "support_reason": "This section involves predicting scores using the models and evaluating metrics on the predictions, which aligns with the Model Evaluation component."
           },
           {
             "quote_or_paraphrase": "Calculates precision, recall, and AUC for the models.",
-            "support_reason": "These are standard evaluation metrics used to assess the performance of a model on a dataset, confirming that this section is focused on model evaluation."
+            "support_reason": "The calculation of performance metrics such as precision, recall, and AUC is a key aspect of Model Evaluation."
           },
           {
-            "quote_or_paraphrase": "Evaluate models and calculate metrics",
-            "support_reason": "The summary explicitly states that this section is dedicated to evaluating models and calculating relevant metrics."
+            "quote_or_paraphrase": "Predicts scores using the models and evaluates metrics on the predictions.",
+            "support_reason": "The process of predicting scores and evaluating metrics on those predictions is central to Model Evaluation."
           }
         ],
-        "why_this_is_separate": "This section is distinct from other parts of the code as it specifically deals with evaluating the performance of the models using various metrics. It does not overlap with data loading, preprocessing, or plotting, making it a clear candidate for a separate ML workflow node focused on Model Evaluation.",
+        "why_this_is_separate": "This section is distinct from other parts of the code as it specifically focuses on evaluating the performance of the models using various metrics. It does not overlap with data loading, preprocessing, or plotting, making it a clear candidate for a separate ML workflow node.",
         "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py"
       }
     },
@@ -109,18 +109,18 @@
         "evidence": [
           {
             "quote_or_paraphrase": "Loads a LightGBM model from a specified text file.",
-            "support_reason": "Loading the model is a prerequisite step for packaging it into a deployment-ready format."
+            "support_reason": "Loading the model is a prerequisite step for packaging it."
           },
           {
             "quote_or_paraphrase": "Dumps the model into a JSON format.",
-            "support_reason": "Converting the model into a JSON format is part of the process of preparing it for deployment."
+            "support_reason": "Converting the model into a different format is a key part of packaging."
           },
           {
             "quote_or_paraphrase": "Generates a binary specification for the model.",
-            "support_reason": "Creating a binary specification is a key step in packaging the model for deployment."
+            "support_reason": "Creating a binary specification is part of preparing the model for deployment."
           }
         ],
-        "why_this_is_separate": "There is no overlap with other identified components' line ranges. The steps from loading the model to transforming it into UME format are distinct and focused on preparing the model for deployment, which fits the 'Model Packaging' category.",
+        "why_this_is_separate": "This section of the code is focused on preparing and converting the model into a deployment-ready format, which is distinct from other ML components like training or evaluation. There is no overlap with other components in the provided summary.",
         "file_name": "rmr_agent/repos/bt-retry-v2/deployment/01_export_to_ume.py"
       }
     },
@@ -130,18 +130,18 @@
         "evidence": [
           {
             "quote_or_paraphrase": "Loads the UME model from a file and makes predictions on the validation sample.",
-            "support_reason": "This indicates that the model is being used to make predictions, which is a key aspect of model scoring."
+            "support_reason": "This indicates the model is being used to make predictions, which aligns with the Model Scoring component."
           },
           {
             "quote_or_paraphrase": "Filters the predictions to remove rows with missing values in the `mcc_code` column.",
             "support_reason": "Filtering predictions is part of the scoring process to ensure the quality of the output."
           },
           {
-            "quote_or_paraphrase": "Saves the first 5000 rows of filtered predictions to a CSV file.",
-            "support_reason": "Saving the predictions to a file is a typical step after scoring the model."
+            "quote_or_paraphrase": "Iterates over the first 10 samples, converting each to a dictionary for individual predictions.",
+            "support_reason": "This further confirms that the code is focused on generating predictions from the model."
           }
         ],
-        "why_this_is_separate": "There is no overlap with other identified components' line ranges. This section specifically deals with making predictions using the trained model and handling the output, which is distinct from other processes like data preprocessing or feature engineering.",
+        "why_this_is_separate": "There is no overlap with other identified components' line ranges. This section is distinct because it specifically deals with using the trained model to generate predictions on the validation sample, which is a separate step from other processes like data preprocessing or feature engineering.",
         "file_name": "rmr_agent/repos/bt-retry-v2/deployment/02_pyscoring_validation.py"
       }
     }

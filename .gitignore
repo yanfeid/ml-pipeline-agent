@@ -3,3 +3,4 @@ venv/
 .env
 lib/
 rmr_agent/repos/ql-store-recommendation-prod/
+rmr_agent.egg-info/

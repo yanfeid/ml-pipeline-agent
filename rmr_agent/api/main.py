@@ -97,6 +97,9 @@ def run_workflow_background(request: WorkflowRequest, repo_name: str, run_id: st
         state["status"] = "failed"
         state["error"] = str(e)
 
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
 
 @app.get("/workflow-status/{repo_name}")
 def get_workflow_status(
