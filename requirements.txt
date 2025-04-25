@@ -14,6 +14,7 @@ charset-normalizer==3.4.1
 click==8.1.8
 distro==1.9.0
 fastapi==0.115.11
+fastjsonschema==2.21.1
 filelock==3.17.0
 frozenlist==1.5.0
 fsspec==2025.2.0
@@ -32,6 +33,8 @@ jsonpatch==1.33
 jsonpointer==3.0.0
 jsonschema==4.23.0
 jsonschema-specifications==2024.10.1
+jupyter_core==5.7.2
+jupytext==1.17.0
 langchain-core==0.3.41
 langgraph==0.3.5
 langgraph-checkpoint==2.0.16
@@ -40,16 +43,21 @@ langgraph-prebuilt==0.1.1
 langgraph-sdk==0.1.53
 langsmith==0.3.11
 litellm==1.62.1
+markdown-it-py==3.0.0
 MarkupSafe==3.0.2
+mdit-py-plugins==0.4.2
+mdurl==0.1.2
 msgpack==1.1.0
 multidict==6.1.0
 narwhals==1.30.0
+nbformat==5.10.4
 numpy==2.2.3
 openai==1.65.3
 orjson==3.10.15
 packaging==24.2
 pandas==2.2.3
 pillow==11.1.0
+platformdirs==4.3.7
 pluggy==1.5.0
 propcache==0.3.0
 protobuf==5.29.3
@@ -79,6 +87,7 @@ tokenizers==0.21.0
 toml==0.10.2
 tornado==6.4.2
 tqdm==4.67.1
+traitlets==5.14.3
 typing_extensions==4.12.2
 tzdata==2025.1
 urllib3==2.3.0
