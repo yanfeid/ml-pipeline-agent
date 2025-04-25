@@ -131,7 +131,7 @@ def parse_attribute_identification(component_identification_dict, attribute_text
         config_fill_prompt = f"""\n### Config values to use to fill in the variable values:\n{config_content}"""
         parse_prompt += config_fill_prompt
     
-    llm_client = LLMClient(model_name="gpt-4o")
+    llm_client = LLMClient()
     response: litellm.types.utils.ModelResponse = llm_client.call_llm(
         prompt=parse_prompt,
         max_tokens=2048,
