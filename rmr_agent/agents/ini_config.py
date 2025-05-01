@@ -1,9 +1,9 @@
 import os
 import re
 import yaml
-from llms import LLMClient 
+from rmr_agent.llms import LLMClient
 from typing import Dict, Any
-from utils import save_ini_file
+from rmr_agent.utils import save_ini_file
 
 # ========== **Extract .ini Content from AI Response** ==========
 def extract_ini_content(response):
@@ -30,26 +30,22 @@ def extract_ini_content(response):
     return response_text
 
 # ========== **Filter duplicate lines** ==========
-def filter_duplicate_value_lines(ini_str):
-    """
-    Filter duplicated lines by value (after '=') across sections,
-    but completely preserve lines under [general] section.
-    Also always preserve lines with empty value (e.g., key=),
-    and blank lines.
+def filter_duplicate_value_lines(ini_str, verified_dag):
 
-    :param ini_str: The original ini-format string
-    :return: The filtered ini string
-    """
-    seen_values = set()
+    controlled_params = set()
+    seen_controlled_params = set()
+
+    for edge in verified_dag.get("edges", []):
+        attributes = edge.get("attributes", {})
+        for param_name in attributes.keys():
+            controlled_params.add(param_name)
+
     filtered_lines = []
-
     current_section = None
-    preserve_section = "general"  # section to skip filtering
 
     for line in ini_str.splitlines():
         stripped = line.strip()
 
-        # Detect section headers
         if stripped.startswith("[") and stripped.endswith("]"):
             current_section = stripped.strip("[]").lower()
             filtered_lines.append(line)
@@ -61,20 +57,22 @@ def filter_duplicate_value_lines(ini_str):
 
         if "=" in line:
             key, value = line.split("=", 1)
+            key = key.strip()
             value = value.strip()
 
-            if current_section == preserve_section:
-                filtered_lines.append(line)
-            elif value == "":
-                filtered_lines.append(line)
-            elif value not in seen_values:
-                seen_values.add(value)
+            if key in controlled_params:
+                if key not in seen_controlled_params:
+                    filtered_lines.append(line)
+                    seen_controlled_params.add(key)
+                else:
+                    continue
+            else:
                 filtered_lines.append(line)
         else:
-            # Non key=value line, keep it
             filtered_lines.append(line)
 
     return "\n".join(filtered_lines)
+
 
 
 # ========== **Replace hard-coded params with general configurable params in env.ini** ==========
@@ -121,6 +119,7 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     """
 
     # Load YAML structure directly from verified_dag
+
     llm_client = LLMClient(model_name=llm_model)
 
     # ========== **Step 1: AI agent generates environment.ini content** ==========
@@ -164,15 +163,15 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     - **Check for User Name:** Review the directory structure to identify if a user name (or owner) is present.
     - If detected, treat that directory segment as the username.
 
-    3. **Dataproc Project & Storage Bucket**
-    - **Dataproc Project Name:** Identify keywords such as `gcp_project_id`, `project_name`, etc., to determine the project name.
-    - **Dataproc Storage Bucket:** Identify keywords such as `gcs_bucket_name`, `bucket_name`, `bucket_id`, etc., to determine the storage bucket name.
+    3. **dataproc_project_name & dataproc_storage_bucket**
+    - **dataproc_project_name:** Identify keywords such as `gcp_project_id`, `project_name`, etc., to determine the project name. Set to blank if not provided. If unsure, leave blank. 
+    - **dataproc_storage_bucket:** Identify keywords such as `gcs_bucket_name`, `bucket_name`, `bucket_id`, etc., to determine the storage bucket name. Set to blank if not provided.
 
     4. **Path Analysis**
-    - **Local Output Base Path:**
+    - **local_output_base_path:**
         - Identify paths containing keywords like “local” (typically starting with `/projects`).
         - Extract the longest common directory path.
-    - **GCS Base Path:**
+    - **gcs_base_path:**
         - Detect paths starting with `gs://`.
         - Extract the longest common directory path.
 
@@ -314,18 +313,19 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
 
     try:
         env_vars = parse_env_ini(environment_ini_str)
-        solution_ini_str = replace_with_env_vars(filter_duplicate_value_lines(extract_ini_content(response_solution)),env_vars)
+        print(f"verified_dag = {repr(verified_dag)}")
+
+        solution_ini_str = replace_with_env_vars(filter_duplicate_value_lines(extract_ini_content(response_solution),yaml.safe_load(verified_dag)),env_vars)
 
         result = {
             "environment_ini": environment_ini_str,
             "solution_ini": solution_ini_str
         }
+        return result
 
     except ValueError as e:
         print(f"⚠️ Error extracting .ini content: {e}")
-
-    return result
-
+        raise  
     
  # ========== **Step 3: Simple Unit Test Code** ==========
 if __name__ == "__main__":
@@ -349,6 +349,4 @@ if __name__ == "__main__":
 
     print(f"[✓] INI files saved to: {CONFIG_DIR}")
     print(f"[✓] Checkpoint directory used: {CHECKPOINT_DIR}")
-
-    # export PYTHONPATH=/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent
 

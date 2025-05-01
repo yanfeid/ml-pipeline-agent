@@ -284,7 +284,7 @@ def run_config_agent(state: WorkflowState) -> Dict[str, Any]:
     if "config" in state and state["config"]:
         print("Skipping run_config_agent: 'config' already in state")
         return {}
-    from agents.ini_config import config_agent
+    from rmr_agent.agents.ini_config import config_agent
     config = config_agent(state["dag_yaml"]) 
 
     config_dir = os.path.join(state["local_repo_path"], "config")
@@ -301,7 +301,7 @@ def run_notebook_agent(state: WorkflowState) -> Dict[str, Any]:
         print("Skipping run_notebook_agent: 'notebooks' already in state")
         return {}
 
-    from agents.notebook import notebook_agent
+    from rmr_agent.agents.notebook import notebook_agent
     notebooks = notebook_agent(yaml.safe_load(state["dag_yaml"]),state["cleaned_code"],state["local_repo_path"])
     return {"notebooks": notebooks}
 
@@ -310,7 +310,7 @@ def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:
         print("Skipping run_notebook_agent: 'notebooks' already in state")
         return {}
     
-    from agents.code_editor import code_editor_agent
+    from rmr_agent.agents.code_editor import code_editor_agent
     edited_notebooks = {}
 
     for name, path in state["notebooks"].items():
@@ -443,8 +443,6 @@ if __name__ == "__main__":
     )
     print("Final Config:", result["config"])
     print("Final Notebooks:", result["notebooks"])
-
-
 
 
 

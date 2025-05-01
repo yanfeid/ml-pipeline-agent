@@ -1,5 +1,5 @@
 
-from llms import LLMClient  
+from rmr_agent.llms import LLMClient
 import os
 import ast
 
@@ -11,25 +11,26 @@ def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
         python_code = f.read()
 
     prompt_editor = f"""
-    You are an AI agent tasked with refactoring Python research scripts to ensure that configuration values are used consistently.
+    You are an AI agent tasked with refactoring research scripts to ensure that configuration values are used consistently.
 
     Your instructions:
-    1. In the **=== Research Code ===** section, remove any parameter declarations that are already defined earlier in the script. These predefined parameters have values starting with config.get.
-    2. Ensure the research code just uses the correct variable name loaded from config in previous sections, avoid hard-coded.
-    3. Ensure all parameters are declared properly and the code remains fully configurable.
-    4. Return the complete modified Python script without any explanations or additional comments. 
-    5. Do **not** include any Markdown formatting such as ```python or ``` — return only the raw Python code.
+    1. Inside the === Research Code === section, only remove pure parameter assignment lines (e.g., x = ..., y = ...) where the variable is already defined earlier using config.get.
+    2. DO NOT remove, modify, or touch any other lines, even if they are non-Python, invalid syntax, BigQuery magics (%%bigquery), SQL code, or unknown formats.
+    3. Ensure the research code uses only the variables loaded from config, with no hard-coded values.
+    4. Return the complete modified script with no markdown or explanations. Do **not** include any Markdown formatting such as ```python or ``` — return only the raw Python code.
 
-    Here is the Python script:
+    Remember: even if the code is not standard Python, you must preserve it unchanged.
+
+    Here is the script:
     {python_code}
     """
  
-    print('prompt DEBUG',prompt_editor)
+    # print('prompt DEBUG',prompt_editor)
  
     # Call the LLM to process the code
     response = llm_client.call_llm(
         prompt=prompt_editor,
-        max_tokens=4096,
+        max_tokens=17384,
         temperature=0,
         repetition_penalty=1.0,
         top_p=1
@@ -47,16 +48,16 @@ def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
     # ==================    Code Cleanning Part ======================
 
     prompt_editor = f"""
-    You are an AI agent responsible for cleaning and formatting messy Python code into readable, well-organized scripts or Jupyter Notebooks. 
+    You are an AI agent responsible for formatting messy code into readable, well-organized scripts. 
 
     Your instructions:
-    1. Do not delete any of the original code (unless there is clearly duplicated code). 
-    Especially following code:
-    ## gsutil authentication
-    %ppauth
-    2. Fix indentation and spacing to comply with PEP 8 and ensure the code runs smoothly in a Jupyter Notebook environment.
-    3. Format the code into logical blocks, separated by two blank lines, avoid splitting the script into overly short chunks. Each block should reflect a meaningful code unit for conversion to Jupyter Notebook cells.
-    4. Output only the raw Python code — do not include any explanations, comments, or Markdown formatting (e.g., ```python or ``` ).
+    1. Your task is to fix only indentation and spacing according to PEP 8. 
+    2. Do not delete any original code lines or comments, even if you do not understand them.
+    e.g,. ## gsutil authentication
+           %ppauth
+    or any other magic commands
+    3. Group code into logical blocks separated by two blank lines. Avoid overly short blocks. Each block should be a complete and meaningful unit and should contain at least 4 lines of code.
+    4. Output only the updated code — do not include any explanations or Markdown formatting (e.g., ```python or ``` ).
 
     Here is the Python script:
     {modified_code}
@@ -65,7 +66,7 @@ def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
     # Call the LLM to process the code
     response = llm_client.call_llm(
         prompt=prompt_editor,
-        max_tokens=4096,
+        max_tokens=16384,
         temperature=0,
         repetition_penalty=1.0,
         top_p=1

@@ -1,7 +1,6 @@
 import requests
 
 def call_codepal_gpt(prompt, model="gpt-4o", temperature=0, max_tokens=1024, 
-                #  frequency_penalty=0, presence_penalty=0, base_url="http://10.183.170.134:8001/api/llm/"):
                 frequency_penalty=0, presence_penalty=0, base_url="http://10.183.170.134:8001/api/llm/"):
     headers = {
         "Content-Type": "application/json"
