@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rmr-agent
+  namespace: di-dta-gke
+spec:
+  selector:
+    matchLabels:
+      app: rmr-agent
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: rmr-agent
+    spec:
+      serviceAccountName: openalgplt
+      containers:
+        - name: rmr-agent
+          image: "dockerhub.paypalcorp.com/dta-ces/rmr-agent:0.1.0"
+          ports:
+            - containerPort: 8000
+          envFrom:
+          - configMapRef:
+              name: rmr-agent-service
+          env:
+            - name: azure_client_secret
+              valueFrom:
+                secretKeyRef:
+                  name: rmr-agent-service
+                  key: azure_client_secret
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "6Gi"
+              cpu: 6
+      restartPolicy: Always

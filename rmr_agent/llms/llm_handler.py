@@ -13,6 +13,8 @@ from urllib3.exceptions import InsecureRequestWarning
 from typing import Dict, Any, Optional, List
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from dotenv import load_dotenv
+load_dotenv() 
 
 
 
@@ -47,48 +49,44 @@ def messages_to_prompt(messages: list[dict[str, str]]) -> str:
             
     return "\n\n".join(prompt_pieces)
 
+print("client_id:", os.getenv("AZURE_CLIENT_ID"))
+print("client_secret starts with:", os.getenv("AZURE_CLIENT_SECRET")[:5])
 
 
 class TokenManager:
     def __init__(self):
         self._token = None
         self._token_expiry = 0
-        self.url = 'https://login.microsoftonline.com/fb007914-6020-4374-977e-21bac5f3f4c8/oauth2/v2.0/token'
+        self.tenant_id = os.getenv("AZURE_TENANT_ID")
+        self.token_url = os.getenv("AZURE_TOKEN_URL")
 
     def get_token(self):
-        current_time = time.time()
-        
-        # Check if token exists and is still valid
-        if self._token and current_time < self._token_expiry:
+        if self._token and time.time() < self._token_expiry:
             return self._token
 
-        # Token doesn't exist or is expired, get new one
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Cookie': 'fpc=AlGJE26qB45Lt9QvUL18hP4oYQGpAwAAAMZzLN8OAAAA; stsservicecookie=estsfd; x-ms-gateway-slice=estsfd'
-        }
         data = {
             "client_id": os.getenv("AZURE_CLIENT_ID"),
             "client_secret": os.getenv("AZURE_CLIENT_SECRET"),
             "scope": os.getenv("AZURE_SCOPE"),
             "grant_type": "client_credentials"
         }
-        #print('data for getting token:', data)
-        if not data['client_id']:
-            raise ValueError("AZURE_CLIENT_ID not found in environment variables")
-        if not data['client_secret']:
-            raise ValueError("AZURE_CLIENT_SECRET not found in environment variables")
-        if not data['scope']:
-            raise ValueError("AZURE_SCOPE not found in environment variables")
-        
-        res = requests.post(self.url, data=data, verify=False)
-        #print("Requested access token:", res)
-        #print(res.text)
-        self._token = res.json()["access_token"]
-        self._token_lifetime = res.json()["expires_in"]
-        self._token_expiry = current_time + self._token_lifetime
-        
-        return self._token
+
+        if not all(data.values()):
+            missing = [k for k, v in data.items() if not v]
+            raise EnvironmentError(f"Missing env vars: {', '.join(missing)}")
+
+        res = requests.post(self.token_url, data=data, headers={"Content-Type": "application/x-www-form-urlencoded"}, verify=False)
+
+        try:
+            res.raise_for_status()
+            token_data = res.json()
+            self._token = token_data["access_token"]
+            self._token_expiry = time.time() + token_data.get("expires_in", 3600)
+            return self._token
+        except Exception:
+            raise RuntimeError(f"Failed to fetch token: {res.status_code} — {res.text}")
+
+
 
 # single instance of token manager
 token_manager = TokenManager()
@@ -206,7 +204,7 @@ class AzureGPTHandler(LLMHandler):
         
         payload = {
             "messages": messages,
-            # "model": "gpt-4",  # may be configurable - for now hard coding to gpt-4o
+            # "model": os.getenv("MODEL_NAME", "gpt-4o"),  # may be configurable - for now hard coding to gpt-4o
             "temperature": kwargs.get('temperature', 0.0),  
             "max_tokens": kwargs.get('max_tokens', 2048),  
             "top_p": kwargs.get('top_p', 0.3),  
@@ -221,13 +219,13 @@ class AzureGPTHandler(LLMHandler):
         headers = {
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json',
-            'Cookie': 'ApplicationGatewayAffinity=3436f7a0151f5b426de1e5ceb7acb2a2; ApplicationGatewayAffinityCORS=3436f7a0151f5b426de1e5ceb7acb2a2'
+            'Cookie': os.getenv("AUTH_COOKIE")
         }
         return headers
     
     def create_params(self):
         params = {
-            "api-version": "2024-02-15-preview" # hard coding for gpt-4o for now
+            "api-version": os.getenv("AZURE_API_VERSION") 
         }
         return params
     
@@ -268,8 +266,8 @@ class AzureGPTHandler(LLMHandler):
 
 
 class LLMClient:
-    def __init__(self, model_name: str):
-        self.model_name = model_name
+    def __init__(self, model_name: Optional[str] = None):
+        self.model_name = os.getenv("MODEL_NAME")
 
         open_url = open_models.get(model_name, "")
         if open_url:
@@ -277,7 +275,8 @@ class LLMClient:
             self.url = open_url
         else:
             self.handler = AzureGPTHandler()
-            self.url = 'https://genai-cus-tdz.paypalcorp.com/solar-amps/openai/deployments/gpt-4o/chat/completions' # "http://10.183.170.134:8001/api/llm/" # "http://10.183.170.134:8001/api/llm/" # codepal LLM endpoint  # "http://host.docker.internal:8001/api/llm/"
+            self.url = os.getenv("GENAI_API_URL")# "http://10.183.170.134:8001/api/llm/" # "http://10.183.170.134:8001/api/llm/" # codepal LLM endpoint  # "http://host.docker.internal:8001/api/llm/"
+
     
     def call_llm(self, 
                  prompt: str = "",
@@ -324,7 +323,7 @@ class LLMClient:
 if __name__ == "__main__":
     #model_name = "deepseek"
     #model_name = "gpt-4-turbo"
-    model_name = "gpt-4o"
+    # model_name = "gpt-4o"
 
     def _history_to_messages(history):
         def get_role(history_item) -> str:
@@ -370,11 +369,11 @@ if __name__ == "__main__":
     messages = _history_to_messages(history)
     print(messages_to_prompt(messages))
 
-    input_tokens: int = litellm.utils.token_counter(messages=messages, model=model_name) # defaults to tiktoken general token counter if that model name does not match
+    input_tokens: int = litellm.utils.token_counter(messages=messages) # defaults to tiktoken general token counter if that model name does not match
     print("input tokens:", input_tokens)
     #exit()
 
-    llm_client = LLMClient(model_name=model_name)
+    llm_client = LLMClient()
     response = llm_client.call_llm(
         #messages=messages,
         prompt="hello",

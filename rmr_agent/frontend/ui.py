@@ -14,8 +14,8 @@ from rmr_agent.frontend.ui_utils import (
     get_default_line_range, get_steps_could_start_from
 )
 
-#BASE_URL = "http://localhost:8000"
-BASE_URL = "http://rmr-agent-api:8000"
+BASE_URL = "http://localhost:8000"
+#BASE_URL = "http://rmr-agent-api:8000"
 
 sys.stdout.flush()
 

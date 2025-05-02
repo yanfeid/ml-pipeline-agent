@@ -119,7 +119,7 @@ edges:
 {nodes_yaml_str}
 """
     
-    llm_client = LLMClient(model_name="gpt-4o")
+    llm_client = LLMClient()
     response: litellm.types.utils.ModelResponse = llm_client.call_llm(
         prompt=edge_identification_prompt,
         max_tokens=2048,

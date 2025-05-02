@@ -86,7 +86,7 @@ def node_aggregator_agent(all_final_components: List[Dict]):
 ### Instructions:
 
 """
-    llm_client = LLMClient(model_name="gpt-4o")
+    llm_client = LLMClient()
     response: litellm.types.utils.ModelResponse = llm_client.call_llm(
         prompt=aggregation_prompt,
         max_tokens=4096,

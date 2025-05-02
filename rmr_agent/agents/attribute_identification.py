@@ -161,7 +161,7 @@ def attribute_identification_agent(python_file_path: str, component_dict: Dict[s
 {clean_code}
     """
         #print(attribute_prompt)
-        llm_client = LLMClient(model_name="gpt-4o")
+        llm_client = LLMClient()
         response: litellm.types.utils.ModelResponse = llm_client.call_llm(
             prompt=attribute_prompt,
             max_tokens=2048,

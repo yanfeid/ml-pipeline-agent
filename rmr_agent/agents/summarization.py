@@ -26,7 +26,7 @@ Output Format (for each major code block):
 - [Brief, practical bullet points going into slightly more detail]
 
 """
-    llm_client = LLMClient(model_name="gpt-4o")
+    llm_client = LLMClient()
     response: litellm.types.utils.ModelResponse = llm_client.call_llm(
         prompt=summarization_prompt,
         max_tokens=2048,
