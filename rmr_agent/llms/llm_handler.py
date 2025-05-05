@@ -15,6 +15,8 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from dotenv import load_dotenv
 load_dotenv() 
+from dotenv import load_dotenv
+load_dotenv() 
 
 
 
@@ -51,6 +53,8 @@ def messages_to_prompt(messages: list[dict[str, str]]) -> str:
 
 print("client_id:", os.getenv("AZURE_CLIENT_ID"))
 print("client_secret starts with:", os.getenv("AZURE_CLIENT_SECRET")[:5])
+print("client_id:", os.getenv("AZURE_CLIENT_ID"))
+print("client_secret starts with:", os.getenv("AZURE_CLIENT_SECRET")[:5])
 
 
 class TokenManager:
@@ -59,8 +63,11 @@ class TokenManager:
         self._token_expiry = 0
         self.tenant_id = os.getenv("AZURE_TENANT_ID")
         self.token_url = os.getenv("AZURE_TOKEN_URL")
+        self.tenant_id = os.getenv("AZURE_TENANT_ID")
+        self.token_url = os.getenv("AZURE_TOKEN_URL")
 
     def get_token(self):
+        if self._token and time.time() < self._token_expiry:
         if self._token and time.time() < self._token_expiry:
             return self._token
 
@@ -70,6 +77,23 @@ class TokenManager:
             "scope": os.getenv("AZURE_SCOPE"),
             "grant_type": "client_credentials"
         }
+
+        if not all(data.values()):
+            missing = [k for k, v in data.items() if not v]
+            raise EnvironmentError(f"Missing env vars: {', '.join(missing)}")
+
+        res = requests.post(self.token_url, data=data, headers={"Content-Type": "application/x-www-form-urlencoded"}, verify=False)
+
+        try:
+            res.raise_for_status()
+            token_data = res.json()
+            self._token = token_data["access_token"]
+            self._token_expiry = time.time() + token_data.get("expires_in", 3600)
+            return self._token
+        except Exception:
+            raise RuntimeError(f"Failed to fetch token: {res.status_code} — {res.text}")
+
+
 
         if not all(data.values()):
             missing = [k for k, v in data.items() if not v]
@@ -205,6 +229,7 @@ class AzureGPTHandler(LLMHandler):
         payload = {
             "messages": messages,
             # "model": os.getenv("MODEL_NAME", "gpt-4o"),  # may be configurable - for now hard coding to gpt-4o
+            # "model": os.getenv("MODEL_NAME", "gpt-4o"),  # may be configurable - for now hard coding to gpt-4o
             "temperature": kwargs.get('temperature', 0.0),  
             "max_tokens": kwargs.get('max_tokens', 2048),  
             "top_p": kwargs.get('top_p', 0.3),  
@@ -220,11 +245,13 @@ class AzureGPTHandler(LLMHandler):
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json',
             'Cookie': os.getenv("AUTH_COOKIE")
+            'Cookie': os.getenv("AUTH_COOKIE")
         }
         return headers
     
     def create_params(self):
         params = {
+            "api-version": os.getenv("AZURE_API_VERSION") 
             "api-version": os.getenv("AZURE_API_VERSION") 
         }
         return params
@@ -266,6 +293,8 @@ class AzureGPTHandler(LLMHandler):
 
 
 class LLMClient:
+    def __init__(self, model_name: Optional[str] = None):
+        self.model_name = os.getenv("MODEL_NAME")
     def __init__(self, model_name: Optional[str] = None):
         self.model_name = os.getenv("MODEL_NAME")
 
@@ -323,6 +352,7 @@ if __name__ == "__main__":
     #model_name = "deepseek"
     #model_name = "gpt-4-turbo"
     # model_name = "gpt-4o"
+    # model_name = "gpt-4o"
 
     def _history_to_messages(history):
         def get_role(history_item) -> str:
@@ -369,9 +399,11 @@ if __name__ == "__main__":
     print(messages_to_prompt(messages))
 
     input_tokens: int = litellm.utils.token_counter(messages=messages) # defaults to tiktoken general token counter if that model name does not match
+    input_tokens: int = litellm.utils.token_counter(messages=messages) # defaults to tiktoken general token counter if that model name does not match
     print("input tokens:", input_tokens)
     #exit()
 
+    llm_client = LLMClient()
     llm_client = LLMClient()
     response = llm_client.call_llm(
         #messages=messages,

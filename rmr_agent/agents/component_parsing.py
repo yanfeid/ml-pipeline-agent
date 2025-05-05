@@ -94,7 +94,7 @@ def parse_component_identification(component_identification_response, file):
 {relevant_component_definitions}
 """
 
-    llm_client = LLMClient(model_name="gpt-4o")
+    llm_client = LLMClient()
     response: litellm.types.utils.ModelResponse = llm_client.call_llm(
         prompt=parse_prompt,
         max_tokens=2048,
@@ -111,6 +111,8 @@ def parse_component_identification(component_identification_response, file):
 
     # Create dictionary with parsed data
     parsed_dict = convert_to_dict(parsed_text)
+    if not parsed_dict:
+        raise ValueError("No components identified in the response for file: " + file)
     # Add the file name to each identified component
     for component, metadata in parsed_dict.items():
         if component not in allowed_components:

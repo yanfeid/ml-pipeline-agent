@@ -39,14 +39,15 @@ def save_human_feedback(request: ComponentsResponse | DagResponse, repo_name: st
     if isinstance(request, ComponentsResponse):
         step_name = "human_verification_of_components"
         update_name = "verified_components"
+        update = {update_name: request.verified_components}
     elif isinstance(request, DagResponse):
         step_name = "human_verification_of_dag"
         update_name = "verified_dag"
+        update = {update_name: request.verified_dag}
     else:
         raise HTTPException(400, "Invalid request type for saving human feedback")
 
     start_idx = STEPS.index((step_name, None))
-    update = {update_name: request.verified_components}
     # add update to our global state
     workflow_states[repo_name][run_id].update(update)
     # Save to checkpoints folder

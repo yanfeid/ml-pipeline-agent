@@ -70,7 +70,7 @@ def component_identification_agent(python_file_path, full_file_list, code_summar
 ### Current File's Code Summary:
 {code_summary}
 """
-    llm_client = LLMClient(model_name="gpt-4o")
+    llm_client = LLMClient()
     response: litellm.types.utils.ModelResponse = llm_client.call_llm(
         prompt=classification_prompt,
         max_tokens=2048,
