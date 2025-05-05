@@ -30,7 +30,7 @@ def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
     # Call the LLM to process the code
     response = llm_client.call_llm(
         prompt=prompt_editor,
-        max_tokens=17384,
+        max_tokens=16384,
         temperature=0,
         repetition_penalty=1.0,
         top_p=1
