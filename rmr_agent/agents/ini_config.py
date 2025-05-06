@@ -1,6 +1,7 @@
 import os
 import re
 import yaml
+from datetime import datetime
 from rmr_agent.llms import LLMClient
 from typing import Dict, Any
 from rmr_agent.utils import save_ini_file
@@ -103,6 +104,22 @@ def replace_with_env_vars(generated_file, env_vars):
 
     return generated_file
 
+# ========== **fill in today's date** ==========
+def fill_in_today_date(ini_content: str) -> str:
+    """
+    Replaces the line starting with 'refresh_date =' with today's date in the given .ini content.
+    """
+    today_str = datetime.today().strftime('%Y-%m-%d')
+    lines = ini_content.splitlines()
+
+    for i, line in enumerate(lines):
+        if line.strip().startswith("refresh_date"):
+            lines[i] = f"refresh_date = {today_str}"
+            break
+
+    return "\n".join(lines)
+
+
 # ========== **Config Agent Part** ==========
 def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dict[str, Dict[str, Dict[str, str]]]:
     """
@@ -151,9 +168,9 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
 
     ### Guidelines to Follow
 
-    1. **Date & Default Values**
-    - **Insert Today's Date:** Automatically fill in `refresh_date` with the current date.
-    - **Default Values:**
+    1. Default Values**
+    - **Default Values:** 
+        - Set `refresh_date` as blank by default.
         - Set `mo_name` as blank by default.
         - Set `environment` as blank by default.
         - `Queue Name` set to `default` if not provided.
@@ -164,8 +181,8 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     - If detected, treat that directory segment as the username.
 
     3. **dataproc_project_name & dataproc_storage_bucket**
-    - **dataproc_project_name:** Identify keywords such as `gcp_project_id`, `project_name`, etc., to determine the project name. Set to blank if not provided. If unsure, leave blank. 
-    - **dataproc_storage_bucket:** Identify keywords such as `gcs_bucket_name`, `bucket_name`, `bucket_id`, etc., to determine the storage bucket name. Set to blank if not provided.
+    - **dataproc_project_name:** Dataproc_project_name always starts with "ccg24-hrzana-". You can search keywords such as `gcp_project_id`, `project_name`. Leave blank if you could not fina a value started with "ccg24-hrzana-". 
+    - **dataproc_storage_bucket:** Dataproc_storage_bucket always starts with "pypl-bkt-rsh-row-std-". You can search keywords such as `gcs_bucket_name`, `bucket_name`, `bucket_id`, etc. Set to blank if not provided.
 
     4. **Path Analysis**
     - **local_output_base_path:**
@@ -210,7 +227,7 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
         top_p=1
     )
 
-    environment_ini_str = extract_ini_content(response_environment)
+    environment_ini_str = fill_in_today_date(extract_ini_content(response_environment))
     
 
 
