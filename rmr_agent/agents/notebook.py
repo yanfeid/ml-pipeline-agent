@@ -132,23 +132,6 @@ def notebook_agent(verified_dag, cleaned_code, local_repo_path):
     print(f" Final edge attributes mapping: {edge_attributes}\n")
 
     # === Step 4: generate Python file（based on solution.ini）===
-    # generated_files = {}
-
-    # for section_name in config.sections():
-    #     if section_name.lower() == "general":  # ✅ skip general
-    #         print(f"🚀 Skipping general section: {section_name}")
-    #         continue
-
-    #     node_name = section_name.strip().lower().replace(" ", "_")  # standardized file name
-    #     file_path = os.path.join(NOTEBOOKS_DIR, f"{node_name}.py")
-    #     generated_files[section_name] = file_path  # record file's path
-
-    #     print(f"\n Generating file for: {section_name} (node_name: {node_name})")
-    #     print(f"  Checking dependencies for {node_name}: {dependencies.get(node_name, 'None')}")
-    #     print(f"  Checking edge attributes for {node_name}: {edge_attributes.get(node_name, 'None')}")
-
-    #     with open(file_path, "w", encoding="utf-8") as f:
-    
     generated_files = {}
     sections = [s for s in config.sections() if s.lower() != "general"]
 

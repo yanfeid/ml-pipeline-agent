@@ -313,8 +313,12 @@ def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:
     from rmr_agent.agents.code_editor import code_editor_agent
     edited_notebooks = {}
 
-    for name, path in state["notebooks"].items():
-        edited_notebooks[name] = code_editor_agent(path)
+    with ThreadPoolExecutor() as executor:
+        results = executor.map(
+            lambda item: (item[0], code_editor_agent(item[1])),
+            state["notebooks"].items()
+        )
+        edited_notebooks = dict(results)
     return {"edited_notebooks": edited_notebooks}
 
 
