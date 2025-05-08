@@ -41,23 +41,23 @@ def component_identification_agent(python_file_path, full_file_list, code_summar
 
 ### Response Format (JSON):
 {{
-  "Component Name": {{
-    "line_range": "Merged, non-overlapping range (e.g., 0-49)",
+  "<ML_COMPONENT_NAME_HERE>": {{ 
+    "line_range": "<MERGED_NON_OVERLAPPING_LINE_RANGE>", // Example: "0-49", "55-72"
     "evidence": [
       {{
-        "quote_or_paraphrase": "Quote/paraphrase 1",
-        "support_reason": "Why it supports this category"
+        "quote_or_paraphrase": "<RELEVANT_QUOTE_OR_PARAPHRASE_1>",
+        "support_reason": "<EXPLANATION_WHY_EVIDENCE_1_SUPPORTS_THIS_COMPONENT>"
       }},
       {{
-        "quote_or_paraphrase": "Quote/paraphrase 2",
-        "support_reason": "Why it supports this category"
+        "quote_or_paraphrase": "<RELEVANT_QUOTE_OR_PARAPHRASE_2>",
+        "support_reason": "<EXPLANATION_WHY_EVIDENCE_2_SUPPORTS_THIS_COMPONENT>"
       }},
       {{
-        "quote_or_paraphrase": "Quote/paraphrase 3",
-        "support_reason": "Why it supports this category"
+        "quote_or_paraphrase": "<RELEVANT_QUOTE_OR_PARAPHRASE_3>",
+        "support_reason": "<EXPLANATION_WHY_EVIDENCE_3_SUPPORTS_THIS_COMPONENT>"
       }}
     ],
-    "why_this_is_separate": "Verification of no overlap with other component line ranges; Justification for why this should be split from the other code"
+    "why_this_is_separate": "<JUSTIFICATION_FOR_THIS_COMPONENT_BEING_SEPARATE_AND_VERIFICATION_OF_NOT_OVERLAPPING>"
     }}
 }}
     
