@@ -158,61 +158,60 @@ def render_dag_graph(edges, nodes):
 #   },
 
     net.set_options("""
-{
- "layout": {
-    "improvedLayout": true
-},
-"physics": {
-  "enabled": true,
-  "solver": "forceAtlas2Based",
-  "forceAtlas2Based": {
-    "gravitationalConstant": -100,
-    "centralGravity": 0.01,
-    "springLength": 150,
-    "springConstant": 0.08,
-    "damping": 0.4,
-    "avoidOverlap": 1
-  },
-  "minVelocity": 0.75            
-},
-  "edges": {
-    "arrows": {
-      "to": {
-        "enabled": true
-      }
+    {
+    "layout": {
+        "improvedLayout": true
     },
-    "smooth": {
-      "enabled": true,
-      "type": "cubicBezier",
-      "forceDirection": "vertical",
-      "roundness": 0.4
+    "physics": {
+    "enabled": true,
+    "solver": "forceAtlas2Based",
+    "forceAtlas2Based": {
+        "gravitationalConstant": -100,
+        "centralGravity": 0.01,
+        "springLength": 150,
+        "springConstant": 0.08,
+        "damping": 0.4,
+        "avoidOverlap": 1
     },
-    "color": {
-      "color": "#848484",
-      "inherit": false
+    "minVelocity": 0.75            
+    },
+    "edges": {
+        "arrows": {
+        "to": {
+            "enabled": true
+        }
+        },
+        "smooth": {
+        "enabled": true,
+        "type": "cubicBezier",
+        "forceDirection": "vertical",
+        "roundness": 0.4
+        },
+        "color": {
+        "color": "#848484",
+        "inherit": false
+        }
+    },
+    "nodes": {
+        "shape": "box",
+        "margin": 10,
+        "borderWidth": 2,
+        "color": {
+        "border": "#2B7CE9",
+        "background": "#F0F8FF",
+        "highlight": {
+            "border": "#1A1A1A",
+            "background": "#E6F2FF"
+        }
+        },
+        "font": {
+        "color": "#000000",
+        "size": 18,
+        "face": "Arial"
+        }
     }
-  },
-  "nodes": {
-    "shape": "box",
-    "margin": 10,
-    "borderWidth": 2,
-    "color": {
-      "border": "#2B7CE9",
-      "background": "#F0F8FF",
-      "highlight": {
-        "border": "#1A1A1A",
-        "background": "#E6F2FF"
-      }
-    },
-    "font": {
-      "color": "#000000",
-      "size": 18,
-      "face": "Arial"
     }
-  }
-}
-""")
-
+    """)
 
     temp_path = tempfile.NamedTemporaryFile(suffix=".html", delete=False)
     net.save_graph(temp_path.name)
@@ -331,7 +330,6 @@ def dag_edge_editor(edited_dag_yaml):
         st.text_area("Final DAG YAML", new_yaml, height=300, key="final_yaml_preview")
 
     # Save YAML into session state (can be submitted later)
-    # _, col1, col2 = st.columns([0.001, 8, 1])
     col1, col2 = st.columns([8, 0.75])
     with col1:
         if st.button("Save Changes"):
@@ -342,7 +340,6 @@ def dag_edge_editor(edited_dag_yaml):
         if st.button("Submit DAG"):
             if new_yaml:
                 st.session_state.workflow_running = True
-                # Important: you call submit_human_feedback outside this component using session_state.final_dag_yaml
                 return new_yaml
             else:
                 st.warning("No DAG YAML to submit.")
