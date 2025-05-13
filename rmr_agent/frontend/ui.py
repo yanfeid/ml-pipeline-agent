@@ -3,8 +3,6 @@ import streamlit as st
 import requests
 import json
 import time
-import yaml
-import uuid
 from datetime import datetime
 from rmr_agent.utils import parse_github_url 
 from rmr_agent.workflow import STEPS, HUMAN_STEPS
@@ -433,21 +431,11 @@ def human_verification_of_components_ui(repo_name, run_id):
                 st.error("Could not display code for this file")
 
 def human_verification_of_dag_ui(repo_name, run_id):
-    # WIP -> improve DAG editing experience. Should focus on editing edges because nodes were already verified
-    # st.subheader("Please verify/edit the identified DAG")
-    # dag_yaml = get_dag_yaml(repo_name, run_id) # result["dag_yaml"] # loading from checkpoint instead of from API result
-    # dag = yaml.safe_load(dag_yaml)  # Convert YAML string to Python dict
-    # edited_dag = st.text_area("DAG YAML", dag_yaml, height=800)
-    # if st.button("Submit DAG"):
-    #     payload = {"verified_dag": edited_dag}
-    #     st.session_state.workflow_running = True # before submit back to API, set workflow running again to continue polling
-    #     submit_human_feedback(payload=payload, repo_name=repo_name, run_id=run_id)
     dag_yaml = get_dag_yaml(repo_name, run_id)
     updated_dag_yaml = dag_edge_editor(dag_yaml)
 
-    if st.button("Submit DAG"):
+    if updated_dag_yaml:
         payload = {"verified_dag": updated_dag_yaml}
-        st.session_state.workflow_running = True
         submit_human_feedback(payload=payload, repo_name=repo_name, run_id=run_id)
 
 def main():

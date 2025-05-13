@@ -58,17 +58,7 @@ nodes:
       n_trials: '250'
     outputs:
       model_artifact_path: /projects/dnaomi/bt-retry-global-v2/models/final/bt_retry_v2.txt
-- Hyperparameter Tuning:
-    file_name: rmr_agent/repos/bt-retry-v2/model-dev/train.py
-    line_range: 300-367
-    inputs:
-      tracking_url: https://mlflow.apps.cosmos-onprem.dp.lvs.paypalinc.com
-      experiment_name: bt_retry_global_v2_full_fts_strategy_subset_model_all_strat_valid_control
-      study_name: bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control
-      studies_dir: ../reports/studies/
-      n_trials: '250'
-      objective_metric_name: partial_aucpr_geq90
-    outputs: {}
+
 - Model Evaluation:
     file_name: rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py
     line_range: 1-383
@@ -87,16 +77,7 @@ nodes:
       v1_metrics: calculated metrics for V1 model
       v2_metrics: calculated metrics for V2 model
       valid_data_filtered_path: /projects/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
-- Model Packaging:
-    file_name: rmr_agent/repos/bt-retry-v2/deployment/01_export_to_ume.py
-    line_range: 1-60
-    inputs:
-      full_features_path: /projects/dnaomi/bt-retry-global-v2/metadata/v2_features_final_2.txt
-      model_file_path: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_small.txt
-      path_to_json: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json
-    outputs:
-      model_json_with_pd_path: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json
-      output_path: /projects/dnaomi/bt-retry-global-v2/models/ume/
+
 - Model Scoring:
     file_name: rmr_agent/repos/bt-retry-v2/deployment/02_pyscoring_validation.py
     line_range: 1-140

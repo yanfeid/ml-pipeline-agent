@@ -106,6 +106,7 @@ def get_steps_could_start_from(repo_name, run_id, all_steps):
     return display_available_steps
 
 # === for dag verification ===
+# === Parsing Function ===
 def parse_dag_edges_from_yaml(dag_yaml):
     data = yaml.safe_load(dag_yaml)
     if not isinstance(data, dict):
@@ -126,181 +127,197 @@ def parse_dag_edges_from_yaml(dag_yaml):
 
     return edges, nodes
 
+# === DAG Renderer ===
 def render_dag_graph(edges, nodes):
     net = Network(height="450px", directed=True)
     for node in nodes:
         net.add_node(
             node,
             label=node,
-            shape="box",  
-            size=30,
+            shape="box",
+            size=20,
+            font={"size": 18},
+            borderWidth=2,
             
-            color={
-                "background": "#ffffff",  
-                "border": "#000000",      
-                "highlight": {
-                    "background": "#eeeeee",  
-                    "border": "#333333"       
-                }
-            },
-            font={
-            "color": "#000000",
-            "size": 35,
-            "face": "Arial"
-        }
-        )
-    for src, tgt in edges:
-        net.add_edge(
-            src,
-            tgt,
-            color="#444444",
-            width=2,
-            length=3,  
-            arrows="to"
         )
 
+    for src, tgt in edges:
+        net.add_edge(src, tgt)
+
+#          "layout": {
+#     "hierarchical": {
+#       "enabled": true,
+#       "direction": "UD",
+#       "sortMethod": "directed",
+#       "nodeSpacing": 120,
+#       "levelSeparation": 150
+#     }
+#   },
+#   "physics": {
+#     "enabled": false
+#   },
+
     net.set_options("""
-    {
-      "layout": {
-        "hierarchical": {
-          "enabled": true,
-          "direction": "UD",
-          "sortMethod": "directed",
-          "nodeSpacing": 300
-        }
-      },
-      "physics": {
-        "enabled": false
-      },
-      "edges": {
-        "arrows": {
-          "to": {
-            "enabled": true
-          }
-        }
+{
+ "layout": {
+    "improvedLayout": true
+},
+"physics": {
+  "enabled": true,
+  "solver": "forceAtlas2Based",
+  "forceAtlas2Based": {
+    "gravitationalConstant": -100,
+    "centralGravity": 0.01,
+    "springLength": 150,
+    "springConstant": 0.08,
+    "damping": 0.4,
+    "avoidOverlap": 1
+  },
+  "minVelocity": 0.75            
+},
+  "edges": {
+    "arrows": {
+      "to": {
+        "enabled": true
       }
+    },
+    "smooth": {
+      "enabled": true,
+      "type": "cubicBezier",
+      "forceDirection": "vertical",
+      "roundness": 0.4
+    },
+    "color": {
+      "color": "#848484",
+      "inherit": false
     }
-    """)
+  },
+  "nodes": {
+    "shape": "box",
+    "margin": 10,
+    "borderWidth": 2,
+    "color": {
+      "border": "#2B7CE9",
+      "background": "#F0F8FF",
+      "highlight": {
+        "border": "#1A1A1A",
+        "background": "#E6F2FF"
+      }
+    },
+    "font": {
+      "color": "#000000",
+      "size": 18,
+      "face": "Arial"
+    }
+  }
+}
+""")
 
 
     temp_path = tempfile.NamedTemporaryFile(suffix=".html", delete=False)
     net.save_graph(temp_path.name)
     return temp_path.name
 
+# === Main DAG Editor App ===
 def dag_edge_editor(edited_dag_yaml):
-    st.subheader("DAG Visualizer")
-    edges, nodes = parse_dag_edges_from_yaml(edited_dag_yaml)
+    st.subheader("Human Verification Of Dag")
 
-    # Load to session state if not already
+    # Step 0: Parse
+    edges, nodes = parse_dag_edges_from_yaml(edited_dag_yaml)
+    node_names = [name for name, _ in nodes]
+
     if "edges_state" not in st.session_state:
         st.session_state.edges_state = edges.copy()
     if "nodes_state" not in st.session_state:
         st.session_state.nodes_state = nodes.copy()
+    if "edge_index" not in st.session_state:
+        st.session_state.edge_index = 0
 
-    node_names = [name for name, _ in st.session_state.nodes_state]
-
-    # Render DAG
-    html_path = render_dag_graph(
-        [(e[0], e[1]) for e in st.session_state.edges_state],
-        node_names
-    )
-    components.html(open(html_path, "r", encoding="utf-8").read(), height=450, scrolling=True)
-
-
-    # --------- edit edges ---------
-    if st.session_state.edges_state:
-        st.markdown("### Edit Edge Attributes")
-        edge_to_edit = st.selectbox(
-            "Select edge to edit",
-            st.session_state.edges_state,
-            format_func=lambda e: f"{e[0]} -> {e[1]}",
-            key="edit_edge_selector"
+    # === Step 1: Structure Verification ===
+    with st.expander("Step 1: Verify and Edit DAG Structure", expanded=True):
+        html_path = render_dag_graph(
+            [(e[0], e[1]) for e in st.session_state.edges_state],
+            node_names
         )
+        components.html(open(html_path, "r", encoding="utf-8").read(), height=450, scrolling=True)
 
-        src_edit = edge_to_edit[0]
-        tgt_edit = edge_to_edit[1]
-        current_attrs = edge_to_edit[2].get("attributes", {})
+        st.markdown("##### Add a New Edge")
+        col1, col2 = st.columns(2)
+        with col1:
+            src = st.selectbox("Source Node", node_names, key="src_add")
+        with col2:
+            tgt = st.selectbox("Target Node", node_names, key="tgt_add")
 
-        source_node_attrs = dict(st.session_state.nodes_state).get(src_edit, {})
-        output_attrs = source_node_attrs.get("outputs", {})
-        candidate_keys = list(output_attrs.keys())
-        current_selected_keys = [k for k in current_attrs if k in candidate_keys]
-
-        with st.expander("Edit Attributes"):
-            selected_keys = st.multiselect(
-                "Select output attributes",
-                candidate_keys,
-                default=current_selected_keys,
-                key="edit_attr_select"
-            )
-            updated_attr_dict = {k: output_attrs[k] for k in selected_keys}
-
-            st.markdown("---")
-            st.markdown("Edit / Add custom attribute")
-            custom_key = st.text_input("Custom Attribute Key", key="edit_custom_key")
-            custom_val = st.text_input("Custom Attribute Value", key="edit_custom_val")
-            if custom_key and custom_val:
-                updated_attr_dict[custom_key] = custom_val
-
-        if st.button("Save Attribute Changes"):
-            st.session_state.edges_state.remove(edge_to_edit)
-            new_edge = {"from": src_edit, "to": tgt_edit, "attributes": updated_attr_dict}
-            st.session_state.edges_state.append((src_edit, tgt_edit, new_edge))
-            st.success("Edge updated.")
-            rerun()
-
-    # Modify edges
-    st.markdown("### Add Edge")
-    col1, col2 = st.columns(2)
-    with col1:
-        src = st.selectbox("Source Node", node_names, key="src_node")
-    with col2:
-        tgt = st.selectbox("Target Node", node_names, key="tgt_node")
-
-    # --------- Edge Attribute UI ---------
-    with st.expander("Optional: Add Edge Attributes"):
-    
-        source_node_attrs = dict(st.session_state.nodes_state).get(src, {})
-        output_attrs = source_node_attrs.get("outputs", {})
-
-        candidate_keys = list(output_attrs.keys())
-        selected_keys = st.multiselect("Select output attributes to attach", candidate_keys)
-
-        attr_dict = {key: output_attrs[key] for key in selected_keys}
-        st.markdown("---")
-        st.markdown("Add custom attribute (optional)")
-        custom_key = st.text_input("Custom Attribute Key", key="custom_attr_key")
-        custom_val = st.text_input("Custom Attribute Value", key="custom_attr_val")
-
-        if custom_key and custom_val:
-            attr_dict[custom_key] = custom_val
-
-    # --------- add edge ---------
-    if st.button("Add Edge"):
-        try:
-            new_edge = {"from": src, "to": tgt, "attributes": attr_dict}
+        if st.button("Add Edge"):
+            new_edge = {"from": src, "to": tgt, "attributes": {}}
             st.session_state.edges_state.append((src, tgt, new_edge))
-            st.success("Edge added.")
+            st.success(f"Edge {src} → {tgt} added.")
             rerun()
-        except Exception as e:
-            st.error(f"Failed to add edge: {e}")
 
-
-    # ---------remove edge ---------
-    if st.session_state.edges_state:
-        st.markdown("### Remove Edge")
+        st.markdown("##### Remove an Edge")
         edge_to_remove = st.selectbox(
             "Select edge to remove",
             st.session_state.edges_state,
-            format_func=lambda e: f"{e[0]} -> {e[1]}",
-            key="remove_edge_selector"
+            format_func=lambda e: f"{e[0]} -> {e[1]}"
         )
         if st.button("Remove Selected Edge"):
             st.session_state.edges_state.remove(edge_to_remove)
             st.success("Edge removed.")
             rerun()
 
-    # Reconstruct YAML
+    # === Step 2: Attribute Verification ===
+    with st.expander("Step 2: Verify Attributes of Each Edge", expanded=True):
+        if not st.session_state.edges_state:
+            st.info("No edges to review.")
+        else:
+            index = st.session_state.edge_index
+            edge = st.session_state.edges_state[index]
+            src, tgt, edge_data = edge
+            attrs = edge_data.get("attributes", {})
+
+            st.markdown(f"<p style='font-size:18px; font-weight:bold;'>Edge {index + 1} of {len(st.session_state.edges_state)}&nbsp;&nbsp;&nbsp;{src} → {tgt}</p>",unsafe_allow_html=True)
+            source_node_attrs = dict(st.session_state.nodes_state).get(src, {})
+            output_attrs = source_node_attrs.get("outputs", {})
+            candidate_keys = list(output_attrs.keys())
+
+            # Display and edit attributes
+            updated_attrs = {}
+            st.markdown("##### Edit Existing Attributes")
+            for key, val in attrs.items():
+                col1, col2, col3 = st.columns([4, 4, 1])
+                with col1:
+                    new_key = st.text_input(f"Key", value=key, key=f"key_{key}_{index}")
+                with col2:
+                    new_val = st.text_input(f"Value", value=val, key=f"val_{key}_{index}")
+                with col3:
+                    if st.checkbox("Delete", key=f"delete_{key}_{index}"):
+                        continue
+                updated_attrs[new_key] = new_val
+
+            st.markdown("")
+            st.markdown("##### Add New Attribute")
+            new_key = st.text_input("New Attribute Key", key=f"new_key_{index}")
+            new_val = st.text_input("New Attribute Value", key=f"new_val_{index}")
+            if new_key and new_val:
+                updated_attrs[new_key] = new_val
+
+            if st.button("Save Attributes for This Edge"):
+                new_edge_data = {"from": src, "to": tgt, "attributes": updated_attrs}
+                st.session_state.edges_state[index] = (src, tgt, new_edge_data)
+                st.success("Attributes updated.")
+
+            # Navigation buttons
+            col1, col2 = st.columns([8, 0.67])
+            with col1:
+                if st.button("Previous Edge") and index > 0:
+                    st.session_state.edge_index -= 1
+                    rerun()
+            with col2:
+                if st.button("Next Edge") and index < len(st.session_state.edges_state) - 1:
+                    st.session_state.edge_index += 1
+                    rerun()
+
+    # Step 3: Finalize and Export YAML (in expander)
     reconstructed_nodes = [{name: attrs} for name, attrs in st.session_state.nodes_state]
     reconstructed_edges = [edge_dict for _, _, edge_dict in st.session_state.edges_state]
 
@@ -309,13 +326,29 @@ def dag_edge_editor(edited_dag_yaml):
         "edges": reconstructed_edges
     }, sort_keys=False)
 
-    # st.markdown("### Preview Updated YAML")
-    # st.text_area("DAG YAML", new_yaml, height=300, key="updated_yaml_preview")
-    st.markdown("---")
-    st.markdown("Use the buttons below to **save your changes locally** or **submit the verified DAG** to the system.")
+    with st.expander("Step 3: Finalize and Export YAML", expanded=False):
+        st.markdown("Here is the final DAG YAML you can review before saving or submitting.")
+        st.text_area("Final DAG YAML", new_yaml, height=300, key="final_yaml_preview")
 
-    if st.button("Save Changes"):
-        return new_yaml
+    # Save YAML into session state (can be submitted later)
+    # _, col1, col2 = st.columns([0.001, 8, 1])
+    col1, col2 = st.columns([8, 0.75])
+    with col1:
+        if st.button("Save Changes"):
+            st.session_state.final_dag_yaml = new_yaml
+            st.success("YAML saved.")
 
+    with col2:
+        if st.button("Submit DAG"):
+            if new_yaml:
+                st.session_state.workflow_running = True
+                # Important: you call submit_human_feedback outside this component using session_state.final_dag_yaml
+                return new_yaml
+            else:
+                st.warning("No DAG YAML to submit.")
+
+    # default return if no action
     return None
+
+
 
