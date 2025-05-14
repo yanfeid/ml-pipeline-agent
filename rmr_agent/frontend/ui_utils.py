@@ -159,22 +159,16 @@ def render_dag_graph(edges, nodes):
 
     net.set_options("""
     {
-    "layout": {
-        "improvedLayout": true
-    },
-    "physics": {
-    "enabled": true,
-    "solver": "forceAtlas2Based",
-    "forceAtlas2Based": {
-        "gravitationalConstant": -100,
-        "centralGravity": 0.01,
-        "springLength": 150,
-        "springConstant": 0.08,
-        "damping": 0.4,
-        "avoidOverlap": 1
-    },
-    "minVelocity": 0.75            
-    },
+            "layout": {
+    "hierarchical": {
+      "enabled": true,
+      "direction": "UD",
+      "sortMethod": "directed",
+      "nodeSpacing": 120,
+      "levelSeparation": 150
+    }
+  },
+
     "edges": {
         "arrows": {
         "to": {
@@ -270,51 +264,116 @@ def dag_edge_editor(edited_dag_yaml):
             st.info("No edges to review.")
         else:
             index = st.session_state.edge_index
-            edge = st.session_state.edges_state[index]
-            src, tgt, edge_data = edge
+            src, tgt, edge_data = st.session_state.edges_state[index]
             attrs = edge_data.get("attributes", {})
 
-            st.markdown(f"<p style='font-size:18px; font-weight:bold;'>Edge {index + 1} of {len(st.session_state.edges_state)}&nbsp;&nbsp;&nbsp;{src} → {tgt}</p>",unsafe_allow_html=True)
+            st.markdown(
+                f"<p style='font-size:18px; font-weight:bold;'>Edge {index + 1} of {len(st.session_state.edges_state)}&nbsp;&nbsp;&nbsp;{src} → {tgt}</p>",
+                unsafe_allow_html=True
+            )
+
+            # Get source node outputs
             source_node_attrs = dict(st.session_state.nodes_state).get(src, {})
             output_attrs = source_node_attrs.get("outputs", {})
             candidate_keys = list(output_attrs.keys())
 
-            # Display and edit attributes
-            updated_attrs = {}
-            st.markdown("##### Edit Existing Attributes")
-            for key, val in attrs.items():
+            # Init session state
+            if ("attr_rows" not in st.session_state or st.session_state.attr_rows is None or st.session_state.get("prev_edge_index") != index):
+                st.session_state.attr_rows = [
+                    {"key": k, "value": v, "custom": k not in candidate_keys}
+                    for k, v in attrs.items()
+                ]
+                st.session_state.prev_edge_index = index
+
+            st.markdown("##### Edit / Add Attributes")
+
+            updated_rows = []
+            for i, row in enumerate(st.session_state.attr_rows):
                 col1, col2, col3 = st.columns([4, 4, 1])
+
                 with col1:
-                    new_key = st.text_input(f"Key", value=key, key=f"key_{key}_{index}")
+                    used_keys = [
+                        r["key"] for j, r in enumerate(st.session_state.attr_rows)
+                        if j != i and not r.get("custom", False) and r["key"]
+                    ]
+                    available_keys = [k for k in candidate_keys if k not in used_keys]
+                    options = available_keys + ["Custom Attribute"]
+
+                    if row.get("custom", False):
+                        key = st.text_input("Select Attribute", value=row.get("key", ""), key=f"custom_key_{i}_{index}")
+                        row["key"] = key
+                    else:
+                        selected = st.selectbox(
+                            "Select Attribute",
+                            options,
+                            index=options.index(row["key"]) if row["key"] in options else 0,
+                            key=f"key_select_{i}_{index}"
+                        )
+                        if selected == "Custom Attribute":
+                            row["custom"] = True
+                            row["key"] = ""
+                            row["value"] = ""  # ✅ 这行是关键：清空 value
+                            key = ""
+                            st.rerun()
+                        else:
+                            row["custom"] = False
+                            row["key"] = selected
+                            key = selected
+                     
+
                 with col2:
-                    new_val = st.text_input(f"Value", value=val, key=f"val_{key}_{index}")
+                    if row.get("custom", False):
+                        val = st.text_input("Value", value=row.get("value", ""), key=f"val_{i}_{index}")
+                        row["value"] = val
+                    else:
+                        auto_val = output_attrs.get(row["key"], "")
+                        val = st.text_input("Value", value=auto_val, key=f"val_{i}_{index}")
+                        row["value"] = val
+
                 with col3:
-                    if st.checkbox("Delete", key=f"delete_{key}_{index}"):
+                    if st.checkbox("🗑️ Delete", key=f"delete_{i}_{index}"):
                         continue
-                updated_attrs[new_key] = new_val
 
-            st.markdown("")
-            st.markdown("##### Add New Attribute")
-            new_key = st.text_input("New Attribute Key", key=f"new_key_{index}")
-            new_val = st.text_input("New Attribute Value", key=f"new_val_{index}")
-            if new_key and new_val:
-                updated_attrs[new_key] = new_val
+                updated_rows.append(row)
 
-            if st.button("Save Attributes for This Edge"):
-                new_edge_data = {"from": src, "to": tgt, "attributes": updated_attrs}
+            st.session_state.attr_rows = updated_rows
+
+            # Add Attribute row
+            if st.button("➕ Add Attribute"):
+                default_key = next((k for k in candidate_keys if k not in [r["key"] for r in st.session_state.attr_rows]), "")
+                st.session_state.attr_rows.append({
+                    "key": default_key,
+                    "value": output_attrs.get(default_key, "") if default_key else "",
+                    "custom": False if default_key else True
+                })
+                st.rerun()
+
+            # Save Attributes
+            if st.button("💾 Save"):
+                new_attr_dict = {
+                    row["key"]: row["value"]
+                    for row in st.session_state.attr_rows
+                    if row["key"]
+                }
+                new_edge_data = {"from": src, "to": tgt, "attributes": new_attr_dict}
                 st.session_state.edges_state[index] = (src, tgt, new_edge_data)
                 st.success("Attributes updated.")
+                st.session_state.attr_rows = None  # Reset
 
-            # Navigation buttons
+            # Navigation
             col1, col2 = st.columns([8, 0.67])
             with col1:
                 if st.button("Previous Edge") and index > 0:
                     st.session_state.edge_index -= 1
+                    st.session_state.attr_rows = None
                     rerun()
             with col2:
                 if st.button("Next Edge") and index < len(st.session_state.edges_state) - 1:
                     st.session_state.edge_index += 1
+                    st.session_state.attr_rows = None
                     rerun()
+
+
 
     # Step 3: Finalize and Export YAML (in expander)
     reconstructed_nodes = [{name: attrs} for name, attrs in st.session_state.nodes_state]

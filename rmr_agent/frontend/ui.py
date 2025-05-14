@@ -4,6 +4,7 @@ import requests
 import json
 import time
 from datetime import datetime
+from streamlit import rerun
 from rmr_agent.utils import parse_github_url 
 from rmr_agent.workflow import STEPS, HUMAN_STEPS
 from rmr_agent.frontend.ui_utils import (
@@ -151,8 +152,11 @@ def check_workflow_status():
                 # Found a human verification step - stop auto-polling
                 print(f"Human verification step detected: {current_step}")
                 st.session_state.workflow_running = False
-            elif status == "completed":
+            elif st.session_state["current_step"] == "complete":
+                print("✅ backend returned complete status")
                 st.session_state.workflow_running = False
+                st.session_state["workflow_complete"] = True
+                st.rerun()
                 st.success("Workflow completed successfully!")
             elif status == "failed":
                 st.session_state.workflow_running = False
@@ -431,14 +435,35 @@ def human_verification_of_components_ui(repo_name, run_id):
                 st.error("Could not display code for this file")
 
 def human_verification_of_dag_ui(repo_name, run_id):
+    print("\n=== 🚧 ENTER DAG UI ===")
+    print("📍 current_step =", st.session_state.get("result", {}).get("step"))
+
+    if st.session_state.get("result", {}).get("step") != "human_verification_of_dag":
+        print("🔁 Step changed – not rendering DAG editor UI")
+        return
+
     dag_yaml = get_dag_yaml(repo_name, run_id)
     updated_dag_yaml = dag_edge_editor(dag_yaml)
 
     if updated_dag_yaml:
-        payload = {"verified_dag": updated_dag_yaml}
+        payload = {
+            "verified_dag": updated_dag_yaml,
+            "github_url": st.session_state["github_url"],
+            "input_files": st.session_state["input_files"]
+        }
+        print("📤 Submitting human feedback from DAG UI...")
         submit_human_feedback(payload=payload, repo_name=repo_name, run_id=run_id)
 
+
 def main():
+    if st.session_state.get("workflow_complete"):
+        st.success("🎉 Workflow is complete!")
+
+        if st.button("Back to Home"):
+            st.session_state.clear()
+            st.rerun()
+        return
+
     # UI welcome page before starting workflow
     if st.session_state["display_welcome_page"] == True:
         display_welcome_page()
@@ -495,11 +520,6 @@ def main():
             human_verification_of_components_ui(repo_name, run_id)
         elif current_step == "human_verification_of_dag":
             human_verification_of_dag_ui(repo_name, run_id)
-        elif current_step == "complete":
-            st.session_state.workflow_running=False
-            st.success("Workflow Complete!")
-            st.json(result["result"])
-
 
 if __name__ == "__main__":
     main()

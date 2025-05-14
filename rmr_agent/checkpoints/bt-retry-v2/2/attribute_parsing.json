@@ -5,65 +5,58 @@
         "inputs": [
           {
             "name": "strategy_type",
-            "value": "['PAN', 'NO_AVS', 'NETWORK_TOKENIZATION', 'ABU']"
-          },
-          {
-            "name": "created_at_start",
-            "value": "'2023-08-15'"
-          },
-          {
-            "name": "created_at_end",
-            "value": "'2025-01-02'"
-          },
-          {
-            "name": "sampling_factor",
-            "value": "15"
+            "value": [
+              "PAN",
+              "NO_AVS",
+              "NETWORK_TOKENIZATION",
+              "ABU"
+            ]
           },
           {
             "name": "date_range_start",
-            "value": "'2023-01-01'"
+            "value": "2023-08-15"
           },
           {
             "name": "date_range_end",
-            "value": "'2025-01-02'"
+            "value": "2025-01-02"
           },
           {
-            "name": "currency_code",
-            "value": "'USD'"
+            "name": "random_sampling_factor",
+            "value": 15
           },
           {
             "name": "train_downsampling_factor",
-            "value": "900"
+            "value": 900
           },
           {
-            "name": "validation_downsampling_factor_start",
-            "value": "900"
+            "name": "validation_downsampling_start",
+            "value": 900
           },
           {
-            "name": "validation_downsampling_factor_end",
-            "value": "950"
+            "name": "validation_downsampling_end",
+            "value": 950
           },
           {
-            "name": "test_downsampling_factor_start",
-            "value": "950"
+            "name": "oot_downsampling_start",
+            "value": 950
           }
         ],
         "outputs": [
           {
-            "name": "bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3",
+            "name": "train_dataset",
             "value": "pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3"
           },
           {
-            "name": "bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3",
+            "name": "validation_dataset",
             "value": "pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3"
           },
           {
-            "name": "bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3",
+            "name": "test_dataset",
             "value": "pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3"
           }
         ],
         "file_name": "rmr_agent/repos/bt-retry-v2/etl/01_etl.py",
-        "line_range": "1-1125"
+        "line_range": "1-1187"
       }
     },
     {
@@ -97,24 +90,12 @@
           }
         ],
         "file_name": "rmr_agent/repos/bt-retry-v2/etl/02_bq_to_dataproc.py",
-        "line_range": "1-40"
+        "line_range": "1-53"
       }
     },
     {
       "Model Training": {
         "inputs": [
-          {
-            "name": "v1_features_path",
-            "value": "/projects/dnaomi/bt-retry-global-v2/metadata/v1_features.txt"
-          },
-          {
-            "name": "v1_latest_features_path",
-            "value": "/projects/dnaomi/bt-retry-global-v2/metadata/v0_features_latest.txt"
-          },
-          {
-            "name": "v2_features_path",
-            "value": "/projects/dnaomi/bt-retry-global-v2/metadata/v2_features.txt"
-          },
           {
             "name": "train_parquet_path",
             "value": "/projects/dnaomi/bt-retry-global-v2/data/pypl-bods.gds_pacman_prod.bt_retry_global_v2_driverset_cc_renamed_radd_subset_filtered_full_train_3/"
@@ -122,6 +103,14 @@
           {
             "name": "val_parquet_path",
             "value": "/projects/dnaomi/bt-retry-global-v2/data/pypl-bods.gds_pacman_prod.bt_retry_global_v2_driverset_cc_renamed_radd_subset_filtered_full_valid_3/"
+          },
+          {
+            "name": "v2_features_path",
+            "value": "/projects/dnaomi/bt-retry-global-v2/metadata/v2_features.txt"
+          },
+          {
+            "name": "target_col",
+            "value": "retry_is_success"
           },
           {
             "name": "early_stopping_params",
@@ -132,34 +121,6 @@
           {
             "name": "early_stopping_metric",
             "value": "average_precision"
-          },
-          {
-            "name": "metric_functions",
-            "value": [
-              "precision_at_95",
-              "precision_at_99",
-              "savings_at_95",
-              "savings_at_99",
-              "partial_aucpr_geq90"
-            ]
-          },
-          {
-            "name": "metric_names",
-            "value": [
-              "precision_at_95",
-              "precision_at_99",
-              "savings_at_95",
-              "savings_at_99",
-              "partial_aucpr_geq90"
-            ]
-          },
-          {
-            "name": "objective_metric_name",
-            "value": "partial_aucpr_geq90"
-          },
-          {
-            "name": "target_col",
-            "value": "retry_is_success"
           },
           {
             "name": "best_params",
@@ -179,24 +140,8 @@
             }
           },
           {
-            "name": "tracking_url",
-            "value": "https://mlflow.apps.cosmos-onprem.dp.lvs.paypalinc.com"
-          },
-          {
-            "name": "experiment_name",
-            "value": "bt_retry_global_v2_full_fts_strategy_subset_model_all_strat_valid_control"
-          },
-          {
-            "name": "study_name",
-            "value": "bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control"
-          },
-          {
-            "name": "studies_dir",
-            "value": "../reports/studies/"
-          },
-          {
-            "name": "n_trials",
-            "value": 250
+            "name": "objective_metric_name",
+            "value": "partial_aucpr_geq90"
           }
         ],
         "outputs": [
@@ -206,38 +151,7 @@
           }
         ],
         "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/train.py",
-        "line_range": "1-299"
-      },
-      "Hyperparameter Tuning": {
-        "inputs": [
-          {
-            "name": "tracking_url",
-            "value": "https://mlflow.apps.cosmos-onprem.dp.lvs.paypalinc.com"
-          },
-          {
-            "name": "experiment_name",
-            "value": "bt_retry_global_v2_full_fts_strategy_subset_model_all_strat_valid_control"
-          },
-          {
-            "name": "study_name",
-            "value": "bt-retry-global-v1-full-fts-strategy-subset-model-all-strat-valid-control"
-          },
-          {
-            "name": "studies_dir",
-            "value": "../reports/studies/"
-          },
-          {
-            "name": "n_trials",
-            "value": 250
-          },
-          {
-            "name": "objective_metric_name",
-            "value": "partial_aucpr_geq90"
-          }
-        ],
-        "outputs": [],
-        "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/train.py",
-        "line_range": "300-367"
+        "line_range": "1-414"
       }
     },
     {
@@ -264,18 +178,6 @@
             "value": "/projects/dnaomi/bt-retry-global-refresh/models/final/bt_retry_v2.txt"
           },
           {
-            "name": "metric_functions",
-            "value": [
-              "precision_at_95",
-              "precision_at_99",
-              "precision_at_995",
-              "savings_at_95",
-              "savings_at_99",
-              "savings_at_995",
-              "partial_aucpr_geq90"
-            ]
-          },
-          {
             "name": "metric_names",
             "value": [
               "precision_at_95",
@@ -295,11 +197,11 @@
         "outputs": [
           {
             "name": "v1_metrics",
-            "value": "calculated metrics for V1 model"
+            "value": "List of metrics calculated for V1 model"
           },
           {
             "name": "v2_metrics",
-            "value": "calculated metrics for V2 model"
+            "value": "List of metrics calculated for V2 model"
           },
           {
             "name": "valid_data_filtered_path",
@@ -307,7 +209,7 @@
           }
         ],
         "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py",
-        "line_range": "1-383"
+        "line_range": "1-443"
       }
     },
     {
@@ -324,6 +226,18 @@
           {
             "name": "path_to_json",
             "value": "/projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json"
+          },
+          {
+            "name": "model_name",
+            "value": "bt_retry_v2"
+          },
+          {
+            "name": "tree_nodes_only",
+            "value": false
+          },
+          {
+            "name": "output_name",
+            "value": "bt_retry_v2_score"
           }
         ],
         "outputs": [
@@ -337,7 +251,7 @@
           }
         ],
         "file_name": "rmr_agent/repos/bt-retry-v2/deployment/01_export_to_ume.py",
-        "line_range": "1-60"
+        "line_range": "1-78"
       }
     },
     {
@@ -360,18 +274,22 @@
             "value": "/home/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv"
           },
           {
-            "name": "features_path",
+            "name": "features_file_path",
             "value": "/projects/dnaomi/bt-retry-global-refresh/metadata/v2_features_final_2.txt"
+          },
+          {
+            "name": "scored_data_output_path",
+            "value": "/projects/dnaomi/bt-retry-global-refresh/deployment/cosmos_ai_valid_data.csv"
           }
         ],
         "outputs": [
           {
-            "name": "scored_data_path",
+            "name": "scored_data_output_path",
             "value": "/projects/dnaomi/bt-retry-global-refresh/deployment/cosmos_ai_valid_data.csv"
           }
         ],
         "file_name": "rmr_agent/repos/bt-retry-v2/deployment/02_pyscoring_validation.py",
-        "line_range": "1-140"
+        "line_range": "1-172"
       }
     }
   ]
