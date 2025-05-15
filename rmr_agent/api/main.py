@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
+from fastapi import Request, Query, BackgroundTasks, HTTPException, FastAPI
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 from rmr_agent.workflow import *
@@ -27,8 +27,7 @@ class ComponentsResponse(BaseModel):
     verified_components: List[Dict[str, Dict[str, Any]]]
 
 class DagResponse(BaseModel):
-    verified_dag: Dict[str, Any]
-
+    verified_dag: str 
 
 def save_human_feedback(request: ComponentsResponse | DagResponse, repo_name: str, run_id: str, background_tasks: BackgroundTasks = None):
     # Save the human verification response
@@ -139,17 +138,39 @@ def cancel_workflow(
 
 # Main workflow endpoint
 @app.post("/run-workflow")
-def run_workflow_endpoint(
-    request: WorkflowRequest | ComponentsResponse | DagResponse,
+async def run_workflow_endpoint(
+    raw_request: Request,
     repo_name: str = Query(..., description="Repository name (required)"),
     run_id: Optional[str] = Query(None, description="Run ID for continuing workflow"),
     background_tasks: BackgroundTasks = None
 ):
+    payload = await raw_request.json()
+    print("📥 Received payload:", payload)
 
-    if isinstance(request, WorkflowRequest):
+    # === DAG Feedback ===
+    if "verified_dag" in payload:
+        print("🧩 Detected: DagResponse")
+        parsed = DagResponse(**payload)
+        workflow_states[repo_name][run_id]["step"] = "human_verification_of_dag"
+        workflow_states[repo_name][run_id]["status"] = "saving_feedback"
+        return save_human_feedback(parsed, repo_name, run_id, background_tasks)
+
+    # === Component Feedback ===
+    elif "verified_components" in payload:
+        print("🧩 Detected: ComponentsResponse")
+        parsed = ComponentsResponse(**payload)
+        workflow_states[repo_name][run_id]["step"] = "human_verification_of_components"
+        workflow_states[repo_name][run_id]["status"] = "saving_feedback"
+        return save_human_feedback(parsed, repo_name, run_id, background_tasks)
+
+    # === Workflow Init / Start ===
+    elif "github_url" in payload and "input_files" in payload:
+        print("🚀 Detected: WorkflowRequest")
+        parsed = WorkflowRequest(**payload)
+
         # Start or continue workflow
-        run_id = request.run_id or get_next_run_id(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name)
-        start_idx = 0 if not request.start_from else next(i for i, (s, _) in enumerate(STEPS) if s == request.start_from)
+        run_id = parsed.run_id or get_next_run_id(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name)
+        start_idx = 0 if not parsed.start_from else next(i for i, (s, _) in enumerate(STEPS) if s == parsed.start_from)
         step_name = STEPS[start_idx][0]
         status = "initializing"
 
@@ -160,30 +181,19 @@ def run_workflow_endpoint(
         state = workflow_states[repo_name][run_id]
         state["step"] = step_name
         state["status"] = status
-        state["github_url"] = request.github_url
-        state["input_files"] = request.input_files
+        state["github_url"] = parsed.github_url
+        state["input_files"] = parsed.input_files
         state["repo_name"] = repo_name
         state["run_id"] = run_id
 
-        # Add workflow task to run in background, return immediately so we can poll the results in UI
-        background_tasks.add_task(run_workflow_background, request, repo_name, run_id, start_idx)
+        # Add background task to run
+        background_tasks.add_task(run_workflow_background, parsed, repo_name, run_id, start_idx)
         return {"repo_name": repo_name, "run_id": run_id, "step": step_name, "status": status}
-    elif isinstance(request, ComponentsResponse):
-        # Save the verified components and move on to next step
-        workflow_states[repo_name][run_id]["step"] = "human_verification_of_components"
-        workflow_states[repo_name][run_id]["status"] = "saving_feedback"
-        result = save_human_feedback(request=request, repo_name=repo_name, run_id=run_id, background_tasks=background_tasks)
-        return result
-    elif isinstance(request, DagResponse):
-        # Save the verified DAG and move on to next step
-        workflow_states[repo_name][run_id]["step"] = "human_verification_of_dag"
-        workflow_states[repo_name][run_id]["status"] = "saving_feedback"
-        result = save_human_feedback(request=request, repo_name=repo_name, run_id=run_id, background_tasks=background_tasks)
-        return result
+
     else:
-        raise HTTPException(400, "Invalid request type")
+        raise HTTPException(400, "Invalid or unrecognized request type")
 
-
+# Uvicorn entry point
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="debug")

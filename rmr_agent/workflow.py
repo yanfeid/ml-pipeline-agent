@@ -1,5 +1,6 @@
 import os
 import json
+import yaml
 import tempfile
 import requests
 import argparse
@@ -8,14 +9,18 @@ from typing import Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor
 from rmr_agent.utils import (
     clone_repo, parse_github_url, convert_notebooks,
-    get_next_run_id, load_step_output, save_step_output
+    get_next_run_id, load_step_output, save_step_output,
+    save_ini_file
 )
 from langgraph.graph import StateGraph, END
+import time
 
 # State
 WorkflowState = Dict[str, Any]
 
 CHECKPOINT_BASE_PATH = "rmr_agent/checkpoints"
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
 
 def is_cancelled(state: WorkflowState) -> bool:
     """Check if the workflow has been cancelled."""
@@ -275,20 +280,46 @@ def human_verification_of_dag(state: WorkflowState) -> Dict[str, Any]:
         time.sleep(2)
 
 def run_config_agent(state: WorkflowState) -> Dict[str, Any]:
+    print(state.keys())
     if "config" in state and state["config"]:
         print("Skipping run_config_agent: 'config' already in state")
         return {}
     from rmr_agent.agents.ini_config import config_agent
-    config = config_agent(state["verified_dag"])
+    config = config_agent(state["dag_yaml"]) 
+
+    config_dir = os.path.join(state["local_repo_path"], "config")
+    os.makedirs(config_dir, exist_ok=True)
+
+    save_ini_file("environment.ini", config["environment_ini"], config_dir)
+    save_ini_file("solution.ini", config["solution_ini"], config_dir)
+
     return {"config": config}
 
 def run_notebook_agent(state: WorkflowState) -> Dict[str, Any]:
+    print("DEBUG - json type:", (state["cleaned_code"]))
     if "notebooks" in state and state["notebooks"]:
         print("Skipping run_notebook_agent: 'notebooks' already in state")
         return {}
+
     from rmr_agent.agents.notebook import notebook_agent
-    notebooks = notebook_agent(state["verified_dag"])
+    notebooks = notebook_agent(yaml.safe_load(state["dag_yaml"]),state["cleaned_code"],state["local_repo_path"])
     return {"notebooks": notebooks}
+
+def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:
+    if "edited_notebooks" in state and state["edited_notebooks"]:
+        print("Skipping run_notebook_agent: 'notebooks' already in state")
+        return {}
+    
+    from rmr_agent.agents.code_editor import code_editor_agent
+    edited_notebooks = {}
+
+    with ThreadPoolExecutor() as executor:
+        results = executor.map(
+            lambda item: (item[0], code_editor_agent(item[1])),
+            state["notebooks"].items()
+        )
+        edited_notebooks = dict(results)
+    return {"edited_notebooks": edited_notebooks}
 
 
 # Define steps requiring human input
@@ -308,7 +339,8 @@ STEPS = [
     ("generate_dag_yaml", generate_dag_yaml),
     ("human_verification_of_dag", None),  # Placeholder
     ("config_agent", run_config_agent),
-    ("notebook_agent", run_notebook_agent)
+    ("notebook_agent", run_notebook_agent),
+    ("code_editor_agent", run_code_editor_agent)
 ]
 
 INITIAL_STATE = {
@@ -338,6 +370,7 @@ INITIAL_STATE = {
     "verified_dag": {},
     "config": {},
     "notebooks": [],
+    "edited_notebooks": [],
     "pr_url": ""
 }
 
@@ -414,3 +447,8 @@ if __name__ == "__main__":
     )
     print("Final Config:", result["config"])
     print("Final Notebooks:", result["notebooks"])
+
+
+
+
+
