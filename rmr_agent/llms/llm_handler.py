@@ -1,7 +1,6 @@
 
 import os
 import requests
-import json
 import time
 import warnings
 import contextlib
@@ -16,8 +15,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from dotenv import load_dotenv
 load_dotenv() 
 
-
-
 open_models = {
     "code-llama-7b" :  "https://aiplatform.dev51.cbf.dev.paypalinc.com/seldon/seldon/codellama-7b-in-3273d/v2/models/codellama-7b-in-3273d/infer", # 'https://aiplatform.dev51.cbf.dev.paypalinc.com/v1/chat/completions'
     "code-llama-13b" : "https://aiplatform.dev51.cbf.dev.paypalinc.com/seldon/seldon/code-llama-13b--5cd35/v2/models/code-llama-13b--5cd35/infer",
@@ -29,7 +26,6 @@ open_models = {
     "deepseek/deepseek-reasoner": "https://aiplatform.dev52.cbf.dev.paypalinc.com/seldon/seldon/deepseek-r1-dis-9233d/v2/models/deepseek-r1-dis-9233d/infer", # DeepSeek-R1-Distill-Llama-70B
     "code-llama-13b-in" : "https://aiplatform.dev51.cbf.dev.paypalinc.com/seldon/seldon/codellama-13b-in-3273d/v2/models/codellama-13b-in-3273d/infer"
 }
-
 
 
 def messages_to_prompt(messages: list[dict[str, str]]) -> str:
@@ -52,11 +48,12 @@ def messages_to_prompt(messages: list[dict[str, str]]) -> str:
 print("client_id:", os.getenv("AZURE_CLIENT_ID"))
 print("client_secret starts with:", os.getenv("AZURE_CLIENT_SECRET")[:5])
 
-
 class TokenManager:
     def __init__(self):
         self._token = None
         self._token_expiry = 0
+        self.tenant_id = os.getenv("AZURE_TENANT_ID")
+        self.token_url = os.getenv("AZURE_TOKEN_URL")
         self.tenant_id = os.getenv("AZURE_TENANT_ID")
         self.token_url = os.getenv("AZURE_TOKEN_URL")
 
@@ -86,11 +83,8 @@ class TokenManager:
         except Exception:
             raise RuntimeError(f"Failed to fetch token: {res.status_code} — {res.text}")
 
-
-
 # single instance of token manager
 token_manager = TokenManager()
-
 old_merge_environment_settings = requests.Session.merge_environment_settings
 
 
@@ -205,6 +199,7 @@ class AzureGPTHandler(LLMHandler):
         payload = {
             "messages": messages,
             # "model": os.getenv("MODEL_NAME", "gpt-4o"),  # may be configurable - for now hard coding to gpt-4o
+            # "model": os.getenv("MODEL_NAME", "gpt-4o"),  # may be configurable - for now hard coding to gpt-4o
             "temperature": kwargs.get('temperature', 0.0),  
             "max_tokens": kwargs.get('max_tokens', 2048),  
             "top_p": kwargs.get('top_p', 0.3),  
@@ -268,6 +263,8 @@ class AzureGPTHandler(LLMHandler):
 class LLMClient:
     def __init__(self, model_name: Optional[str] = None):
         self.model_name = os.getenv("MODEL_NAME")
+    def __init__(self, model_name: Optional[str] = None):
+        self.model_name = os.getenv("MODEL_NAME")
 
         open_url = open_models.get(model_name, "")
         if open_url:
@@ -276,7 +273,6 @@ class LLMClient:
         else:
             self.handler = AzureGPTHandler()
             self.url = os.getenv("GENAI_API_URL")# "http://10.183.170.134:8001/api/llm/" # "http://10.183.170.134:8001/api/llm/" # codepal LLM endpoint  # "http://host.docker.internal:8001/api/llm/"
-
     
     def call_llm(self, 
                  prompt: str = "",

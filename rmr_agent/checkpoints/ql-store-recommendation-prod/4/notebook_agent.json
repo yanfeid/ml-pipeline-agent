@@ -1,0 +1,12 @@
+{
+  "notebooks": {
+    "driver_creation": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/0_driver_creation.py",
+    "feature_engineering": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/1_feature_engineering.py",
+    "data_pulling": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/2_data_pulling.py",
+    "feature_consolidation": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/3_feature_consolidation.py",
+    "data_preprocessing": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/4_data_preprocessing.py",
+    "model_training": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/5_model_training.py",
+    "model_packaging": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/6_model_packaging.py",
+    "model_scoring": "rmr_agent/repos/ql-store-recommendation-prod/notebooks/7_model_scoring.py"
+  }
+}
