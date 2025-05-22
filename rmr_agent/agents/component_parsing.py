@@ -71,19 +71,23 @@ def parse_component_identification(component_identification_response, file):
 
 ### Response Format (JSON):
 {{
-  "Component Name": {{
-    "line_range": "A single, merged line range (e.g., 0-49)",
+  "<ML_COMPONENT_NAME_HERE>": {{ 
+    "line_range": "<MERGED_NON_OVERLAPPING_LINE_RANGE>", // Example: "0-49", "55-72"
     "evidence": [
       {{
-        "quote_or_paraphrase": "Quote/paraphrase text",
-        "support_reason": "Reason text"
+        "quote_or_paraphrase": "<RELEVANT_QUOTE_OR_PARAPHRASE_1>",
+        "support_reason": "<EXPLANATION_WHY_EVIDENCE_1_SUPPORTS_THIS_COMPONENT>"
       }},
       {{
-        "quote_or_paraphrase": "Quote/paraphrase text",
-        "support_reason": "Reason text"
+        "quote_or_paraphrase": "<RELEVANT_QUOTE_OR_PARAPHRASE_2>",
+        "support_reason": "<EXPLANATION_WHY_EVIDENCE_2_SUPPORTS_THIS_COMPONENT>"
+      }},
+      {{
+        "quote_or_paraphrase": "<RELEVANT_QUOTE_OR_PARAPHRASE_3>",
+        "support_reason": "<EXPLANATION_WHY_EVIDENCE_3_SUPPORTS_THIS_COMPONENT>"
       }}
     ],
-    "why_this_is_separate": "The explanation of why this component is separate (or null if not present)"
+    "why_this_is_separate": "<JUSTIFICATION_FOR_THIS_COMPONENT_BEING_SEPARATE_AND_VERIFICATION_OF_NOT_OVERLAPPING>"
     }}
 }}
 

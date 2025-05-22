@@ -134,19 +134,18 @@ def attribute_identification_agent(python_file_path: str, component_dict: Dict[s
     
 ### Output Format (JSON):
 {{
-    "Component Name": {{
+    "<ML_COMPONENT_NAME_HERE>": {{
         "inputs": [
-            {{"name": "variable_name_1", "value": "variable value 1"}},
-            {{"name": "variable_name_2", "value": "variable value 2"}},
+            {{"name": "<INPUT_VARIABLE_1_NAME>", "value": "<INPUT_VARIABLE_1_VALUE>"}},
+            {{"name": "<INPUT_VARIABLE_2_NAME>", "value": "<INPUT_VARIABLE_2_VALUE>"}}
         ],
         "outputs": [
-            {{"name": "variable_name_1", "value": "variable value 1"}},
-            {{"name": "variable_name_2", "value": "variable value 2"}},
+            {{"name": "<OUTPUT_VARIABLE_1_NAME>", "value": "<OUTPUT_VARIABLE_1_VALUE>"}},
+            {{"name": "<OUTPUT_VARIABLE_2_NAME>", "value": "<OUTPUT_VARIABLE_2_VALUE>"}}
         ],
         "needs_config_fill": false // Mark as true if any variable values are loading from a config
     }}
 }}
-
 
 ### The Identified ML Component:
 {component}

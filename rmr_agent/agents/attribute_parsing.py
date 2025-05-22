@@ -107,14 +107,14 @@ def parse_attribute_identification(component_identification_dict, attribute_text
 
 ### Output format (JSON):
 {{
-    "Component Name": {{
+    "<ML_COMPONENT_NAME_HERE>": {{
         "inputs": [
-            {{"name": "variable_name_1", "value": "variable value 1"}},
-            {{"name": "variable_name_2", "value": "variable value 2"}},
+            {{"name": "<INPUT_VARIABLE_1_NAME>", "value": "<INPUT_VARIABLE_1_VALUE>"}},
+            {{"name": "<INPUT_VARIABLE_2_NAME>", "value": "<INPUT_VARIABLE_2_VALUE>"}}
         ],
         "outputs": [
-            {{"name": "variable_name_1", "value": "variable value 1"}},
-            {{"name": "variable_name_2", "value": "variable value 2"}},
+            {{"name": "<OUTPUT_VARIABLE_1_NAME>", "value": "<OUTPUT_VARIABLE_1_VALUE>"}},
+            {{"name": "<OUTPUT_VARIABLE_2_NAME>", "value": "<OUTPUT_VARIABLE_2_VALUE>"}}
         ]
     }}
 }}
