@@ -117,22 +117,29 @@ def parse_component_identification(component_identification_response, file):
     parsed_dict = convert_to_dict(parsed_text)
     if not parsed_dict:
         raise ValueError("No components identified in the response for file: " + file)
-    # Add the file name to each identified component
+    
+    # Add the file name to each identified component and filter out invalid components
+    components_to_delete = []
     for component, metadata in parsed_dict.items():
+        # Check if component is in the allowed set of components
         if component not in allowed_components:
             print(f'Found identified component outside of allowed set of components for {file}: "{component}"')
-            # Delete this extra component category
-            del parsed_dict[component]
+            # Delete this extra component category (do later so we do not edit dictionary we are iterating over)
+            components_to_delete.append(component)
             continue
             
-            
         metadata['file_name'] = file
+    
+    # Delete the invalid components
+    for component in components_to_delete:
+        del parsed_dict[component]
 
-        if len(parsed_dict) == 1:
-            # when only one component identified in the file, just take all of the lines in the file for that component. 
-            cleaned_code = preprocess_python_file(file)
-            num_lines = len(cleaned_code.splitlines())
-            metadata['line_range'] = f"1-{num_lines}"
+    # Handle single component case
+    if len(parsed_dict) == 1:
+        # when only one component identified in the file, just take all of the lines in the file for that component. 
+        cleaned_code = preprocess_python_file(file)
+        num_lines = len(cleaned_code.splitlines())
+        metadata['line_range'] = f"1-{num_lines}"
 
     return parsed_text, parsed_dict
 
