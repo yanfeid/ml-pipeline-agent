@@ -288,7 +288,16 @@ def human_verification_of_components_ui(repo_name, run_id):
         st.success("All files verified! Submitting...")
     else:
         # Current file’s components dictionary
-        current_components_dict = components[current_index]
+        if (
+            "edited_components_list" in st.session_state and
+            current_index < len(st.session_state["edited_components_list"]) and
+            st.session_state["edited_components_list"][current_index]
+        ):
+            # Load from the edited version in session state
+            current_components_dict = st.session_state["edited_components_list"][current_index]
+        else:
+            # Load from the original components list
+            current_components_dict = components[current_index]
         file_name = next(iter(current_components_dict.values()))["file_name"]  # Get from first component
         cleaned_file_name = clean_file_path(file_name, repo_name)
 
@@ -306,7 +315,7 @@ def human_verification_of_components_ui(repo_name, run_id):
         code_display = code_lines if file_name in cleaned_code else []
         code_display = remove_line_numbers(code_display) # line numbers will already be shown by streamlit
 
-        # Existing component names (identified by agent)
+        # Existing component names for this file
         existing_component_names = list(current_components_dict.keys())
 
         # Split into two columns so we can always show cleaned code on the right for reference -> easier to identify line numbers this way
@@ -318,12 +327,17 @@ def human_verification_of_components_ui(repo_name, run_id):
             st.write(f"     - **{cleaned_file_name}** ({current_index + 1}/{total_files})")
 
             # Multiselect to keep/delete/add component names
-            options = list(ml_components.keys()) + ["Other"]
+            multiselect_options = list(ml_components.keys()) + ["Other"]
+            # Ensure all existing_component_names (which are the defaults) are in multiselect_options.
+            # This is crucial for when custom components were added and are now part of the defaults.
+            for comp_name in existing_component_names:
+                if comp_name not in multiselect_options:
+                    multiselect_options.append(comp_name)
             if not existing_component_names:
                 st.warning("None of the available ML components could identified in this file. Please select the appropriate component(s).")
             selected_components = st.multiselect(
                 "Components identified in this file (please verify):",
-                options=options,
+                options=multiselect_options,
                 default=existing_component_names,
                 key=f"components_{current_index}"
             )
@@ -338,7 +352,7 @@ def human_verification_of_components_ui(repo_name, run_id):
                 # Process the other components
                 if other_components:
                     # Split by newline to get individual components
-                    custom_components = [comp.strip() for comp in other_components.split('\n') if comp.strip()]
+                    custom_components = [comp.strip().replace('_', ' ').title() for comp in other_components.split('\n') if comp.strip()]
                     
                     # Remove "Other" and add the custom components
                     selected_components.remove("Other")
