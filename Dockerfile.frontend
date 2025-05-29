@@ -25,4 +25,4 @@ ENV PYTHONPATH=/rmr_agent
 EXPOSE 8501
 
 # Run Streamlit
-CMD ["streamlit", "run", "rmr_agent/frontend/ui.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["python", "run_ui.py"]
