@@ -120,10 +120,13 @@ def attribute_identification_agent(python_file_path: str, component_dict: Dict[s
     2. Identify all **input** variables (name & value) for this component.
     3. Identify all **output** variables (name & value) for this component. 
     4. For each input and output variable identified, provide:
-        a. The variable **name**: the exact Python variable name if it exists
-            - If there is no existing variable name, create a descriptive name which follows standard Python variable naming: use all lowercase letters, with words separated by underscores (e.g. driver_output_path, batch_size). Avoid spaces, uppercase letters, or special characters other than underscores.
+        a. The variable **name**: 
+            - If the value comes from an existing declared variable with a descriptive, unique name (e.g., train_batch_size = 32), use that exact variable name
+            - If the value comes from an existing variable with a reused name (e.g., source_table_name used for multiple different tables), create a more descriptive name (e.g., train_source_table_name, validation_source_table_name)
+            - If the value is hardcoded directly in the code (e.g., model.fit(epochs=100) where 100 is hardcoded), create a unique, descriptive variable name following standard Python naming: lowercase letters with underscores (e.g., training_epochs, batch_size, driver_output_path). Ensure your variables names are unique. 
         b. The current **value** in the code
-    5. Detect variables loaded from a configuration file - identify whether any of the variables you found have a value which is missing in the code and instead being loaded dynamically from a configuration file
+        c. Whether the variable **already exists** in the code as a declared variable vs. is a hardcoded value
+        d. Whether you **renamed** an existing non-unique variable to make it unique and more descriptive
 
 ### Additional Guidance:
     - Focus only on input/output variables that should be **configurable** in a rerunnable pipeline. Pay special attention to hardcoded variables that might change between pipeline runs!
@@ -131,19 +134,62 @@ def attribute_identification_agent(python_file_path: str, component_dict: Dict[s
     - Include only static, configurable variables. Exclude function/method calls and file name lists. Paths constructed with `os.path.join()` are okay to include.
     - Exclude long column lists, such as categorical, numerical, meta, or candidate columns, from being treated as variables. The target (or label) column list, weight column list, can be included as variables however. Also, lists used directly in data operations (e.g., join keys, filter keys, grouping keys, indexing or sort keys) are fine to include if necessary.
     - Make sure each variable in your response has both a variable name followed by its value. Use valid JSON structure for your output. 
-    
+
+### Variable Classification Examples:
+- Existing variable with good name ("already_exists": true, "renamed": false):
+    ```python
+    train_batch_size = 32
+    model.fit(X_train, y_train, batch_size=train_batch_size)
+    ```
+    → Variable name: train_batch_size, Value: 32, Already exists: true, Renamed: false
+- Existing variable with reused name ("already_exists": true, "renamed": true):
+    ```python
+    source_table_name = "train_data_path"
+    move_data(source_table_name, target_table_name)
+    # Later in code...
+    source_table_name = "validation_data_path"  # Same variable reused!
+    move_data(source_table_name, target_table_name)
+    ```
+    → For first usage: Variable name: train_source_table_name (you rename it), Value: "train_data_path", Already exists: true, Renamed: true
+    → For second usage: Variable name: validation_source_table_name (you rename it), Value: "validation_data_path", Already exists: true, Renamed: true 
+- Hardcoded value ("already_exists": false):
+    ```python
+    model.fit(X_train, y_train, batch_size=32)
+    ```
+    → Variable name: batch_size (you create this name), Value: 32, Already exists: false
+  
+
 ### Output Format (JSON):
 {{
     "<ML_COMPONENT_NAME_HERE>": {{
         "inputs": [
-            {{"name": "<INPUT_VARIABLE_1_NAME>", "value": "<INPUT_VARIABLE_1_VALUE>"}},
-            {{"name": "<INPUT_VARIABLE_2_NAME>", "value": "<INPUT_VARIABLE_2_VALUE>"}}
+            {{
+                "name": "<INPUT_VARIABLE_1_NAME>", 
+                "value": "<INPUT_VARIABLE_1_VALUE>",
+                "already_exists": <BOOL_HERE>,
+                "renamed": <BOOL_HERE>
+            }},
+            {{
+                "name": "<INPUT_VARIABLE_2_NAME>", 
+                "value": "<INPUT_VARIABLE_2_VALUE>",
+                "already_exists": <BOOL_HERE>,
+                "renamed": <BOOL_HERE>
+            }}
         ],
         "outputs": [
-            {{"name": "<OUTPUT_VARIABLE_1_NAME>", "value": "<OUTPUT_VARIABLE_1_VALUE>"}},
-            {{"name": "<OUTPUT_VARIABLE_2_NAME>", "value": "<OUTPUT_VARIABLE_2_VALUE>"}}
-        ],
-        "needs_config_fill": false // Mark as true if any variable values are loading from a config
+            {{
+                "name": "<OUTPUT_VARIABLE_1_NAME>", 
+                "value": "<OUTPUT_VARIABLE_1_VALUE>",
+                "already_exists": <BOOL_HERE>,
+                "renamed": <BOOL_HERE>
+            }},
+            {{
+                "name": "<OUTPUT_VARIABLE_2_NAME>", 
+                "value": "<OUTPUT_VARIABLE_2_VALUE>",
+                "already_exists": <BOOL_HERE>,
+                "renamed": <BOOL_HERE>
+            }}
+        ]
     }}
 }}
 
@@ -159,7 +205,7 @@ def attribute_identification_agent(python_file_path: str, component_dict: Dict[s
 ### Code:
 {clean_code}
     """
-        #print(attribute_prompt)
+        # Call the LLM to identify attributes for this component
         llm_client = LLMClient()
         response: litellm.types.utils.ModelResponse = llm_client.call_llm(
             prompt=attribute_prompt,
@@ -172,7 +218,7 @@ def attribute_identification_agent(python_file_path: str, component_dict: Dict[s
         attribute_text = choices[0].message.content or ""
 
         # add to overall result
-        attribute_identification_result += attribute_text + "\n"
+        attribute_identification_result += attribute_text + "\n\n"
     return attribute_identification_result
 
 
