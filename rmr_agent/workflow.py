@@ -12,7 +12,6 @@ from rmr_agent.utils import (
     get_next_run_id, load_step_output, save_step_output,
     save_ini_file
 )
-from langgraph.graph import StateGraph, END
 import time
 
 # State
@@ -30,7 +29,10 @@ def clone_and_prepare_repo(state: WorkflowState) -> Dict[str, Any]:
     if "files" in state and state["files"]:
         print("Skipping clone_and_prepare_repo: 'files' already in state")
         return {}
-    local_repo_path = clone_repo(state["github_url"])
+    # Clone the repository and prepare the local path
+    local_repo_path = clone_repo(state["github_url"], state['run_id'])
+
+    # Convert notebooks to Python files
     files = convert_notebooks(state["input_files"], local_repo_path)
     return {
         "github_url": state['github_url'],
@@ -118,7 +120,7 @@ def run_component_parsing(state: WorkflowState) -> Dict[str, Any]:
     return {"component_parsing": component_parsing}
 
 def human_verification_of_components(state: WorkflowState) -> Dict[str, Any]:
-    # temporarily just edit in vim -> later move to user interface front end to verify the list of components identified for each python file
+    """This is a mock function that simulates human verification of the identified ML Components."""
     if "verified_components" in state and state["verified_components"]:
         print("Skipping human_verification_of_components: 'verified_components' already in state")
         return {}
@@ -203,7 +205,6 @@ def run_attribute_identification(state: WorkflowState) -> Dict[str, Any]:
     return {"attribute_identification": attribute_identification}
 
 def run_attribute_parsing(state: WorkflowState) -> Dict[str, Any]:
-    # to do - add config values from existing config if applicable. Add conditional logic to check if that is the case, use LLM call to fill the values (easiest way) 
     if 'attribute_parsing' in state and state['attribute_parsing']:
         print("Skipping run_attribute_parsing: 'attribute_parsing' already in state")
         return {}
@@ -248,7 +249,14 @@ def run_edge_identification(state: WorkflowState) -> Dict[str, Any]:
         print("Skipping run_edge_identification: 'edges' already in state")
         return {}
     from rmr_agent.agents.edge_identification import edge_identification_agent
-    edges = edge_identification_agent(state["node_aggregator"])
+    edges, edge_identification_response = edge_identification_agent(state["node_aggregator"])
+    edge_id_justification_path = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'], "edge_identification_response.txt")
+    try:
+        with open(edge_id_justification_path, 'w') as file:
+            file.write(edge_identification_response)
+        print(f"Edge identification response successfully exported to {edge_id_justification_path}")
+    except Exception as e:
+        print(f"Error exporting edge identification response to {edge_id_justification_path}: {type(e).__name__}: {str(e)}")
     return {"edges": edges}
 
 def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
@@ -257,7 +265,7 @@ def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
         return {}
     from rmr_agent.agents.dag import generage_dag_yaml
     dag_yaml_str = generage_dag_yaml(aggregated_nodes=state["node_aggregator"], edges=state["edges"])
-    dag_yaml_path = f"{CHECKPOINT_BASE_PATH}/{state['repo_name']}/{state['run_id']}/dag.yaml"
+    dag_yaml_path = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'], "dag.yaml")
     try:
         with open(dag_yaml_path, 'w') as yaml_file:
             yaml_file.write(dag_yaml_str)
@@ -267,6 +275,7 @@ def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
     return {"dag_yaml": dag_yaml_str}
 
 def human_verification_of_dag(state: WorkflowState) -> Dict[str, Any]:
+    """This is a mock function that simulates human verification of the DAG."""
     if "verified_dag" in state and state["verified_dag"]:
         print("Skipping human_verification: 'verified_dag' already in state")
         return {}
@@ -321,6 +330,32 @@ def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:
         edited_notebooks = dict(results)
     return {"edited_notebooks": edited_notebooks}
 
+def push_code_changes(state: WorkflowState) -> Dict[str, Any]:
+    if "edited_notebooks" not in state or not state["edited_notebooks"]:
+        print("No edited notebooks to push")
+        return {}
+
+    local_repo_path = state["local_repo_path"]
+    edited_notebooks = state["edited_notebooks"]
+
+    #
+
+    return {}
+
+def run_pr_creation(state: WorkflowState) -> Dict[str, Any]:
+    if "pr_url" in state and state["pr_url"]:
+        print("Skipping create_pr: 'pr_url' already in state")
+        return {}
+    
+    from rmr_agent.utils import generate_pr_body, create_pull_request
+
+    checkpoint_dir = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'])
+    if not os.path.exists(checkpoint_dir):
+        raise FileNotFoundError(f"Checkpoint directory {checkpoint_dir} does not exist. Please run the workflow first.")
+    pr_body = generate_pr_body(checkpoints_dir_path=checkpoint_dir)
+    pr_url = create_pull_request(github_url=state["github_url"], pr_body=pr_body)
+
+
 
 # Define steps requiring human input
 HUMAN_STEPS = {"human_verification_of_components", "human_verification_of_dag"}
@@ -340,7 +375,8 @@ STEPS = [
     ("human_verification_of_dag", None),  # Placeholder
     ("config_agent", run_config_agent),
     ("notebook_agent", run_notebook_agent),
-    ("code_editor_agent", run_code_editor_agent)
+    ("code_editor_agent", run_code_editor_agent),
+    ("create_pull_request", run_pr_creation)
 ]
 
 INITIAL_STATE = {
@@ -375,6 +411,7 @@ INITIAL_STATE = {
 }
 
 def build_workflow():
+    from langgraph.graph import StateGraph, END
     workflow = StateGraph(WorkflowState)
     
     # Add all nodes using a for loop

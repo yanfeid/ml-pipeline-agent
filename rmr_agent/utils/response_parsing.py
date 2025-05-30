@@ -57,15 +57,69 @@ def list_to_yaml_string(data_list):
         print(f"Error converting to YAML string: {e}")
         return ""
     
+    
+def yaml_to_dict(yaml_str: str):
+    """
+    Extracts YAML content from a string, prioritizing content within
+    a ```yaml ... ``` or ``` ... ``` code block if present.
+    If no block is found, it attempts to parse the entire string.
 
-def yaml_to_dict(yaml_str):
-    # Remove Markdown code block markers and clean whitespace
-    cleaned_yaml = re.sub(r'```(?:yaml)?\n|```', '', yaml_str).strip()
-    try:
-        return yaml.safe_load(cleaned_yaml)
-    except yaml.YAMLError as e:
-        print(f"Error parsing YAML: {e}")
+    Args:
+        yaml_str (str): The string potentially containing YAML data,
+                        possibly within a Markdown code block and with
+                        other surrounding text.
+
+    Returns:
+        dict or list: The parsed YAML data, or None if parsing fails
+                      or input is not a string.
+    """
+    if not isinstance(yaml_str, str):
+        print("Error: Input must be a string.")
         return None
+
+    # Regex to find content within ```yaml ... ``` or ``` ... ```
+    # - ```(?:yaml\s*)? : Matches "```" followed optionally by "yaml" and spaces.
+    #   (?:...) is a non-capturing group. \s* matches zero or more whitespace chars.
+    # - (.*?) : Captures the content in between. It's non-greedy (?),
+    #   and re.DOTALL makes . match newlines.
+    # - ``` : Matches the closing triple backticks.
+    pattern = re.compile(r"```(?:yaml\s*)?(.*?)```", re.DOTALL)
+    match = pattern.search(yaml_str)
+
+    content_to_parse = None
+    source_of_content = "" # For debugging messages
+
+    if match:
+        # A fenced block was found, extract its content
+        extracted_content = match.group(1).strip() # .strip() to remove leading/trailing newlines/spaces from the captured group
+        if extracted_content: # Ensure extracted content is not empty
+            content_to_parse = extracted_content
+            source_of_content = "extracted YAML block"
+        else:
+            # Block found but was empty, try parsing the whole string as a fallback
+            # print("DEBUG: Found an empty YAML block. Attempting to parse the whole string.")
+            content_to_parse = yaml_str.strip()
+            source_of_content = "entire string (after finding empty block)"
+    else:
+        # No ```...``` block found. Assume the entire string might be YAML.
+        # print("DEBUG: No explicit YAML block found. Attempting to parse the whole string.")
+        content_to_parse = yaml_str.strip()
+        source_of_content = "entire string (no block detected)"
+
+    if content_to_parse:
+        try:
+            return yaml.safe_load(content_to_parse)
+        except yaml.YAMLError as e:
+            print(f"Error parsing YAML from {source_of_content}: {e}")
+            print(f"--- Content that failed to parse ---\n{content_to_parse}\n------------------------------------")
+            return None
+    else:
+        # This case should ideally not be hit if yaml_str was not empty,
+        # as content_to_parse would be yaml_str.strip().
+        # But if yaml_str itself was empty or only whitespace.
+        print("Error: No content to parse after processing.")
+        return None
+
     
 def dict_to_yaml(data):
     """Convert dictionary back to YAML string."""
