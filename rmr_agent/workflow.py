@@ -331,20 +331,20 @@ def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:
     return {"edited_notebooks": edited_notebooks}
 
 def push_code_changes(state: WorkflowState) -> Dict[str, Any]:
-    if "edited_notebooks" not in state or not state["edited_notebooks"]:
-        print("No edited notebooks to push")
+    if "successfully_pushed_code" in state and state["successfully_pushed_code"]:
+        print("Skipping push_code_changes: 'successfully_pushed_code' already True in state")
         return {}
+    from rmr_agent.utils import push_refactored_code
 
-    local_repo_path = state["local_repo_path"]
-    edited_notebooks = state["edited_notebooks"]
-
-    #
-
-    return {}
+    successfully_pushed_code = push_refactored_code(github_url=state['github_url'], run_id=state['run_id'])    #
+    return {"successfully_pushed_code": successfully_pushed_code}
 
 def run_pr_creation(state: WorkflowState) -> Dict[str, Any]:
     if "pr_url" in state and state["pr_url"]:
         print("Skipping create_pr: 'pr_url' already in state")
+        return {}
+    if "successfully_pushed_code" in state and not state["successfully_pushed_code"]:
+        print("Skipping create_pr: Code changes must be successfully pushed before creating a PR.")
         return {}
     
     from rmr_agent.utils import generate_pr_body, create_pull_request
@@ -354,6 +354,7 @@ def run_pr_creation(state: WorkflowState) -> Dict[str, Any]:
         raise FileNotFoundError(f"Checkpoint directory {checkpoint_dir} does not exist. Please run the workflow first.")
     pr_body = generate_pr_body(checkpoints_dir_path=checkpoint_dir)
     pr_url = create_pull_request(github_url=state["github_url"], pr_body=pr_body)
+    return {"pr_url": pr_url}
 
 
 
@@ -407,6 +408,7 @@ INITIAL_STATE = {
     "config": {},
     "notebooks": [],
     "edited_notebooks": [],
+    "successfully_pushed_code": False,
     "pr_url": ""
 }
 
