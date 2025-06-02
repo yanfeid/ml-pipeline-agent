@@ -1,6 +1,8 @@
 import os
 import json
 import yaml
+import re
+import ast
 import configparser
 from pathlib import Path
 import litellm
@@ -9,13 +11,14 @@ from rmr_agent.utils import convert_to_dict
 
 
 def update_attributes_with_existing_config(attribute_text, config_path):
+    raise NotImplementedError("This function is not implemented yet.")
     path_obj = Path(config_path)
     config_text = path_obj.read_text()
     #print(config_text)
 
     fill_config_attributes_prompt = f"""Replace all configuration references in this YAML with their actual values from the provided configuration data. Maintain the same format (with the dash prefix) but replace any expressions with the actual string values from the config.
     YAML: 
-    {attribute_yaml}
+    {attribute_text}
 
     Config: 
     {config_text}"""
@@ -43,6 +46,7 @@ def read_config_file(file_path):
     Returns:
         str: The content of the file as a string.
     """
+    raise NotImplementedError("This function is not implemented yet.")
     file_extension = os.path.splitext(file_path)[1].lower()
     
     try:
@@ -69,9 +73,6 @@ def read_config_file(file_path):
         return None
 
 
-
-
-
 def check_if_need_config_fill(attribute_text):
     try:
         # Convert the JSON response into a Python dictionary
@@ -94,28 +95,52 @@ def check_if_need_config_fill(attribute_text):
 
 
 
+# Agent function
 def parse_attribute_identification(component_identification_dict, attribute_text, existing_config_file_path=""):
     components_list = list(component_identification_dict.keys())
     needs_config_fill = check_if_need_config_fill(attribute_text)
     parse_prompt = f"""You are parsing a JSON string to correct its content and produce a valid JSON.
 
 ### Instructions:
-    - Include all components from the provided Components List and exclude any additional components not listed.
+    - Include all components from the provided "Components List" and exclude any additional components not listed.
     - Extract only input and output variables that are static and configurable, excluding any variables with values that are function calls, method calls, list comprehensions, or other dynamic expressions.
     - Exclude long column lists, such as categorical, numerical, meta, or candidate columns, from being treated as variables. The target (or label) column list, weight column list, are okay to included as variables however. Also, lists used directly in data operations (e.g., join keys, filter keys, grouping keys, indexing or sort keys) are fine to include if necessary.
+    - For the extracted valid input and output variables, maintain the "already_exists" and "renamed" values (true or false) as they are in the provided JSON. 
+    - Detect whether or not there are any variables loaded from a configuration file - identify whether any of the variables have a value which is missing in the code and instead being loaded dynamically from a configuration file (e.g. the value is left as config['variable_name'] or config.get('variable_name', 'default_value')). If so, set the "needs_config_fill" flag to True for that component.
     - Produce only valid JSON in your response
 
 ### Output format (JSON):
 {{
-    "Component Name": {{
+    "<ML_COMPONENT_NAME_HERE>": {{
         "inputs": [
-            {{"name": "variable_name_1", "value": "variable value 1"}},
-            {{"name": "variable_name_2", "value": "variable value 2"}},
+            {{
+                "name": "<INPUT_VARIABLE_1_NAME>", 
+                "value": "<INPUT_VARIABLE_1_VALUE>",
+                "already_exists": <BOOL_HERE>,
+                "renamed": <BOOL_HERE>
+            }},
+            {{
+                "name": "<INPUT_VARIABLE_2_NAME>", 
+                "value": "<INPUT_VARIABLE_2_VALUE>",
+                "already_exists": <BOOL_HERE>,
+                "renamed": <BOOL_HERE>
+            }}
         ],
         "outputs": [
-            {{"name": "variable_name_1", "value": "variable value 1"}},
-            {{"name": "variable_name_2", "value": "variable value 2"}},
-        ]
+            {{
+                "name": "<OUTPUT_VARIABLE_1_NAME>", 
+                "value": "<OUTPUT_VARIABLE_1_VALUE>",
+                "already_exists": <BOOL_HERE>,
+                "renamed": <BOOL_HERE>
+            }},
+            {{
+                "name": "<OUTPUT_VARIABLE_2_NAME>", 
+                "value": "<OUTPUT_VARIABLE_2_VALUE>",
+                "already_exists": <BOOL_HERE>,
+                "renamed": <BOOL_HERE>
+            }}
+        ],
+        "needs_config_fill": <BOOL_HERE>
     }}
 }}
 
@@ -131,6 +156,7 @@ def parse_attribute_identification(component_identification_dict, attribute_text
         config_fill_prompt = f"""\n### Config values to use to fill in the variable values:\n{config_content}"""
         parse_prompt += config_fill_prompt
     
+    # Call the LLM to parse the attribute identification
     llm_client = LLMClient()
     response: litellm.types.utils.ModelResponse = llm_client.call_llm(
         prompt=parse_prompt,
@@ -141,14 +167,28 @@ def parse_attribute_identification(component_identification_dict, attribute_text
     )
     choices: litellm.types.utils.Choices = response.choices
     parsed_attributes_text = choices[0].message.content or ""
+    if not parsed_attributes_text:
+        raise ValueError("No content returned from the LLM for attribute identification parsing")
+
+    # Convert the LLM response into a dictionary
     parsed_attributes_dict = convert_to_dict(parsed_attributes_text)
+    if not parsed_attributes_dict:
+        raise ValueError("No valid JSON object found in the LLM attribute identification response")
+    
     # Add file name and line range to the result to bring all the node information together. Delete any extra components hallucinated by LLM. 
+    components_to_delete = []
     for component in parsed_attributes_dict.keys():
         if component not in component_identification_dict:
             print(f"Found an extra component {component} added by LLM during attribute identification parsing. Deleting it")
-            del parsed_attributes_dict[component]
+            components_to_delete.append(component) # delete later so we do not edit dictionary we are iterating over
             continue
         parsed_attributes_dict[component]["file_name"] = component_identification_dict[component].get('file_name', 'None')
         parsed_attributes_dict[component]["line_range"] = component_identification_dict[component].get('line_range', 'None')
 
+    # Delete the invalid components
+    for component in components_to_delete:
+        del parsed_attributes_dict[component]
+
     return parsed_attributes_text, parsed_attributes_dict
+
+

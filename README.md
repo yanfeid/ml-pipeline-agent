@@ -8,6 +8,8 @@ Follow these steps to set up and run the project locally.
 
 ### Setup Instructions
 
+Development was performed with Python version `3.12.6`
+
 1. **Clone the Repository**
 ```bash
 git clone https://github.paypal.com/FOCUS-ML/rmr_agent.git
@@ -72,12 +74,12 @@ View checkpoints stored locally at `rmr_agent/checkpoints/`
 - Files should be relative paths from the root directory of your repository, and separated by new lines. 
 - You should specify the files in the order they should be executed in your ML pipeline. 
 
-3. **Specify Run ID (Optional)**
+3. **Specify `Run ID` (Optional)**
 - You can optionally set a Run ID (1, 2, 3, etc.) to:
     - Organize Experiments: Use a unique run ID to create a separate checkpoint folder for each trial, keeping your results and model states isolated and easy to track.
     - Enable Reproducibility: Assigning a run ID ensures you can revisit or resume a specific trial later, preserving its settings and progress for comparison or auditing.
 
-4. **Specify a step to Start From**
+4. **Specify a step to `Start From`**
 - If you have completed some or all steps of the workflow, and have returned to the home page, you can optionally choose a step to start the workflow from. 
 - Only those steps which have completed for this particular repository and Run ID will appear as options to Start From. 
 - Setting Start From enables:
