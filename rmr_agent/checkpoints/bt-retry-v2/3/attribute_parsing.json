@@ -5,32 +5,48 @@
         "inputs": [
           {
             "name": "strategy_type",
-            "value": [
-              "PAN",
-              "NO_AVS",
-              "NETWORK_TOKENIZATION",
-              "ABU"
-            ]
+            "value": "['PAN', 'NO_AVS', 'NETWORK_TOKENIZATION', 'ABU']"
           },
           {
-            "name": "date_range",
-            "value": [
-              "2023-08-15",
-              "2025-01-02"
-            ]
+            "name": "date_range_start",
+            "value": "2023-08-15"
+          },
+          {
+            "name": "date_range_end",
+            "value": "2025-01-02"
+          },
+          {
+            "name": "random_sampling_factor",
+            "value": 15
+          },
+          {
+            "name": "train_downsampling_factor",
+            "value": 900
+          },
+          {
+            "name": "validation_downsampling_start",
+            "value": 900
+          },
+          {
+            "name": "validation_downsampling_end",
+            "value": 950
+          },
+          {
+            "name": "oot_downsampling_start",
+            "value": 950
           }
         ],
         "outputs": [
           {
-            "name": "final_driver_table_train",
+            "name": "final_train_table",
             "value": "pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3"
           },
           {
-            "name": "final_driver_table_validation",
+            "name": "final_validation_table",
             "value": "pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3"
           },
           {
-            "name": "final_driver_table_test",
+            "name": "final_test_table",
             "value": "pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3"
           }
         ],
@@ -52,6 +68,10 @@
           {
             "name": "source_table_name_test",
             "value": "pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test"
+          },
+          {
+            "name": "temporary_gcs_bucket",
+            "value": "pypl-bkt-rsh-row-std-gds-pacman"
           }
         ],
         "outputs": [
@@ -92,23 +112,6 @@
             "value": "retry_is_success"
           },
           {
-            "name": "best_params",
-            "value": {
-              "colsample_bytree": 0.5837239684404587,
-              "learning_rate": 0.0598927112458938,
-              "min_child_samples": 61,
-              "min_data_in_bin": 25,
-              "num_leaves": 217,
-              "num_trees": 141,
-              "n_estimators": 141,
-              "n_jobs": 8,
-              "reg_alpha": 4.784258485091152e-08,
-              "reg_lambda": 0.0002699654851946926,
-              "subsample": 0.6899589770039457,
-              "subsample_freq": 5
-            }
-          },
-          {
             "name": "early_stopping_params",
             "value": {
               "stopping_rounds": 10
@@ -127,10 +130,6 @@
           {
             "name": "model_artifact_path",
             "value": "/projects/dnaomi/bt-retry-global-v2/models/final/bt_retry_v2.txt"
-          },
-          {
-            "name": "metric_values",
-            "value": "List of metric values calculated during evaluation"
           }
         ],
         "file_name": "rmr_agent/repos/bt-retry-v2/model-dev/train.py",
@@ -159,18 +158,6 @@
           {
             "name": "v2_model_path",
             "value": "/projects/dnaomi/bt-retry-global-refresh/models/final/bt_retry_v2.txt"
-          },
-          {
-            "name": "metric_names",
-            "value": [
-              "precision_at_95",
-              "precision_at_99",
-              "precision_at_995",
-              "savings_at_95",
-              "savings_at_99",
-              "savings_at_995",
-              "partial_aucpr_geq90"
-            ]
           },
           {
             "name": "target_col",
@@ -215,11 +202,7 @@
             "value": "/projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json"
           },
           {
-            "name": "output_name",
-            "value": "bt_retry_v2_score"
-          },
-          {
-            "name": "output_path",
+            "name": "output_directory",
             "value": "/projects/dnaomi/bt-retry-global-v2/models/ume/"
           }
         ],
@@ -238,12 +221,8 @@
       }
     },
     {
-      "Model Evaluation": {
+      "Model Scoring": {
         "inputs": [
-          {
-            "name": "valid_sample_path",
-            "value": "/home/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv"
-          },
           {
             "name": "model_dir",
             "value": "/home/dnaomi/bt-retry-global-refresh/models/ume/"
@@ -253,21 +232,17 @@
             "value": "bt_retry_v2"
           },
           {
-            "name": "model_file",
-            "value": "/home/dnaomi/bt-retry-global-refresh/models/ume/ume/bt_retry_v2.m"
+            "name": "valid_sample_path",
+            "value": "/home/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv"
           },
           {
-            "name": "features_file_path",
+            "name": "features_path",
             "value": "/projects/dnaomi/bt-retry-global-refresh/metadata/v2_features_final_2.txt"
-          },
-          {
-            "name": "delta",
-            "value": 1e-06
           }
         ],
         "outputs": [
           {
-            "name": "cosmos_ai_valid_data_path",
+            "name": "scored_data_path",
             "value": "/projects/dnaomi/bt-retry-global-refresh/deployment/cosmos_ai_valid_data.csv"
           }
         ],

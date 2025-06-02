@@ -3,17 +3,11 @@
     line_range: 1-1187
     inputs:
       strategy_type: '[''PAN'', ''NO_AVS'', ''NETWORK_TOKENIZATION'', ''ABU'']'
-      date_range_start: '2023-08-15'
-      date_range_end: '2025-01-02'
-      random_sampling_factor: '15'
-      train_downsampling_factor: '900'
-      validation_downsampling_start: '900'
-      validation_downsampling_end: '950'
-      oot_downsampling_start: '950'
+      date_range: '[''2023-08-15'', ''2025-01-02'']'
     outputs:
-      train_dataset: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3
-      validation_dataset: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3
-      test_dataset: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
+      final_driver_table_train: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3
+      final_driver_table_validation: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3
+      final_driver_table_test: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
 - Driver Creation 2:
     file_name: rmr_agent/repos/bt-retry-v2/etl/02_bq_to_dataproc.py
     line_range: 1-53
@@ -33,16 +27,17 @@
       val_parquet_path: /projects/dnaomi/bt-retry-global-v2/data/pypl-bods.gds_pacman_prod.bt_retry_global_v2_driverset_cc_renamed_radd_subset_filtered_full_valid_3/
       v2_features_path: /projects/dnaomi/bt-retry-global-v2/metadata/v2_features.txt
       target_col: retry_is_success
-      early_stopping_params: '{''stopping_rounds'': 10}'
-      early_stopping_metric: average_precision
       best_params: '{''colsample_bytree'': 0.5837239684404587, ''learning_rate'':
         0.0598927112458938, ''min_child_samples'': 61, ''min_data_in_bin'': 25, ''num_leaves'':
         217, ''num_trees'': 141, ''n_estimators'': 141, ''n_jobs'': 8, ''reg_alpha'':
         4.784258485091152e-08, ''reg_lambda'': 0.0002699654851946926, ''subsample'':
         0.6899589770039457, ''subsample_freq'': 5}'
+      early_stopping_params: '{''stopping_rounds'': 10}'
+      early_stopping_metric: average_precision
       objective_metric_name: partial_aucpr_geq90
     outputs:
       model_artifact_path: /projects/dnaomi/bt-retry-global-v2/models/final/bt_retry_v2.txt
+      metric_values: List of metric values calculated during evaluation
 - Model Evaluation:
     file_name: rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py
     line_range: 1-443
@@ -56,8 +51,8 @@
         ''savings_at_95'', ''savings_at_99'', ''savings_at_995'', ''partial_aucpr_geq90'']'
       target_col: retry_is_success
     outputs:
-      v1_metrics: List of metrics calculated for V1 model
-      v2_metrics: List of metrics calculated for V2 model
+      v1_metrics: calculated metrics for V1 model
+      v2_metrics: calculated metrics for V2 model
       valid_data_filtered_path: /projects/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
 - Model Packaging:
     file_name: rmr_agent/repos/bt-retry-v2/deployment/01_export_to_ume.py
@@ -65,22 +60,22 @@
     inputs:
       full_features_path: /projects/dnaomi/bt-retry-global-v2/metadata/v2_features_final_2.txt
       model_file_path: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_small.txt
-      path_to_json: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json
       model_name: bt_retry_v2
-      tree_nodes_only: 'False'
+      path_to_json: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json
       output_name: bt_retry_v2_score
+      output_path: /projects/dnaomi/bt-retry-global-v2/models/ume/
     outputs:
       model_json_with_pd_path: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json
-      output_path: /projects/dnaomi/bt-retry-global-v2/models/ume/
-- Model Scoring:
+      binary_spec_output_path: /projects/dnaomi/bt-retry-global-v2/models/ume/
+- Model Evaluation 2:
     file_name: rmr_agent/repos/bt-retry-v2/deployment/02_pyscoring_validation.py
     line_range: 1-172
     inputs:
-      models_dir: /home/dnaomi/bt-retry-global-refresh/models/ume/
+      valid_sample_path: /home/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
       model_dir: /home/dnaomi/bt-retry-global-refresh/models/ume/
       model_ume_name: bt_retry_v2
-      valid_sample_path: /home/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
+      model_file: /home/dnaomi/bt-retry-global-refresh/models/ume/ume/bt_retry_v2.m
       features_file_path: /projects/dnaomi/bt-retry-global-refresh/metadata/v2_features_final_2.txt
-      scored_data_output_path: /projects/dnaomi/bt-retry-global-refresh/deployment/cosmos_ai_valid_data.csv
+      delta: 1e-06
     outputs:
-      scored_data_output_path: /projects/dnaomi/bt-retry-global-refresh/deployment/cosmos_ai_valid_data.csv
+      cosmos_ai_valid_data_path: /projects/dnaomi/bt-retry-global-refresh/deployment/cosmos_ai_valid_data.csv

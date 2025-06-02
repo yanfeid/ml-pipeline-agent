@@ -4,3 +4,4 @@ from .checkpointing import *
 from .git_utils import clone_repo, parse_github_url
 from .convert_ipynb_to_py import convert_notebooks
 from .save_file import save_ini_file
+from .convert_py_to_ipynb import py_to_notebook

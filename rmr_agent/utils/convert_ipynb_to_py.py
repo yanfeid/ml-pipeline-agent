@@ -22,11 +22,17 @@ def convert_notebooks(input_files: list[str], local_repo_path: str) -> list[str]
             raise FileNotFoundError(f"File {full_path} not found in cloned repo")
         
         output_py_file_path = full_path.replace('.ipynb', '.py')
+        # command = (
+        #     f"jupytext --to py '{full_path}' "
+        #     "--opt cell_metadata_filter='-all' "
+        #     "--opt notebook_metadata_filter='-all'"
+        # )
         command = (
-            f"jupytext --to py '{full_path}' "
+            f"jupytext --to py:percent '{full_path}' "
             "--opt cell_metadata_filter='-all' "
             "--opt notebook_metadata_filter='-all'"
         )
+
         try:
             subprocess.check_call(command, shell=True)
             converted_files.append(output_py_file_path)

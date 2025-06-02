@@ -224,7 +224,7 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
         max_tokens=500,
         temperature=0,
         repetition_penalty=1.0,
-        top_p=1
+        top_p=0.1
     )
 
     environment_ini_str = fill_in_today_date(extract_ini_content(response_environment))
@@ -325,7 +325,7 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
         max_tokens=4096,  # increase the max_tokens
         temperature=0,
         repetition_penalty=1.0,
-        top_p=1
+        top_p=0.1
     )
 
     try:

@@ -3,7 +3,6 @@ import litellm
 from rmr_agent.llms import LLMClient
 from rmr_agent.utils import convert_to_dict, preprocess_python_file
 
-
 def retry_component_identification(python_file_path, full_file_list, code_summary, model="gpt-4o", temperature=0, max_tokens=2048, 
                  frequency_penalty=0, presence_penalty=0):
     pass
@@ -71,19 +70,23 @@ def parse_component_identification(component_identification_response, file):
 
 ### Response Format (JSON):
 {{
-  "Component Name": {{
-    "line_range": "A single, merged line range (e.g., 0-49)",
+  "<ML_COMPONENT_NAME_HERE>": {{ 
+    "line_range": "<MERGED_NON_OVERLAPPING_LINE_RANGE>", // Example: "0-49", "55-72"
     "evidence": [
       {{
-        "quote_or_paraphrase": "Quote/paraphrase text",
-        "support_reason": "Reason text"
+        "quote_or_paraphrase": "<RELEVANT_QUOTE_OR_PARAPHRASE_1>",
+        "support_reason": "<EXPLANATION_WHY_EVIDENCE_1_SUPPORTS_THIS_COMPONENT>"
       }},
       {{
-        "quote_or_paraphrase": "Quote/paraphrase text",
-        "support_reason": "Reason text"
+        "quote_or_paraphrase": "<RELEVANT_QUOTE_OR_PARAPHRASE_2>",
+        "support_reason": "<EXPLANATION_WHY_EVIDENCE_2_SUPPORTS_THIS_COMPONENT>"
+      }},
+      {{
+        "quote_or_paraphrase": "<RELEVANT_QUOTE_OR_PARAPHRASE_3>",
+        "support_reason": "<EXPLANATION_WHY_EVIDENCE_3_SUPPORTS_THIS_COMPONENT>"
       }}
     ],
-    "why_this_is_separate": "The explanation of why this component is separate (or null if not present)"
+    "why_this_is_separate": "<JUSTIFICATION_FOR_THIS_COMPONENT_BEING_SEPARATE_AND_VERIFICATION_OF_NOT_OVERLAPPING>"
     }}
 }}
 
@@ -113,24 +116,28 @@ def parse_component_identification(component_identification_response, file):
     parsed_dict = convert_to_dict(parsed_text)
     if not parsed_dict:
         raise ValueError("No components identified in the response for file: " + file)
-    # Add the file name to each identified component
+    
+    # Add the file name to each identified component and filter out invalid components
+    components_to_delete = []
     for component, metadata in parsed_dict.items():
+        # Check if component is in the allowed set of components
         if component not in allowed_components:
             print(f'Found identified component outside of allowed set of components for {file}: "{component}"')
-            # Delete this extra component category
-            del parsed_dict[component]
+            # Delete this extra component category (do later so we do not edit dictionary we are iterating over)
+            components_to_delete.append(component)
             continue
             
-            
         metadata['file_name'] = file
+    
+    # Delete the invalid components
+    for component in components_to_delete:
+        del parsed_dict[component]
 
-        if len(parsed_dict) == 1:
-            # when only one component identified in the file, just take all of the lines in the file for that component. 
-            cleaned_code = preprocess_python_file(file)
-            num_lines = len(cleaned_code.splitlines())
-            metadata['line_range'] = f"1-{num_lines}"
+    # Handle single component case
+    if len(parsed_dict) == 1:
+        # when only one component identified in the file, just take all of the lines in the file for that component. 
+        cleaned_code = preprocess_python_file(file)
+        num_lines = len(cleaned_code.splitlines())
+        metadata['line_range'] = f"1-{num_lines}"
 
     return parsed_text, parsed_dict
-
-
-

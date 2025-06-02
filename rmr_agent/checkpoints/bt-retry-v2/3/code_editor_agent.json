@@ -5,6 +5,6 @@
     "model_training": null,
     "model_evaluation": null,
     "model_packaging": null,
-    "model_evaluation_2": null
+    "model_scoring": null
   }
 }

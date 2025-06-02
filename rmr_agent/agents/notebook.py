@@ -146,9 +146,10 @@ def notebook_agent(verified_dag, cleaned_code, local_repo_path):
 
          # === Standard Code for RMR ===       
         with open(file_path, "w", encoding="utf-8") as f:
-            f.write("""## gsutil authentication
+            f.write("""# %%
+## gsutil authentication
 %ppauth
-                    
+# %%                    
 from rmr_config.simple_config import Config
 from rmr_config.state_manager import StateManager
 import os, sys, ast, json
@@ -168,6 +169,7 @@ os.makedirs(local_base_path, exist_ok=True)
 
 # set working directory
 os.chdir(working_path)
+# %%
 if not config:
     raise ValueError('config is not correctly setup')
                 
@@ -178,11 +180,12 @@ print(f'username={username}, working_path={working_path}')
 
             # === Section Name ===
             formatted_section_name = section_name.replace(" ", "_").lower()
-            f.write(f"# Section Name\n")
+            f.write(f"# %%\n")
             f.write(f"section_name = \"{formatted_section_name}\"\n\n")
 
             # === General Parameters from environment.ini === 
             # mo_name driver_dataset dataproc_project_name dataproc_storage_bucket gcs_base_path queue_name check_point state_file 
+            f.write(f"# %%\n")
             f.write("# General Parameters \n")
 
             required_keys = [
@@ -259,14 +262,18 @@ print(f'username={username}, working_path={working_path}')
 
                 research_code_lines = extracted_code[match_key]["code"].split("\n")  
                 cleaned_code_list = []
+                
                 for line in research_code_lines:
-                    cleaned_line = line.split("|", 1)[-1].strip()
-                    cleaned_code_list.append(cleaned_line)
+                    _, _, cleaned_line = line.partition("|")
+                    if cleaned_line.startswith(" "):
+                        cleaned_line = cleaned_line[1:]  # 只去掉一个空格
+                    cleaned_code_list.append(cleaned_line.rstrip("\n"))
+
 
                 research_code = "\n".join(cleaned_code_list)
-                f.write("\n" + "# === Research Code ===\n")
+                # f.write("\n" + "# === Research Code ===\n")
                 f.write(research_code + "\n")
-                f.write("\nprint('Script initialized')\n")
+                # f.write("\nprint('Script initialized')\n")
                 print(f"Research code inserted into {file_path}")
             else:
                 print(f"⚠️ WARNING: No research code found for {section_name}")
@@ -284,11 +291,11 @@ print(f'username={username}, working_path={working_path}')
 if __name__ == "__main__":
     # set up path
     BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
-    NOTEBOOKS_DIR = os.path.join(BASE_DIR, "notebooks")
+    NOTEBOOKS_DIR = os.path.join(BASE_DIR, "notebooks_test")
 
-    local_repo_path = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/ql-store-recommendation-prod"
+    local_repo_path = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2"
 
-    CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod","4")
+    CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "bt-retry-v2","3")
     dag_yaml = os.path.join(CHECKPOINTS_DIR, "dag.yaml")
     json_path= os.path.join(CHECKPOINTS_DIR,"summarize.json" )
     
