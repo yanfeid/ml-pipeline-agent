@@ -322,12 +322,17 @@ def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:
     from rmr_agent.agents.code_editor import code_editor_agent
     edited_notebooks = {}
 
+    attribute_parsing_list = state["attribute_parsing"] 
+    attribute_config = {"attribute_parsing": attribute_parsing_list} 
+
     with ThreadPoolExecutor() as executor:
         results = executor.map(
-            lambda item: (item[0], code_editor_agent(item[1])),
+            lambda item: (item[0], code_editor_agent(item[1], attribute_config)),
             state["notebooks"].items()
         )
         edited_notebooks = dict(results)
+
+    
     return {"edited_notebooks": edited_notebooks}
 
 def push_code_changes(state: WorkflowState) -> Dict[str, Any]:
@@ -347,13 +352,13 @@ def run_pr_creation(state: WorkflowState) -> Dict[str, Any]:
         print("Skipping create_pr: 'pr_url' already in state")
         return {}
     
-    from rmr_agent.utils import generate_pr_body, create_pull_request
+    # from rmr_agent.utils import generate_pr_body, create_pull_request
 
-    checkpoint_dir = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'])
-    if not os.path.exists(checkpoint_dir):
-        raise FileNotFoundError(f"Checkpoint directory {checkpoint_dir} does not exist. Please run the workflow first.")
-    pr_body = generate_pr_body(checkpoints_dir_path=checkpoint_dir)
-    pr_url = create_pull_request(github_url=state["github_url"], pr_body=pr_body)
+    # checkpoint_dir = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'])
+    # if not os.path.exists(checkpoint_dir):
+    #     raise FileNotFoundError(f"Checkpoint directory {checkpoint_dir} does not exist. Please run the workflow first.")
+    # pr_body = generate_pr_body(checkpoints_dir_path=checkpoint_dir)
+    # pr_url = create_pull_request(github_url=state["github_url"], pr_body=pr_body)
 
 
 

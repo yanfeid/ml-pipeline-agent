@@ -1,44 +1,233 @@
-
-from rmr_agent.llms import LLMClient
 from rmr_agent.utils import py_to_notebook
+import difflib
+import re
+import json
 
-def code_editor_agent(python_file_path: str, llm_model: str = "gpt-4o"):
-    llm_client = LLMClient(model_name=llm_model)
 
-    # ==================    Params Replacement Part ======================
+def infer_original_name_from_value(code_lines, value):
+    possible_reprs = []
+    if isinstance(value, str):
+        possible_reprs = [f'"{value}"', f"'{value}'"]
+    else:
+        possible_reprs = [repr(value)]
+
+    for line in code_lines:
+        for val_repr in possible_reprs:
+            pattern = re.compile(rf'^\s*(\w+)\s*=\s*{re.escape(val_repr)}\s*$')
+            match = pattern.match(line)
+            if match:
+                return match.group(1)
+
+    return None
+
+
+def infer_section_name(code_lines, attribute_parsing_json):
+    pattern = re.compile(r'section_name\s*=\s*["\']([\w_]+)["\']')
+    for line in code_lines:
+        match = pattern.search(line)
+        if match:
+            raw = match.group(1)
+            section_candidate = raw.replace("_", " ").title()
+            break
+    else:
+        section_candidate = None
+
+    section_names = []
+    for block in attribute_parsing_json.get("attribute_parsing", []):
+        section_names.extend(block.keys())
+
+    if section_candidate in section_names:
+        print(f"📌 Exact section name match: {section_candidate}")
+        return section_candidate
+
+    closest_matches = difflib.get_close_matches(section_candidate or "", section_names, n=1, cutoff=0.4)
+    if closest_matches:
+        print(f"🤖 Section name '{section_candidate}' not found. Using closest match: {closest_matches[0]}")
+        return closest_matches[0]
+
+    print("❌ Could not determine section name from code or JSON.")
+    return None
+
+import re
+
+def scoped_variable_renaming(code_lines, value_to_newname):
+    has_modifications = False
+    updated_lines = list(code_lines)
+    for value, new_var_name in value_to_newname.items():
+        i = 0
+        while i < len(updated_lines):
+            line = updated_lines[i]
+            if line is None:
+                i += 1
+                continue
+            m = re.match(r'^\s*(\w+)\s*=\s*([\'"])(.+?)\2', line)
+            if m:
+                var_name = m.group(1)
+                var_value = m.group(3)
+                if var_value == value:
+                    print(f"🔄 Scoped replacing {var_name} → {new_var_name} for value={value} (deleting line {i+1})")
+                    updated_lines[i] = None  
+                    j = i + 1
+                    while j < len(updated_lines):
+                        next_line = updated_lines[j]
+                        if next_line is None:
+                            j += 1
+                            continue
+                        if re.match(rf'^\s*{re.escape(var_name)}\s*=', next_line, flags=re.IGNORECASE):
+                            break
+                        replaced = re.sub(rf'\b{re.escape(var_name)}\b', new_var_name, next_line)
+                        if replaced != next_line:
+                            has_modifications = True
+                        updated_lines[j] = replaced
+                        j += 1
+            i += 1
+    new_lines = [l for l in updated_lines if l is not None]
+    return new_lines, has_modifications
+
+
+def code_editor_agent(python_file_path: str, attribute_parsing_json: dict) -> str:
     with open(python_file_path, "r", encoding="utf-8") as f:
-        python_code = f.read()
+        code_lines = f.readlines()
 
-    prompt_editor = f"""
-    You are an AI agent tasked with refactoring research scripts to ensure that configuration values are used consistently.
+    code_text = "".join(code_lines)
 
-    Your instructions:
-    1. Inside the === Research Code === section, only remove pure parameter assignment lines (e.g., x = ..., y = ...) where the variable is already defined earlier using config.get.
-    2. DO NOT remove, modify, or touch any other lines, even if they are non-Python, invalid syntax, BigQuery magics (%%bigquery), SQL code, or unknown formats.
-    3. Ensure the research code uses only the variables loaded from config, with no hard-coded values.
-    4. Return the complete modified script only, with no markdown formatting, no explanations, and no code fences like ```python.
+    section_name = infer_section_name(code_lines, attribute_parsing_json)
+    if not section_name:
+        print(f"❌ Could not find section_name in {python_file_path}")
+        return code_text
+    print(f"📌 Inferred section name: '{section_name}'")
 
-    Remember: even if the code is not standard Python, you must preserve it unchanged.
+    relevant_vars = []
+    for block in attribute_parsing_json.get("attribute_parsing", []):
+        if section_name in block:
+            section = block[section_name]
+            relevant_vars.extend(section.get("inputs", []))
+            relevant_vars.extend(section.get("outputs", []))
 
-    Here is the script:
-    {python_code}
-    """
+    if not relevant_vars:
+        print(f"❌ Section '{section_name}' not found in attribute_parsing.")
+        return code_text
+
+    value_to_newname = {}
+    for var in relevant_vars:
+        if var.get("already_exists") and var.get("renamed"):
+            print(f"[mapping] {var.get('value')} → {var.get('name')}")
+            value_to_newname[var.get("value")] = var.get("name")
+    code_lines, scope_mod = scoped_variable_renaming(code_lines, value_to_newname)
+
+    new_lines = []
+    has_modifications = scope_mod  
+    skip_until_idx = -1
+
+    
+    for idx, line in enumerate(code_lines):
+        if idx < skip_until_idx:
+            continue 
+
+        if "config.get" in line:
+            new_lines.append(line)
+            continue
+
+
+        modified_line = line
+
+        # print(f"🔍 Variables in section '{section_name}':")
+        for var in relevant_vars:
+            # print(f"   - {var.get('name')} | already_exists={var.get('already_exists')} | renamed={var.get('renamed')}")
+            name = var.get("name")
+            value = var.get("value")
+            already_exists = var.get("already_exists", False)
+            renamed = var.get("renamed", False)
+
+
+            if already_exists and not renamed:
+                if re.match(rf"^\s*{re.escape(name)}\s*=", line, flags=re.IGNORECASE):
  
-    # print('prompt DEBUG',prompt_editor)
-    response = llm_client.call_llm(
-        prompt=prompt_editor,
-        max_tokens=16384,
-        temperature=0,
-        repetition_penalty=1.0,
-        top_p=0.1
-    )
+                    if not line.rstrip().endswith('\\') and all(k == 0 for k in [
+                        line.count('(') - line.count(')'),
+                        line.count('[') - line.count(']'),
+                        line.count('{') - line.count('}')
+                    ]):
+                      
+                        modified_line = None
+                    else:
+                        statement_lines = [line]
+                        open_parens = line.count('(') - line.count(')')
+                        open_brackets = line.count('[') - line.count(']')
+                        open_braces = line.count('{') - line.count('}')
+                        continuation = line.rstrip().endswith('\\')
 
-    # print("raw response:", response)
-    modified_code = response.choices[0].message.content
-    # Write the modified code back to the file
-    with open(python_file_path, "w", encoding="utf-8") as file:
-        file.write(modified_code)
+                        next_idx = idx + 1
+                        while (open_parens > 0 or open_brackets > 0 or open_braces > 0 or continuation) and next_idx < len(code_lines):
+                            next_line = code_lines[next_idx]
+                            statement_lines.append(next_line)
+                            open_parens += next_line.count('(') - next_line.count(')')
+                            open_brackets += next_line.count('[') - next_line.count(']')
+                            open_braces += next_line.count('{') - next_line.count('}')
+                            continuation = next_line.rstrip().endswith('\\')
+                            next_idx += 1
 
-    print(f"Updated {python_file_path}: Hardcoded values replaced with configuration variables.")
+                        skip_until_idx = next_idx  
+                        modified_line = None
+                    has_modifications = True
+                    continue
+
+
+            elif not already_exists and modified_line:
+                if isinstance(value, list) and all(isinstance(v, str) for v in value):
+                    # construct：'PAN',\s*'NO_AVS',...
+                    values_pattern = ',\s*'.join([rf'["\']{re.escape(v)}["\']' for v in value])
+                    full_tuple_pattern = re.compile(rf'\(\s*{values_pattern}\s*\)')
+
+                    if full_tuple_pattern.search(modified_line):
+                        modified_line = full_tuple_pattern.sub(name, modified_line)
+                        has_modifications = True
+
+                else:
+                    # single value
+                    single_value = value[0] if isinstance(value, list) else value
+
+                    if not isinstance(single_value, str):
+                        single_value = str(single_value)
+
+                    pattern_value = re.compile(
+                        rf'(?:["\']{re.escape(single_value)}["\']|(?<!\w){re.escape(single_value)}(?!\w))'
+                    )
+
+                    if pattern_value.search(modified_line):
+                        modified_line = pattern_value.sub(name, modified_line)
+                        has_modifications = True
+
+
+        if modified_line is not None:
+            new_lines.append(modified_line)
+        else:
+            new_lines.append(None)  
+            has_modifications = True
+
+    final_code = "\n".join(line.rstrip("\n") for line in new_lines if line is not None) + "\n"
+
+    if has_modifications:
+        with open(python_file_path, "w", encoding="utf-8") as f:
+            f.write(final_code)
+        print(f"✅ Code overwritten: {python_file_path}")
+    else:
+        print("✅ No modifications were made to the code.")
+
     py_to_notebook(python_file_path)
+    return final_code
+
+
+
+# # ============= for test ================
+# json_file = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/checkpoints/bt-retry-v2/3/attribute_parsing.json"
+# # python_code = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2/notebooks_test/1_driver_creation_2.py"
+# python_code = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2/notebooks_test/2_model_training.py"
+
+
+# with open(json_file, "r", encoding="utf-8") as f:
+#     attribute_config = json.load(f)
+# edited_code = code_editor_agent(python_code, attribute_config)
+
+
 
