@@ -2,24 +2,8 @@ from rmr_agent.utils import py_to_notebook
 import difflib
 import re
 import json
-
-
-def infer_original_name_from_value(code_lines, value):
-    possible_reprs = []
-    if isinstance(value, str):
-        possible_reprs = [f'"{value}"', f"'{value}'"]
-    else:
-        possible_reprs = [repr(value)]
-
-    for line in code_lines:
-        for val_repr in possible_reprs:
-            pattern = re.compile(rf'^\s*(\w+)\s*=\s*{re.escape(val_repr)}\s*$')
-            match = pattern.match(line)
-            if match:
-                return match.group(1)
-
-    return None
-
+from rmr_agent.llms import LLMClient
+from collections import defaultdict
 
 def infer_section_name(code_lines, attribute_parsing_json):
     pattern = re.compile(r'section_name\s*=\s*["\']([\w_]+)["\']')
@@ -47,8 +31,6 @@ def infer_section_name(code_lines, attribute_parsing_json):
 
     print("❌ Could not determine section name from code or JSON.")
     return None
-
-import re
 
 def scoped_variable_renaming(code_lines, value_to_newname):
     has_modifications = False
@@ -85,7 +67,8 @@ def scoped_variable_renaming(code_lines, value_to_newname):
     return new_lines, has_modifications
 
 
-def code_editor_agent(python_file_path: str, attribute_parsing_json: dict) -> str:
+def code_editor_agent(python_file_path: str, attribute_parsing_json: dict, llm_model: str = "gpt-4o") -> str:
+
     with open(python_file_path, "r", encoding="utf-8") as f:
         code_lines = f.readlines()
 
@@ -119,6 +102,12 @@ def code_editor_agent(python_file_path: str, attribute_parsing_json: dict) -> st
     has_modifications = scope_mod  
     skip_until_idx = -1
 
+    # Build value → [name1, name2, ...] mapping
+    value_to_names = defaultdict(list)
+    for var in relevant_vars:
+        val = var["value"]
+        val_key = str(val[0]) if isinstance(val, list) else str(val)
+        value_to_names[val_key].append(var["name"])
     
     for idx, line in enumerate(code_lines):
         if idx < skip_until_idx:
@@ -130,6 +119,7 @@ def code_editor_agent(python_file_path: str, attribute_parsing_json: dict) -> st
 
 
         modified_line = line
+        processed_values = set() 
 
         # print(f"🔍 Variables in section '{section_name}':")
         for var in relevant_vars:
@@ -174,6 +164,13 @@ def code_editor_agent(python_file_path: str, attribute_parsing_json: dict) -> st
 
 
             elif not already_exists and modified_line:
+                single_value = value[0] if isinstance(value, list) else value
+                single_value_str = str(single_value)
+                if single_value_str in processed_values:
+                    continue
+
+                is_ambiguous = len(value_to_names[single_value_str]) > 1
+
                 if isinstance(value, list) and all(isinstance(v, str) for v in value):
                     # construct：'PAN',\s*'NO_AVS',...
                     values_pattern = ',\s*'.join([rf'["\']{re.escape(v)}["\']' for v in value])
@@ -183,22 +180,101 @@ def code_editor_agent(python_file_path: str, attribute_parsing_json: dict) -> st
                         modified_line = full_tuple_pattern.sub(name, modified_line)
                         has_modifications = True
 
-                else:
-                    # single value
-                    single_value = value[0] if isinstance(value, list) else value
-
-                    if not isinstance(single_value, str):
-                        single_value = str(single_value)
-
+                elif not is_ambiguous:
                     pattern_value = re.compile(
-                        rf'(?:["\']{re.escape(single_value)}["\']|(?<!\w){re.escape(single_value)}(?!\w))'
+                        rf'(?:["\']{re.escape(single_value_str)}["\']|(?<!\w){re.escape(single_value_str)}(?!\w))'
                     )
-
                     if pattern_value.search(modified_line):
                         modified_line = pattern_value.sub(name, modified_line)
                         has_modifications = True
 
+                else:
+                    # ⚠️ One-to-many mapping: multiple variable names share the same value
+                    print(f"⚠️ Ambiguous value `{single_value_str}` shared by: {value_to_names[single_value_str]}")
+                    usage_lines = [
+                        (i, line) for i, line in enumerate(code_lines) if single_value_str in line
+                    ]
 
+                    if usage_lines:
+                        context_blocks = [
+                            {
+                                "line_index": idx,
+                                "context": "\n".join(code_lines[max(0, idx - 3): idx + 4])
+                            }
+                            for idx, _ in usage_lines
+                        ]
+                    else:
+                        print(f"⚠️ No usage lines found for value `{single_value_str}` → skipping LLM disambiguation.")
+                        processed_values.add(single_value_str)
+                        continue
+
+                    if not context_blocks:
+                        print(f"⚠️ No code context generated for value `{single_value_str}` → skipping LLM step.")
+                        processed_values.add(single_value_str)
+                        continue
+
+                    llm_client = LLMClient(model_name=llm_model)
+
+                    prompt = f"""
+                        You are an expert Python code refactoring assistant.
+
+                        We are replacing hardcoded values with config variable names.
+                        However, the same value `{single_value_str}` appears multiple times in the code
+                        and maps to more than one candidate variable name: {value_to_names[single_value_str]}
+
+                        Your task:
+                        - Read each code context provided below.
+                        - For each occurrence, choose the best-matching config variable name from the list above.
+                        - Use only the local code context to make your decision.
+
+                        Instructions:
+                        - Return a JSON list of objects: one for each usage.
+                        - Each object must contain:
+                            - `line_index`: the line number in the original file
+                            - `name`: the best variable name from the candidate list
+
+                        Example Output:
+                        [
+                        {{ "line_index": 27, "name": "train_parquet_path" }},
+                        {{ "line_index": 32, "name": "val_parquet_path" }}
+                        ]
+                        Now analyze the following code contexts:
+                        {json.dumps(context_blocks, indent=2)}
+                        """                  
+                    response_text = llm_client.call_llm(
+                        prompt=prompt,
+                        max_tokens=500,
+                        temperature=0,
+                        repetition_penalty=1.0,
+                        top_p=0.1
+                        )
+                        
+ 
+                    raw_content = response_text['choices'][0]['message']['content']
+                    # Remove markdown code block markers
+                    cleaned = re.sub(r"^```json\s*|\s*```$", "", raw_content.strip())
+
+                        # Now parse JSON
+                    try:
+                        result = json.loads(cleaned)
+                    except json.JSONDecodeError as e:
+                        print("❌ Failed to parse LLM output:", e)
+                        processed_values.add(single_value_str)
+                        continue
+
+                    for mapping in result:
+                        idx = mapping["line_index"]
+                        target_name = mapping["name"]
+                        line = code_lines[idx]
+                        pattern = re.compile(
+                            rf'(?:["\']{re.escape(single_value_str)}["\']|(?<!\w){re.escape(single_value_str)}(?!\w))'
+                        )
+                        new_line = pattern.sub(target_name, line, count=1)
+                        code_lines[idx] = new_line
+                        has_modifications = True
+
+                # record
+                processed_values.add(single_value_str)
         if modified_line is not None:
             new_lines.append(modified_line)
         else:
@@ -222,7 +298,7 @@ def code_editor_agent(python_file_path: str, attribute_parsing_json: dict) -> st
 # # ============= for test ================
 # json_file = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/checkpoints/bt-retry-v2/3/attribute_parsing.json"
 # # python_code = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2/notebooks_test/1_driver_creation_2.py"
-# python_code = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2/notebooks_test/2_model_training.py"
+# python_code = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2/notebooks/1_driver_creation_2.py"
 
 
 # with open(json_file, "r", encoding="utf-8") as f:
