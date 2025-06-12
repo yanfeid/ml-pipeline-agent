@@ -5,10 +5,8 @@ from typing import Dict, Any
 import yaml
 import json
 
-
 def clean_prefix(path: str) -> str:
     return os.path.splitext(os.path.basename(path))[0].strip().lower()
-
 
 def normalize_node_name(name):
     return re.sub(r'\s+', '_', name.strip().lower())
@@ -126,7 +124,6 @@ def notebook_agent(verified_dag, cleaned_code, local_repo_path):
             dependencies.setdefault(to_section, []).append(from_section)
             if "attributes" in edge:
                 edge_attributes.setdefault(to_section, {}).setdefault(from_section, {}).update(edge["attributes"])
-
 
     print(f"\n Final dependencies mapping: {dependencies}")
     print(f" Final edge attributes mapping: {edge_attributes}\n")
@@ -269,7 +266,6 @@ print(f'username={username}, working_path={working_path}')
                         cleaned_line = cleaned_line[1:]  # 只去掉一个空格
                     cleaned_code_list.append(cleaned_line.rstrip("\n"))
 
-
                 research_code = "\n".join(cleaned_code_list)
                 # f.write("\n" + "# === Research Code ===\n")
                 f.write(research_code + "\n")
@@ -277,7 +273,6 @@ print(f'username={username}, working_path={working_path}')
                 print(f"Research code inserted into {file_path}")
             else:
                 print(f"⚠️ WARNING: No research code found for {section_name}")
-
             print("All notebooks generated successfully!")
         print(f" Created: {file_path}")
     print("All sections processed. Python files are ready in notebooks/")
@@ -285,17 +280,15 @@ print(f'username={username}, working_path={working_path}')
     return  generated_files
   # might return a dict
 
-
 # #==========================simple test====================================
-
 if __name__ == "__main__":
     # set up path
     BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
     NOTEBOOKS_DIR = os.path.join(BASE_DIR, "notebooks_test")
 
-    local_repo_path = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2"
+    local_repo_path = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/toy_research_code"
 
-    CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "bt-retry-v2","3")
+    CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "toy_research_code","1")
     dag_yaml = os.path.join(CHECKPOINTS_DIR, "dag.yaml")
     json_path= os.path.join(CHECKPOINTS_DIR,"summarize.json" )
     

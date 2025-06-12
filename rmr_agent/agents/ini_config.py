@@ -4,29 +4,22 @@ import yaml
 from datetime import datetime
 from rmr_agent.llms import LLMClient
 from typing import Dict, Any
-from rmr_agent.utils import save_ini_file
 
 # ========== **Extract .ini Content from AI Response** ==========
 def extract_ini_content(response):
-    """Extracts the `.ini` formatted content from an AI-generated response."""
-
+    """Extracts and cleans `[general]` section content from LLM response. Ensures .ini format and removes markdown."""
     if response is None:
         raise ValueError("AI response is None, unable to extract `.ini` content.")
-
     # Ensure the response contains valid choices with a message
     if hasattr(response, "choices") and response.choices:
         response_text = response.choices[0].message.content  # Extract the `.ini` formatted string
     else:
         raise ValueError("Invalid AI response format, unable to extract `.ini` content.")
-
     if not response_text:
         raise ValueError("AI returned an empty `.ini` content.")
 
-    # Remove potential Markdown-style code block formatting (```ini ... ```)
-    if response_text.startswith("```ini"):
-        response_text = response_text[6:].strip()
-    if response_text.endswith("```"):
-        response_text = response_text[:-3].strip()
+    # Remove Markdown-style code block formatting, including ```ini, ```yaml, or plain ```
+    response_text = re.sub(r"^```(?:ini|yaml)?\s*|^```\s*|\s*```$", "", response_text.strip(), flags=re.IGNORECASE)
 
     return response_text
 
@@ -73,8 +66,6 @@ def filter_duplicate_value_lines(ini_str, verified_dag):
             filtered_lines.append(line)
 
     return "\n".join(filtered_lines)
-
-
 
 # ========== **Replace hard-coded params with general configurable params in env.ini** ==========
 def parse_env_ini(env_ini):
@@ -149,7 +140,7 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     - Your goal is to **fill in the missing values based on the given YAML data**.
     - If a value **exists in the YAML**, insert it into the corresponding field.
     - If a value **is missing in the YAML**, leave the field empty (`""`).
-    - Your response MUST be No explanations, No extra text.
+    - Your response MUST be No explanations, No extra text. No backticks.
 
     ### Fixed Structure of `environment.ini`:
  
@@ -228,8 +219,6 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     )
 
     environment_ini_str = fill_in_today_date(extract_ini_content(response_environment))
-    
-
 
     # ========== **Step 2: AI agent generates solution.ini content** ==========
     llm_client = LLMClient(model_name=llm_model)
@@ -345,25 +334,25 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
         raise  
     
  # ========== **Step 3: Simple Unit Test Code** ==========
-if __name__ == "__main__":
-    # Base paths
-    BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
-    CHECKPOINT_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod", "1")
-    CONFIG_DIR = os.path.join(BASE_DIR, "config")
+# if __name__ == "__main__":
+#     # Base paths
+#     BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
+#     CHECKPOINT_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod", "1")
+#     CONFIG_DIR = os.path.join(BASE_DIR, "config")
 
-    # Load DAG config
-    dag_path = os.path.join(CHECKPOINT_DIR, "dag_copy.yaml")
-    with open(dag_path, "r") as f:
-        verified_dag = yaml.safe_load(f)
+#     # Load DAG config
+#     dag_path = os.path.join(CHECKPOINT_DIR, "dag_copy.yaml")
+#     with open(dag_path, "r") as f:
+#         verified_dag = yaml.safe_load(f)
 
-    # Generate config
-    config = config_agent(verified_dag)
+#     # Generate config
+#     config = config_agent(verified_dag)
 
-    # Save configs
-    os.makedirs(CONFIG_DIR, exist_ok=True)
-    save_ini_file("environment.ini", config["environment_ini"], CONFIG_DIR)
-    save_ini_file("solution.ini", config["solution_ini"], CONFIG_DIR)
+#     # Save configs
+#     os.makedirs(CONFIG_DIR, exist_ok=True)
+#     save_ini_file("environment.ini", config["environment_ini"], CONFIG_DIR)
+#     save_ini_file("solution.ini", config["solution_ini"], CONFIG_DIR)
 
-    print(f"[✓] INI files saved to: {CONFIG_DIR}")
-    print(f"[✓] Checkpoint directory used: {CHECKPOINT_DIR}")
+#     print(f"[✓] INI files saved to: {CONFIG_DIR}")
+#     print(f"[✓] Checkpoint directory used: {CHECKPOINT_DIR}")
 

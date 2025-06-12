@@ -330,9 +330,7 @@ def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:
             lambda item: (item[0], code_editor_agent(item[1], attribute_config)),
             state["notebooks"].items()
         )
-        edited_notebooks = dict(results)
-
-    
+        edited_notebooks = dict(results) 
     return {"edited_notebooks": edited_notebooks}
 
 def push_code_changes(state: WorkflowState) -> Dict[str, Any]:
