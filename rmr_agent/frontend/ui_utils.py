@@ -1,10 +1,12 @@
 import os
 import json
 import yaml
+import re
 from rmr_agent.workflow import CHECKPOINT_BASE_PATH
 from pyvis.network import Network
 import streamlit as st
 from streamlit import rerun
+from streamlit_mermaid import st_mermaid
 import streamlit.components.v1 as components
 import tempfile
 
@@ -68,6 +70,73 @@ def get_dag_yaml(repo_name, run_id):
         raise yaml.YAMLError(f"Invalid YAML in DAG file: {str(e)}")
     except IOError as e:
         raise IOError(f"Error reading DAG YAML file: {str(e)}")
+    
+def get_pr_url(repo_name, run_id):
+    try:
+        file_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'create_pull_request.json')
+        with open(file_path, 'r') as file:
+            content = json.load(file)
+        return content['pr_url'] 
+    except FileNotFoundError:
+        raise FileNotFoundError(f"PR URL file not found for repo: {repo_name}, run_id: {run_id}")
+    except IOError as e:
+        raise IOError(f"Error reading PR URL file: {str(e)}")
+    
+def get_pr_body(repo_name, run_id):
+    try:
+        file_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'create_pr_body.json')
+        with open(file_path, 'r') as file:
+            content = json.load(file)
+        return content['pr_body'] 
+    except FileNotFoundError:
+        raise FileNotFoundError(f"PR body file not found for repo: {repo_name}, run_id: {run_id}")
+    except IOError as e:
+        raise IOError(f"Error reading PR body file: {str(e)}")
+    
+def show_rmr_agent_results(repo_name, run_id):
+    # Load and display the PR URL in Markdown
+    pr_url = get_pr_url(repo_name, run_id)
+    if pr_url:
+        st.markdown(f"### Pull Request Created: [View PR]({pr_url})", unsafe_allow_html=True)
+    else:
+        st.error("Could not retrieve the PR URL.")
+
+    # Load the PR body
+    pr_body = get_pr_body(repo_name, run_id)
+    if not pr_body:
+        st.warning("No PR body available to display.")
+        return  # Exit early if there's no body
+    
+    # 3. Find and render the Mermaid diagram and surrounding markdown
+    # Compile the regex pattern for efficiency and clarity
+    mermaid_pattern = re.compile(r"```mermaid\n(.*?)\n```", re.DOTALL)
+    match = mermaid_pattern.search(pr_body)
+
+    if match:
+        # extract content based on match position, avoiding a second regex pass
+        markdown_before = pr_body[:match.start()].strip()
+        mermaid_code = match.group(1).strip()
+        markdown_after = pr_body[match.end():].strip()
+
+        # Render the parts in order, preserving the document flow
+        if markdown_before:
+            st.markdown(markdown_before, unsafe_allow_html=True)
+
+        with st.expander("View ML Pipeline", expanded=True):
+            try:
+                st_mermaid(mermaid_code)
+            except Exception as e:
+                st.error(f"Error rendering Mermaid diagram: {e}")
+                st.code(mermaid_code, language="mermaid")
+        
+        if markdown_after:
+            st.markdown(markdown_after, unsafe_allow_html=True)
+            
+    else:
+        # If no diagram is found, just render the entire PR body
+        st.markdown(pr_body, unsafe_allow_html=True)
+        st.info("No Mermaid diagram found in the PR body.")
+    
 
 def get_default_line_range(selected_components, cleaned_code):
     if len(selected_components) == 1:
@@ -104,6 +173,7 @@ def get_steps_could_start_from(repo_name, run_id, all_steps):
 
     
     return display_available_steps
+
 
 # === for dag verification ===
 # === Parsing Function ===
