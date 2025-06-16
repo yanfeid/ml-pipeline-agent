@@ -1,6 +1,0 @@
-{
-  "config": {
-    "environment_ini": "[general]\nrefresh_date = 2023-10-05\nuser = \nenvironment = dev\nmo_name = \ndriver_dataset = \ndataproc_project_name = \ndataproc_storage_bucket = \nlocal_output_base_path = \ngcs_base_path = \nqueue_name = default\nnamespace = gds-packman",
-    "solution_ini": "Based on the provided YAML content and the environment.ini content, here is the generated `solution.ini` configuration file:\n\n```ini\n[general]\nmodel_name = \ncheck_point = \nemail_to = \nstate_file = \ncosmos_project = \ngcp_app_id = \n\n```\n\nSince the provided YAML content is empty, there are no additional sections to include in the `solution.ini` file. The `general` section is populated with the fixed parameters as specified in the task instructions."
-  }
-}
