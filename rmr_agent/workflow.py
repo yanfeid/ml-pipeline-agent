@@ -8,7 +8,7 @@ import subprocess
 from typing import Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor
 from rmr_agent.utils import (
-    clone_repo, parse_github_url, convert_notebooks,
+    fork_and_clone_repo, parse_github_url, convert_notebooks,
     get_next_run_id, load_step_output, save_step_output,
     save_ini_file
 )
@@ -25,18 +25,19 @@ def is_cancelled(state: WorkflowState) -> bool:
     """Check if the workflow has been cancelled."""
     return state.get("status") == "cancelled"
 
-def clone_and_prepare_repo(state: WorkflowState) -> Dict[str, Any]:
+def fork_and_clone_repository(state: WorkflowState) -> Dict[str, Any]:
     if "files" in state and state["files"]:
-        print("Skipping clone_and_prepare_repo: 'files' already in state")
+        print("Skipping fork_and_clone_repository: 'files' already in state")
         return {}
-    # Clone the repository and prepare the local path
-    local_repo_path = clone_repo(state["github_url"], state['run_id'])
+    # Fork and clone the repository and prepare the local path
+    local_repo_path, fork_clone_url = fork_and_clone_repo(state["github_url"], state['run_id'])
 
     # Convert notebooks to Python files
     files = convert_notebooks(state["input_files"], local_repo_path)
     return {
         "github_url": state['github_url'],
         "local_repo_path": local_repo_path,
+        "fork_clone_url": fork_clone_url,
         "files": files
     }
 
@@ -330,30 +331,57 @@ def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:
         edited_notebooks = dict(results)
     return {"edited_notebooks": edited_notebooks}
 
+
+def create_pr_body(state: WorkflowState) -> Dict[str, Any]:
+    if "pr_body" in state and state["pr_body"]:
+        print("Skipping create_pr_body: 'pr_body' already in state")
+        return {}
+    
+    from rmr_agent.utils import generate_pr_body
+
+    checkpoint_dir = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'])
+    if not os.path.exists(checkpoint_dir):
+        raise FileNotFoundError(f"Checkpoint directory {checkpoint_dir} does not exist. Please run the workflow first.")
+    
+    # Generate the PR body (markdown file) to include in the push & PR
+    pr_body = generate_pr_body(checkpoints_dir_path=checkpoint_dir)
+    print("Generated PR body:\n", pr_body)
+    # Save the PR body to a markdown file
+    pr_body_save_path = os.path.join('rmr_agent', 'repos', state['repo_name'], "rmr_agent_results.md")
+    try:
+        with open(pr_body_save_path, 'w') as f:
+            f.write(pr_body)
+        print(f"PR body saved to {pr_body_save_path}")
+    except Exception as e:
+        print(f"Error saving PR body to {pr_body_save_path}: {type(e).__name__}: {str(e)}")
+
+    return {"pr_body": pr_body}
+
 def push_code_changes(state: WorkflowState) -> Dict[str, Any]:
     if "successfully_pushed_code" in state and state["successfully_pushed_code"]:
         print("Skipping push_code_changes: 'successfully_pushed_code' already True in state")
         return {}
     from rmr_agent.utils import push_refactored_code
 
-    successfully_pushed_code = push_refactored_code(github_url=state['github_url'], run_id=state['run_id'])    #
+    checkpoint_dir = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'])
+    if not os.path.exists(checkpoint_dir):
+        raise FileNotFoundError(f"Checkpoint directory {checkpoint_dir} does not exist. Please run the workflow first.")
+
+    # Push the refactored code and pr_body markdown file to the repository 
+    successfully_pushed_code = push_refactored_code(github_url=state['github_url'], run_id=state['run_id']) 
     return {"successfully_pushed_code": successfully_pushed_code}
 
 def run_pr_creation(state: WorkflowState) -> Dict[str, Any]:
     if "pr_url" in state and state["pr_url"]:
-        print("Skipping create_pr: 'pr_url' already in state")
+        print("Skipping PR creation: 'pr_url' already in state")
         return {}
     if "successfully_pushed_code" in state and not state["successfully_pushed_code"]:
-        print("Skipping create_pr: Code changes must be successfully pushed before creating a PR.")
+        print("Skipping PR creation: Code changes must be successfully pushed before creating a PR.")
         return {}
     
-    from rmr_agent.utils import generate_pr_body, create_pull_request
+    from rmr_agent.utils import create_rmr_agent_pull_request
 
-    checkpoint_dir = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'])
-    if not os.path.exists(checkpoint_dir):
-        raise FileNotFoundError(f"Checkpoint directory {checkpoint_dir} does not exist. Please run the workflow first.")
-    pr_body = generate_pr_body(checkpoints_dir_path=checkpoint_dir)
-    pr_url = create_pull_request(github_url=state["github_url"], pr_body=pr_body)
+    pr_url = create_rmr_agent_pull_request(github_url=state["github_url"], pr_body_text=state["pr_body"], run_id=state["run_id"])
     return {"pr_url": pr_url}
 
 
@@ -363,7 +391,7 @@ HUMAN_STEPS = {"human_verification_of_components", "human_verification_of_dag"}
 
 # Define all steps (without human verification functions, as they'll be API-driven)
 STEPS = [
-    ("clone_and_prepare_repo", clone_and_prepare_repo),
+    ("fork_and_clone_repository", fork_and_clone_repository),
     ("summarize", summarize),
     ("component_identification", run_component_identification),
     ("component_parsing", run_component_parsing),
@@ -377,6 +405,8 @@ STEPS = [
     ("config_agent", run_config_agent),
     ("notebook_agent", run_notebook_agent),
     ("code_editor_agent", run_code_editor_agent),
+    ("create_pr_body", create_pr_body),
+    ("push_code_changes", push_code_changes),
     ("create_pull_request", run_pr_creation)
 ]
 
@@ -392,6 +422,7 @@ INITIAL_STATE = {
     "repo_name": "",
     "run_id": "",
     "local_repo_path": "",
+    "fork_clone_url": "",
     "existing_config_path": "",
     "files": [],
     "summaries": {},
@@ -408,6 +439,7 @@ INITIAL_STATE = {
     "config": {},
     "notebooks": [],
     "edited_notebooks": [],
+    "pr_body": "",
     "successfully_pushed_code": False,
     "pr_url": ""
 }
