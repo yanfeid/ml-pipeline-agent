@@ -227,7 +227,7 @@ class GitHub:
         except subprocess.CalledProcessError as e:
             error_message = e.output.decode()
             print_data(f"Error running command: '{command_str}': {error_message}", print_log)
-            return error_message
+            raise e
 
     # Context Manager -----------------------------------------------
     def __enter__(self):
@@ -241,21 +241,14 @@ class GitHub:
 
     # /Context Manager ----------------------------------------------
 
-'''
-if __name__ == '__main__':
-    with GitHub("GenAI-DE", "datasets", "<your_account_or_sa>", "<your_encrypted_pat>") as gh:
-         gh.run_command(["git", "switch", "auto-update-embeddings"])
-
-    # or init this way
-    # gh = GitHub("GenAI-DE", "datasets", "<your_account_or_sa>", "<your_encrypted_pat>")
-'''
 
 
-def clone_repo(github_url: str, local_base_dir: str = "rmr_agent/repos") -> str:
+def clone_repo(github_url: str, run_id: int, local_base_dir: str = "rmr_agent/repos") -> str:
     """Clone a GitHub repo and checkout a new branch 'rmr_agent'.
     
     Args:
         github_url: The GitHub repository URL.
+        run_id: Unique identifier for the run, used to create a unique branch.
         local_base_dir: Base directory to store cloned repos.
     
     Returns:
@@ -266,6 +259,7 @@ def clone_repo(github_url: str, local_base_dir: str = "rmr_agent/repos") -> str:
 
     # extract github username and token from environment variables
     account = get_github_username()
+    using_service_account = account == 'rmr-agent'
     token = get_github_token()
 
     local_repo_path = os.path.join(local_base_dir, repo_name)
@@ -273,13 +267,241 @@ def clone_repo(github_url: str, local_base_dir: str = "rmr_agent/repos") -> str:
     if os.path.exists(local_repo_path):
         shutil.rmtree(local_repo_path)
 
+    branch_name = f"rmr_agent_{run_id}"
+
     # clone repo to local directory. This also authenticates with git and safely caches credentials for 24H
     print(f"Changing working directory to {local_base_dir} to clone the repo")
     with temporary_working_directory(local_base_dir):
-        gh = GitHub(repo_owner=repo_owner, repo_name=repo_name, account=account, token=token) 
-        gh.run_command(["git", "checkout", "-b", "rmr_agent"])
+        try:
+            # Clone repo, configure remote URL with token for authentication, and change to the cloned repo directory
+            gh = GitHub(repo_owner=repo_owner, repo_name=repo_name, account=account, token=token) 
+
+            # Check if 'dev' branch exists remotely
+            dev_branch_exists = False
+            try:
+                ls_remote_output = gh.run_command(["git", "ls-remote", "--heads", "origin", "dev"])
+                if ls_remote_output.decode().strip():
+                    dev_branch_exists = True
+                    print("Remote 'dev' branch exists.")
+            except subprocess.CalledProcessError:
+                print("Remote 'dev' branch does not exist.")
+
+            # If 'dev' branch doesn't exist, create and push it
+            if not dev_branch_exists and using_service_account:
+                print("Creating and pushing 'dev' branch to remote.")
+                # Fetch to ensure we have the latest remote state
+                gh.run_command(["git", "fetch", "origin"])
+                # Determine the default branch (e.g., 'main' or 'master')
+                try:
+                    default_branch_output = gh.run_command(["git", "symbolic-ref", "refs/remotes/origin/HEAD"])
+                    default_branch = default_branch_output.decode().strip().split('/')[-1]
+                    print(f"Detected default branch: {default_branch}")
+                except subprocess.CalledProcessError:
+                    # Fallback to common default branches if symbolic-ref fails
+                    default_branch = "main"  
+                    print(f"Could not determine default branch, assuming '{default_branch}'.")
+
+                # Checkout the default branch
+                gh.run_command(["git", "checkout", default_branch])
+                # Create and push the 'dev' branch
+                gh.run_command(["git", "checkout", "-b", "dev"])
+                try:
+                    gh.run_command(["git", "push", "origin", "dev"])
+                except subprocess.CalledProcessError as e:
+                    error_message = e.output.decode() if e.output else str(e)
+                    print(f"Error pushing 'dev' branch: {error_message}")
+                    raise RuntimeError(f"Failed to push 'dev' branch: {error_message}. Please ensure the service account (rmr-agent) has permission to push to the repository.")
+                print("Successfully created and pushed 'dev' branch.")
+
+            # Create and checkout the rmr_agent branch
+            try:
+                gh.run_command(["git", "checkout", "-b", branch_name])
+                print(f"Created and switched to branch: {branch_name}")
+            except subprocess.CalledProcessError as e:
+                error_message = e.output.decode() if e.output else str(e)
+                print(f"Error creating branch {branch_name}: {error_message}")
+                raise RuntimeError(f"Failed to create branch {branch_name}: {error_message}")
+        except subprocess.CalledProcessError as e:
+            error_message = e.output.decode()
+            print(f"Error cloning repo: {error_message}")
+            raise e
+
     print(f"Changing working directory back to {os.getcwd()}")
     
     return local_repo_path
+
+
+def push_refactored_code(github_url: str, run_id: int, local_base_dir: str = "rmr_agent/repos") -> bool:
+    """Push refactored code to the rmr_agent_{run_id} branch in the GitHub repository.
+
+    Args:
+        github_url (str): The GitHub repository URL.
+        run_id (int): Unique identifier for the run, used to create a unique branch.
+        local_base_dir (str): Base directory where the cloned repo is stored.
+        
+    Returns:
+        bool: True if the code was successfully pushed, False otherwise.
+    
+    """
+    # extract repo owner and repo name from url
+    repo_owner, repo_name = parse_github_url(github_url)
+
+    # extract github username and token from environment variables
+    account = get_github_username()
+    using_service_account = account == 'rmr-agent'
+    token = get_github_token()
+
+    local_repo_path = os.path.join(local_base_dir, repo_name)
+
+    if not os.path.exists(local_repo_path):
+        raise FileNotFoundError(f"The local repository path {local_repo_path} does not exist,"
+                                f" cannot push code to remote repository.")
+    
+    branch_name = f"rmr_agent_{run_id}"
+    
+    print(f"Changing working directory to {local_base_dir} to push the changes")
+    with temporary_working_directory(local_base_dir):
+        try:
+            gh = GitHub(repo_owner=repo_owner, repo_name=repo_name, account=account, token=token) 
+            # Check if branch already exists and handle accordingly
+            try:
+                gh.run_command(["git", "checkout", branch_name])
+                print(f"Switched to existing branch: {branch_name}")
+            except subprocess.CalledProcessError:
+                # Branch doesn't exist, create it
+                gh.run_command(["git", "checkout", "-b", branch_name])
+                print(f"Created new branch: {branch_name}")
+            
+            # Add files with error handling
+            files_to_add = []
+            
+            # Check for notebooks directory
+            if os.path.exists("notebooks"):
+                notebook_files = [f for f in os.listdir("notebooks") if f.endswith('.ipynb')]
+                if notebook_files:
+                    gh.run_command(["git", "add", "notebooks/*.ipynb"])
+                    files_to_add.extend([f"notebooks/{f}" for f in notebook_files])
+
+            # Check for config files
+            config_files = ["config/solution.ini", "config/environment.ini"]
+            for config_file in config_files:
+                if os.path.exists(config_file):
+                    gh.run_command(["git", "add", config_file])
+                    files_to_add.append(config_file)
+
+            if not files_to_add:
+                raise ValueError("No files found to add. Expected notebooks/, config/")
+
+            print(f"Added files: {', '.join(files_to_add)}")
+
+            # Check if there are any changes to commit
+            try:
+                status_output = gh.run_command(["git", "status", "--porcelain"])
+                if not status_output.strip():
+                    print("No changes to commit.")
+                    return f"No changes found in branch {branch_name}"
+            except:
+                # If git status fails, proceed with commit attempt
+                pass
+
+            # Commit changes
+            gh.run_command(["git", "commit", "-m", "Add notebooks and config files from RMR Agent"])
+            success_message = f"Successfully committed changes to branch '{branch_name}'"
+            print(success_message)
+            
+            # Push changes to remote repository
+            if using_service_account:
+                try:
+                    gh.run_command(["git", "push", "origin", branch_name])
+                except subprocess.CalledProcessError as e:
+                    error_message = e.output.decode() if e.output else str(e)
+                    print(f"Error pushing code to branch {branch_name}: {error_message}")
+                    raise RuntimeError(f"Failed to push code to branch {branch_name}: {error_message}. Please ensure the service account (rmr-agent) has permission to push to the repository.")
+
+                success_message = f"Successfully pushed code to branch '{branch_name}'"
+                print(success_message)
+
+            return success_message
+
+        except subprocess.CalledProcessError as e:
+            error_message = e.output.decode()
+            print(f"Error pushing code to rmr_agent branch: {error_message}")
+            raise e
+            
+    print(f"Changing working directory back to {os.getcwd()}")
+
+
+def extract_pr_url_from_json_output(output: bytes) -> str:
+    """
+    Extract PR URL from GitHub CLI output.
+    
+    The gh pr create command typically outputs the PR URL on the last line.
+    Example output: "https://github.com/owner/repo/pull/123"
+    """
+    if not output:
+        raise ValueError("No output received from PR creation command")
+    
+    # Split by lines and get the last non-empty line
+    lines = [line.strip() for line in output.strip().split('\n') if line.strip()]
+    
+    if not lines:
+        raise ValueError("No valid output lines found")
+    
+    # The PR URL is typically on the last line
+    potential_url = lines[-1]
+    
+    # Validate that it looks like a GitHub PR URL
+    github_pr_pattern = r'https://github\.com/[^/]+/[^/]+/pull/\d+'
+    
+    if re.match(github_pr_pattern, potential_url):
+        return potential_url
+    
+    # If the last line doesn't match, search through all lines
+    for line in reversed(lines):
+        if re.match(github_pr_pattern, line):
+            return line
+    
+    # If no URL pattern found, return the last line (might be PR number or other info)
+    raise ValueError(f"Could not extract PR URL from output: {output}")
+
+
+def create_pull_request(github_url: str, pr_body_text: str, local_base_dir: str = "rmr_agent/repos") -> str:
+    # extract repo owner and repo name from url
+    repo_owner, repo_name = parse_github_url(github_url)
+
+    # extract github username and token from environment variables
+    account = get_github_username()
+    token = get_github_token()
+
+    local_repo_path = os.path.join(local_base_dir, repo_name)
+
+    if not os.path.exists(local_repo_path):
+        raise FileNotFoundError(f"The local repository path {local_repo_path} does not exist,"
+                                f" cannot create PR.")
+    
+    print(f"Changing working directory to {local_base_dir} to create the PR")
+    with temporary_working_directory(local_base_dir):
+        try:
+            gh = GitHub(repo_owner=repo_owner, repo_name=repo_name, account=account, token=token) 
+            gh.run_command(["git", "checkout", "-b", "rmr_agent"])
+            # Create PR
+            pr_output = gh.run_command(["gh", "pr", "create", 
+                            "--base", "main", # allow this base branch (main) to be configurable? 
+                            "--head", "rmr_agent",
+                            "--title", "Add notebooks and config files from RMR Agent",
+                            "--body", pr_body_text,
+                            "--json", "url"  # Returns JSON with just the URL
+                            ])
+            # Extract PR URL from the JSON output
+            pr_url = extract_pr_url_from_json_output(pr_output)
+        except subprocess.CalledProcessError as e:
+            error_message = e.output.decode()
+            print(f"Error creating PR: {error_message}")
+            raise e
+            
+
+    print(f"✅ Pull Request created: {pr_url}")
+    return pr_url
+
 
 
