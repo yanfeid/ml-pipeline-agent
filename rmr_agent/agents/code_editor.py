@@ -1,8 +1,8 @@
-from rmr_agent.utils import py_to_notebook
-import difflib
 import re
 import json
+import difflib
 from rmr_agent.llms import LLMClient
+from rmr_agent.utils import py_to_notebook
 from collections import defaultdict
 
 def infer_section_name(code_lines, attribute_parsing_json):
@@ -92,7 +92,7 @@ def extract_cross_section_variables(code_text: str, attribute_parsing_json: dict
 
     # Regex to match: config.get('some_section', 'some_key')
     config_get_pattern = re.compile(r"config\.get\(\s*([^\s,]+)\s*,\s*'([^']+)'\s*\)")
-
+   
     extra_vars = []
     for match in config_get_pattern.finditer(code_text):
         ref_section_raw, ref_key = match.groups()
@@ -199,8 +199,14 @@ def code_editor_agent(python_file_path: str, attribute_parsing_json: dict, llm_m
             value = var["value"]
             already_exists = var.get("already_exists", False)
             renamed = var.get("renamed", False)
-
-            if already_exists and not renamed:
+            
+            if already_exists and not renamed:  
+                if modified_line is not None and isinstance(value, str):
+                    param_pattern = rf"(\b{re.escape(name)}\s*=\s*)['\"]{re.escape(value)}['\"]"
+                    modified_line_new, count = re.subn(param_pattern, rf"\1{name}", modified_line)
+                    if count > 0:
+                        modified_line = modified_line_new
+                        has_modifications = True
                 # match “name = …”, ignorecase
                 if re.match(rf"^\s*{re.escape(name)}\s*=", line, flags=re.IGNORECASE):
                     # single row vs multiple rows
@@ -258,7 +264,7 @@ def code_editor_agent(python_file_path: str, attribute_parsing_json: dict, llm_m
                 # ambigious value with LLM disambiguation
                 else:
                     print(f"⚠️ Ambiguous value `{single_value_str}` shared by: {value_to_names[single_value_str]}")
-                    # 找到所有出现该值的行
+                    # find all rows including the values
                     usage_lines = [(i, l) for i, l in enumerate(code_lines) if single_value_str in l]
                     if not usage_lines:
                         print(f"⚠️ No usage lines found for value `{single_value_str}` → skipping LLM disambiguation.")
@@ -354,9 +360,7 @@ Now analyze the following code contexts:
 # # ============= for test ================
 # json_file = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/checkpoints/bt-retry-v2/3/attribute_parsing.json"
 # # python_code = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2/notebooks_test/1_driver_creation_2.py"
-# python_code = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2/notebooks/1_driver_creation_2.py"
-
-# #充分测试！
+# python_code = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2/notebooks/0_driver_creation.py"
 
 # with open(json_file, "r", encoding="utf-8") as f:
 #     attribute_config = json.load(f)

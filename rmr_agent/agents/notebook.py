@@ -281,41 +281,41 @@ print(f'username={username}, working_path={working_path}')
   # might return a dict
 
 # #==========================simple test====================================
-if __name__ == "__main__":
-    # set up path
-    BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
-    NOTEBOOKS_DIR = os.path.join(BASE_DIR, "notebooks_test")
+# if __name__ == "__main__":
+#     # set up path
+#     BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
+#     NOTEBOOKS_DIR = os.path.join(BASE_DIR, "notebooks_test")
 
-    local_repo_path = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/toy_research_code"
+#     local_repo_path = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2"
 
-    CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "toy_research_code","1")
-    dag_yaml = os.path.join(CHECKPOINTS_DIR, "dag.yaml")
-    json_path= os.path.join(CHECKPOINTS_DIR,"summarize.json" )
+#     CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "bt-retry-v2","3")
+#     dag_yaml = os.path.join(CHECKPOINTS_DIR, "dag.yaml")
+#     json_path= os.path.join(CHECKPOINTS_DIR,"summarize.json" )
     
-    with open(json_path, "r", encoding="utf-8") as f:
-        json_file = json.load(f)
+#     with open(json_path, "r", encoding="utf-8") as f:
+#         json_file = json.load(f)
 
-    json = json_file.get('cleaned_code')
+#     json = json_file.get('cleaned_code')
     
-    with open(dag_yaml, "r", encoding="utf-8") as f:
-        verified_dag = yaml.safe_load(f)
+#     with open(dag_yaml, "r", encoding="utf-8") as f:
+#         verified_dag = yaml.safe_load(f)
 
-    # with open(dag_state, "r", encoding="utf-8") as f:
-    #     dag_file = json.load(f)
+#     # with open(dag_state, "r", encoding="utf-8") as f:
+#     #     dag_file = json.load(f)
 
-    generated_files = notebook_agent(verified_dag, json, local_repo_path)
+#     generated_files = notebook_agent(verified_dag, json, local_repo_path)
 
-    # check notebooks
-    if os.path.exists(NOTEBOOKS_DIR):
-        print(f" Notebooks directory exists: {NOTEBOOKS_DIR}")
-    else:
-        print(f" Notebooks directory missing: {NOTEBOOKS_DIR}")
+#     # check notebooks
+#     if os.path.exists(NOTEBOOKS_DIR):
+#         print(f" Notebooks directory exists: {NOTEBOOKS_DIR}")
+#     else:
+#         print(f" Notebooks directory missing: {NOTEBOOKS_DIR}")
 
-    # check py file
-    for section, file_path in generated_files.items():
-        if os.path.exists(file_path):
-            print(f" File exists: {file_path}")
-        else:
-            print(f" File missing: {file_path}")
+#     # check py file
+#     for section, file_path in generated_files.items():
+#         if os.path.exists(file_path):
+#             print(f" File exists: {file_path}")
+#         else:
+#             print(f" File missing: {file_path}")
 
-    print(" Notebook generation test completed!")
+#     print(" Notebook generation test completed!")
