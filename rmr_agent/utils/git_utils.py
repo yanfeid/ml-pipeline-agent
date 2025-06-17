@@ -497,22 +497,22 @@ def fork_and_clone_repo(github_url: str, run_id: int, local_base_dir: str = "rmr
             else:
                 gh_local_runner.run_command(["git", "fetch", "--depth", "1", "origin"])
 
-            # Use the API client to reliably get the default branch name
-            print("Using API to find default branch...")
-            default_branch = gh_api_client.get_default_branch()
+            # --- Use the API to find the correct base branch ('dev' or default) ---
+            print("Using API to find the correct base branch for work...")
+            target_branch = gh_api_client.get_target_branch()
 
             # --- Robust Branch Creation/Reset --
-            print(f"Ensuring branch '{branch_name}' is based on latest '{source_remote}/{default_branch}'...")
+            print(f"Ensuring branch '{branch_name}' is based on latest '{source_remote}/{target_branch}'...")
             try:
                 # Attempt to create the new branch from the latest upstream code
-                gh_local_runner.run_command(["git", "checkout", "-b", branch_name, f"{source_remote}/{default_branch}"])
+                gh_local_runner.run_command(["git", "checkout", "-b", branch_name, f"{source_remote}/{target_branch}"])
                 print(f"Created new branch '{branch_name}'.")
             except subprocess.CalledProcessError as e:
                 # If the branch already exists, check it out and reset it to the latest upstream
                 if "already exists" in e.stderr:
                     print(f"Branch '{branch_name}' already exists. Switching to it and resetting to latest upstream code.")
                     gh_local_runner.run_command(["git", "checkout", branch_name])
-                    gh_local_runner.run_command(["git", "reset", "--hard", f"{source_remote}/{default_branch}"])
+                    gh_local_runner.run_command(["git", "reset", "--hard", f"{source_remote}/{target_branch}"])
                 else:
                     # If it's a different git error, re-raise it
                     raise
