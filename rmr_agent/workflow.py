@@ -340,15 +340,6 @@ def create_pr_body(state: WorkflowState) -> Dict[str, Any]:
         print("Skipping create_pr_body: 'pr_body' already in state")
         return {}
     
-<<<<<<< HEAD
-    # from rmr_agent.utils import generate_pr_body, create_pull_request
-
-    # checkpoint_dir = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'])
-    # if not os.path.exists(checkpoint_dir):
-    #     raise FileNotFoundError(f"Checkpoint directory {checkpoint_dir} does not exist. Please run the workflow first.")
-    # pr_body = generate_pr_body(checkpoints_dir_path=checkpoint_dir)
-    # pr_url = create_pull_request(github_url=state["github_url"], pr_body=pr_body)
-=======
     from rmr_agent.utils import generate_pr_body
 
     checkpoint_dir = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'])
@@ -395,7 +386,6 @@ def run_pr_creation(state: WorkflowState) -> Dict[str, Any]:
 
     pr_url = create_rmr_agent_pull_request(github_url=state["github_url"], pr_body_text=state["pr_body"], run_id=state["run_id"])
     return {"pr_url": pr_url}
->>>>>>> main
 
 
 

@@ -3,18 +3,18 @@ nodes:
     file_name: rmr_agent/repos/bt-retry-v2/etl/01_etl.py
     line_range: 1-1187
     inputs:
-      strategy_types: '[''PAN'', ''NO_AVS'', ''NETWORK_TOKENIZATION'', ''ABU'']'
+      strategy_type_list: '[''PAN'', ''NO_AVS'', ''NETWORK_TOKENIZATION'', ''ABU'']'
       date_range_start: '2023-08-15'
       date_range_end: '2025-01-02'
       random_sampling_factor: '15'
       train_downsampling_factor: '900'
-      validation_downsampling_start: '900'
-      validation_downsampling_end: '950'
-      oot_downsampling_start: '950'
+      validation_downsampling_factor_start: '900'
+      validation_downsampling_factor_end: '950'
+      oot_downsampling_factor: '950'
     outputs:
-      final_driver_table_train: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3
-      final_driver_table_validation: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3
-      final_driver_table_test: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
+      train_dataset_path: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3
+      validation_dataset_path: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3
+      test_dataset_path: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
 - Driver Creation 2:
     file_name: rmr_agent/repos/bt-retry-v2/etl/02_bq_to_dataproc.py
     line_range: 1-53
@@ -35,10 +35,10 @@ nodes:
       val_parquet_path: /projects/dnaomi/bt-retry-global-v2/data/pypl-bods.gds_pacman_prod.bt_retry_global_v2_driverset_cc_renamed_radd_subset_filtered_full_valid_3/
       features_path: /projects/dnaomi/bt-retry-global-v2/metadata/v2_features.txt
       target_column: retry_is_success
-      early_stopping_metric: average_precision
-      objective_metric_name: partial_aucpr_geq90
     outputs:
       model_artifact_path: /projects/dnaomi/bt-retry-global-v2/models/final/bt_retry_v2.txt
+      metric_values: '[''precision_at_95'', ''precision_at_99'', ''savings_at_95'',
+        ''savings_at_99'', ''partial_aucpr_geq90'']'
 - Model Evaluation:
     file_name: rmr_agent/repos/bt-retry-v2/model-dev/evaluate.py
     line_range: 1-443
@@ -49,8 +49,7 @@ nodes:
       v2_features_path: /projects/dnaomi/bt-retry-global-refresh/metadata/v2_features_final_2.txt
       v2_model_path: /projects/dnaomi/bt-retry-global-refresh/models/final/bt_retry_v2.txt
       target_column: retry_is_success
-      v1_score_threshold: '0.018447025070137058'
-      valid_data_sample_size: '50000'
+      v2_score_threshold: '0.018447025070137058'
     outputs:
       v1_metrics: List of metrics calculated for V1 model
       v2_metrics: List of metrics calculated for V2 model
@@ -59,21 +58,22 @@ nodes:
     file_name: rmr_agent/repos/bt-retry-v2/deployment/01_export_to_ume.py
     line_range: 1-78
     inputs:
-      trained_model_path: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_small.txt
+      model_file_path: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_small.txt
+      model_json_path: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json
+      ume_output_path: /projects/dnaomi/bt-retry-global-v2/models/ume/
       model_name: bt_retry_v2
-      path_to_json: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json
       tree_nodes_only: 'False'
       output_name: bt_retry_v2_score
     outputs:
-      model_json_with_pd_path: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json
-      binary_spec_output_path: /projects/dnaomi/bt-retry-global-v2/models/ume/
+      binary_spec: LightGBM model spec object
+      ume_model_path: /projects/dnaomi/bt-retry-global-v2/models/ume/bt_retry_v2.m
+      final_model_json_path: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json
 - Model Scoring:
     file_name: rmr_agent/repos/bt-retry-v2/deployment/02_pyscoring_validation.py
     line_range: 1-172
     inputs:
-      models_dir: /home/dnaomi/bt-retry-global-refresh/models/ume/
-      model_dir: /home/dnaomi/bt-retry-global-refresh/models/ume/
-      model_ume_name: bt_retry_v2
+      model_directory_path: /home/dnaomi/bt-retry-global-refresh/models/ume/
+      model_name: bt_retry_v2
       valid_sample_path: /home/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
       features_file_path: /projects/dnaomi/bt-retry-global-refresh/metadata/v2_features_final_2.txt
       model_file_path: /home/dnaomi/bt-retry-global-refresh/models/ume/ume/bt_retry_v2.m
@@ -84,9 +84,9 @@ edges:
 - from: Driver Creation
   to: Driver Creation 2
   attributes:
-    final_driver_table_train: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3
-    final_driver_table_validation: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3
-    final_driver_table_test: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
+    train_dataset_path: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3
+    validation_dataset_path: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3
+    test_dataset_path: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
 - from: Driver Creation 2
   to: Model Training
   attributes:
@@ -103,4 +103,5 @@ edges:
 - from: Model Packaging
   to: Model Scoring
   attributes:
-    binary_spec_output_path: /projects/dnaomi/bt-retry-global-v2/models/ume/
+    ume_model_path: /projects/dnaomi/bt-retry-global-v2/models/ume/bt_retry_v2.m
+    final_model_json_path: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json

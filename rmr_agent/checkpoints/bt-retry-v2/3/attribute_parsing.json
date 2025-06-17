@@ -4,7 +4,7 @@
       "Driver Creation": {
         "inputs": [
           {
-            "name": "strategy_types",
+            "name": "strategy_type_list",
             "value": [
               "PAN",
               "NO_AVS",
@@ -39,19 +39,19 @@
             "renamed": false
           },
           {
-            "name": "validation_downsampling_start",
+            "name": "validation_downsampling_factor_start",
             "value": 900,
             "already_exists": false,
             "renamed": false
           },
           {
-            "name": "validation_downsampling_end",
+            "name": "validation_downsampling_factor_end",
             "value": 950,
             "already_exists": false,
             "renamed": false
           },
           {
-            "name": "oot_downsampling_start",
+            "name": "oot_downsampling_factor",
             "value": 950,
             "already_exists": false,
             "renamed": false
@@ -59,19 +59,19 @@
         ],
         "outputs": [
           {
-            "name": "final_driver_table_train",
+            "name": "train_dataset_path",
             "value": "pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3",
             "already_exists": false,
             "renamed": false
           },
           {
-            "name": "final_driver_table_validation",
+            "name": "validation_dataset_path",
             "value": "pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3",
             "already_exists": false,
             "renamed": false
           },
           {
-            "name": "final_driver_table_test",
+            "name": "test_dataset_path",
             "value": "pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3",
             "already_exists": false,
             "renamed": false
@@ -106,7 +106,7 @@
           {
             "name": "temporary_gcs_bucket",
             "value": "pypl-bkt-rsh-row-std-gds-pacman",
-            "already_exists": false,
+            "already_exists": true,
             "renamed": false
           }
         ],
@@ -161,18 +161,6 @@
             "value": "retry_is_success",
             "already_exists": true,
             "renamed": false
-          },
-          {
-            "name": "early_stopping_metric",
-            "value": "average_precision",
-            "already_exists": true,
-            "renamed": false
-          },
-          {
-            "name": "objective_metric_name",
-            "value": "partial_aucpr_geq90",
-            "already_exists": true,
-            "renamed": false
           }
         ],
         "outputs": [
@@ -180,6 +168,18 @@
             "name": "model_artifact_path",
             "value": "/projects/dnaomi/bt-retry-global-v2/models/final/bt_retry_v2.txt",
             "already_exists": false,
+            "renamed": false
+          },
+          {
+            "name": "metric_values",
+            "value": [
+              "precision_at_95",
+              "precision_at_99",
+              "savings_at_95",
+              "savings_at_99",
+              "partial_aucpr_geq90"
+            ],
+            "already_exists": true,
             "renamed": false
           }
         ],
@@ -228,14 +228,8 @@
             "renamed": false
           },
           {
-            "name": "v1_score_threshold",
+            "name": "v2_score_threshold",
             "value": 0.018447025070137058,
-            "already_exists": false,
-            "renamed": false
-          },
-          {
-            "name": "valid_data_sample_size",
-            "value": 50000,
             "already_exists": false,
             "renamed": false
           }
@@ -269,8 +263,20 @@
       "Model Packaging": {
         "inputs": [
           {
-            "name": "trained_model_path",
+            "name": "model_file_path",
             "value": "/projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_small.txt",
+            "already_exists": false,
+            "renamed": false
+          },
+          {
+            "name": "model_json_path",
+            "value": "/projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json",
+            "already_exists": false,
+            "renamed": false
+          },
+          {
+            "name": "ume_output_path",
+            "value": "/projects/dnaomi/bt-retry-global-v2/models/ume/",
             "already_exists": false,
             "renamed": false
           },
@@ -278,12 +284,6 @@
             "name": "model_name",
             "value": "bt_retry_v2",
             "already_exists": true,
-            "renamed": false
-          },
-          {
-            "name": "path_to_json",
-            "value": "/projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json",
-            "already_exists": false,
             "renamed": false
           },
           {
@@ -301,15 +301,21 @@
         ],
         "outputs": [
           {
-            "name": "model_json_with_pd_path",
-            "value": "/projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json",
+            "name": "binary_spec",
+            "value": "LightGBM model spec object",
             "already_exists": true,
             "renamed": false
           },
           {
-            "name": "binary_spec_output_path",
-            "value": "/projects/dnaomi/bt-retry-global-v2/models/ume/",
-            "already_exists": true,
+            "name": "ume_model_path",
+            "value": "/projects/dnaomi/bt-retry-global-v2/models/ume/bt_retry_v2.m",
+            "already_exists": false,
+            "renamed": false
+          },
+          {
+            "name": "final_model_json_path",
+            "value": "/projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json",
+            "already_exists": false,
             "renamed": false
           }
         ],
@@ -322,19 +328,13 @@
       "Model Scoring": {
         "inputs": [
           {
-            "name": "models_dir",
+            "name": "model_directory_path",
             "value": "/home/dnaomi/bt-retry-global-refresh/models/ume/",
             "already_exists": true,
             "renamed": false
           },
           {
-            "name": "model_dir",
-            "value": "/home/dnaomi/bt-retry-global-refresh/models/ume/",
-            "already_exists": true,
-            "renamed": false
-          },
-          {
-            "name": "model_ume_name",
+            "name": "model_name",
             "value": "bt_retry_v2",
             "already_exists": true,
             "renamed": false

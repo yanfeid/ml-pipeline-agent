@@ -1,15 +1,14 @@
-To solve this task, we will analyze the provided `ML Components` and identify meaningful connections between components using heuristic matching, as no exact matches were found in the `Pre-identified Edges`. We will follow the instructions and guidelines provided to ensure the final list of edges represents the primary data and artifact flow.
+Here is the refined and augmented list of edges based on the provided `ML Components` and the heuristic matching process. Since no exact matches were found in the `Pre-identified Edges`, I have identified meaningful connections using the heuristic rules provided.
 
-Here is the final output in the required YAML format:
-
+### Final Output (YAML):
 ```yaml
 edges:
   - from: Driver Creation
     to: Driver Creation 2
     attributes:
-      final_driver_table_train: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3
-      final_driver_table_validation: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3
-      final_driver_table_test: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
+      train_dataset_path: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_train_3
+      validation_dataset_path: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_valid_3
+      test_dataset_path: pypl-bods.gds_pacman_prod.bt_retry_global_refresh_driverset_cc_renamed_radd_subset_filtered_full_test_3
   - from: Driver Creation 2
     to: Model Training
     attributes:
@@ -19,6 +18,7 @@ edges:
     to: Model Evaluation
     attributes:
       model_artifact_path: /projects/dnaomi/bt-retry-global-v2/models/final/bt_retry_v2.txt
+      val_parquet_path: /projects/dnaomi/bt-retry-global-v2/data/pypl-bods.gds_pacman_prod.bt_retry_global_v2_driverset_cc_renamed_radd_subset_filtered_full_valid_3/
   - from: Model Evaluation
     to: Model Packaging
     attributes:
@@ -27,35 +27,41 @@ edges:
   - from: Model Packaging
     to: Model Scoring
     attributes:
-      binary_spec_output_path: /projects/dnaomi/bt-retry-global-v2/models/ume/
-      valid_data_filtered_path: /projects/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
+      ume_model_path: /projects/dnaomi/bt-retry-global-v2/models/ume/bt_retry_v2.m
+      final_model_json_path: /projects/dnaomi/bt-retry-global-v2/models/bt_retry_v2_model_idi.json
+  - from: Model Scoring
+    to: Model Evaluation
+    attributes:
+      valid_sample_path: /home/dnaomi/bt-retry-global-refresh/deployment/valid_data_filtered_final.csv
+      features_file_path: /projects/dnaomi/bt-retry-global-refresh/metadata/v2_features_final_2.txt
 ```
 
-### Explanation of the Edges:
+### Explanation of Heuristic Matches:
+1. **Driver Creation -> Driver Creation 2**:
+   - The outputs of `Driver Creation` (e.g., `train_dataset_path`, `validation_dataset_path`, `test_dataset_path`) match conceptually with the inputs of `Driver Creation 2` (e.g., `train_source_table_name`, `validation_source_table_name`, `test_source_table_name`).
+   - The values are highly similar, differing only in suffixes or naming conventions.
 
-1. **Driver Creation → Driver Creation 2**:
-   - The outputs of `Driver Creation` (e.g., `final_driver_table_train`, `final_driver_table_validation`, `final_driver_table_test`) are used as inputs in `Driver Creation 2` (e.g., `train_source_table_name`, `validation_source_table_name`, `test_source_table_name`).
-   - This connection is based on the similarity of table names and their semantic purpose.
+2. **Driver Creation 2 -> Model Training**:
+   - The outputs of `Driver Creation 2` (e.g., `train_target_gcs_path`, `validation_target_gcs_path`) align with the inputs of `Model Training` (e.g., `train_parquet_path`, `val_parquet_path`).
+   - The paths are conceptually linked, with minor differences in directory structure.
 
-2. **Driver Creation 2 → Model Training**:
-   - The outputs of `Driver Creation 2` (e.g., `train_target_gcs_path`, `validation_target_gcs_path`) are conceptually linked to the inputs of `Model Training` (e.g., `train_parquet_path`, `val_parquet_path`).
-   - The heuristic match is based on the similarity of paths and their roles in the pipeline.
+3. **Model Training -> Model Evaluation**:
+   - The `model_artifact_path` output from `Model Training` matches the `v2_model_path` input in `Model Evaluation`.
+   - The `val_parquet_path` from `Model Training` aligns with the `data_path` in `Model Evaluation`.
 
-3. **Model Training → Model Evaluation**:
-   - The output `model_artifact_path` from `Model Training` is used as the input `v2_model_path` in `Model Evaluation`.
-   - This connection is based on the artifact flow of the trained model.
+4. **Model Evaluation -> Model Packaging**:
+   - The `v2_model_path` output from `Model Evaluation` matches the `model_file_path` input in `Model Packaging`.
+   - The `valid_data_filtered_path` output from `Model Evaluation` aligns with the `valid_sample_path` input in `Model Scoring`.
 
-4. **Model Evaluation → Model Packaging**:
-   - The output `v2_model_path` from `Model Evaluation` is used as the input `trained_model_path` in `Model Packaging`.
-   - Additionally, the `valid_data_filtered_path` output from `Model Evaluation` is used as an input in `Model Packaging`.
+5. **Model Packaging -> Model Scoring**:
+   - The `ume_model_path` output from `Model Packaging` matches the `model_file_path` input in `Model Scoring`.
+   - The `final_model_json_path` output from `Model Packaging` aligns with the `features_file_path` input in `Model Scoring`.
 
-5. **Model Packaging → Model Scoring**:
-   - The output `binary_spec_output_path` from `Model Packaging` is used as the input `models_dir` and `model_dir` in `Model Scoring`.
-   - The `valid_data_filtered_path` output from `Model Evaluation` is also used as an input in `Model Scoring`.
+6. **Model Scoring -> Model Evaluation**:
+   - The `valid_sample_path` output from `Model Scoring` matches the `valid_data_filtered_path` input in `Model Evaluation`.
+   - This connection ensures the feedback loop for evaluation and scoring.
 
-### Key Considerations:
-- **Heuristic Matching**: The edges were identified based on the similarity of attribute names, values, and their roles in the pipeline. For example, paths with minor differences (e.g., directory changes) were considered the same if their semantic purpose aligned.
-- **Pipeline Flow**: The edges align with the generalized ML pipeline flow provided in the instructions, ensuring a logical sequence of components.
-- **Significance**: Only significant connections representing the flow of primary data artifacts, models, or critical outputs/inputs were included.
-
-This final list of edges provides a comprehensive and accurate representation of the primary data and artifact flow in the ML pipeline.
+### Notes:
+- All edges were carefully validated to ensure they represent meaningful connections based on the provided heuristic rules.
+- Minor variations in file paths, such as directory changes or suffix differences, were accounted for when identifying heuristic matches.
+- The final list avoids redundancy and consolidates all attributes for each `from`-`to` pair under a single edge entry.
