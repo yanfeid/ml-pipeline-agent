@@ -1,21 +1,20 @@
+import os
 import sys
 import streamlit as st
 import requests
 import json
 import time
 from datetime import datetime
-from streamlit import rerun
 from rmr_agent.utils import parse_github_url 
 from rmr_agent.workflow import STEPS, HUMAN_STEPS
 from rmr_agent.frontend.ui_utils import (
     clean_file_path, remove_line_numbers, clean_line_range,
-    get_components, get_cleaned_code, get_dag_yaml,
+    get_components, get_cleaned_code, get_dag_yaml, show_rmr_agent_results,
     get_default_line_range, get_steps_could_start_from,
     dag_edge_editor
 )
 
-BASE_URL = "http://localhost:8000"
-#BASE_URL = "http://rmr-agent-api:8000"
+BASE_URL = os.environ.get("RMR_AGENT_API_BASE_URL", "http://localhost:8000")  # Default to local server if not set
 
 sys.stdout.flush()
 
@@ -72,7 +71,7 @@ def display_welcome_page():
     default_run_id = st.session_state["run_id"] if st.session_state["run_id"] else "1"
     st.session_state["run_id"] = st.text_input("Run ID (optional)", default_run_id, help="Enter an existing run ID (e.g. 1, 2, 3) to resume, or leave blank for a new run")
     # Allow starting from specific step
-    start_from = st.selectbox(
+    start_from = st.session_state["start_from"] if st.session_state["start_from"] else st.selectbox(
         "Start From (optional)",
         [""] + get_steps_could_start_from(st.session_state["repo_name"], st.session_state["run_id"], STEPS),  # Empty option + all step names
         help="Choose a step to start from, or leave blank to start from the beginning"
@@ -247,8 +246,8 @@ def cancel_workflow_button():
         except Exception as e:
             st.error(f"Error sending cancellation request: {str(e)}")
 
-def back_to_home_button():
-    if st.button("Back to Home", key="back_to_home"):
+def back_to_home_button(key="back_to_home"):
+    if st.button("Back to Home", key=key):
         # Reset session state and return to home screen
         st.session_state.workflow_running = False
         st.session_state["display_welcome_page"] = True
@@ -473,8 +472,21 @@ def main():
     if st.session_state.get("workflow_complete"):
         st.success("🎉 Workflow is complete!")
 
+        # Show PR URL and Body
+        show_rmr_agent_results(repo_name=st.session_state["repo_name"], run_id=st.session_state["run_id"])
+
         if st.button("Back to Home"):
+            preserved_state = {
+                "github_url": st.session_state.get("github_url"),
+                "input_files": st.session_state.get("input_files"),
+                "run_id": st.session_state.get("run_id"),
+                "start_from": st.session_state.get("start_from"),
+            }
             st.session_state.clear()
+            # Restore preserved keys
+            for key, value in preserved_state.items():
+                if value:  
+                    st.session_state[key] = value
             st.rerun()
         return
 
@@ -499,7 +511,10 @@ def main():
                     step_changed = check_workflow_status()
                     time.sleep(2)
                 # update the status with the new step
-                status.update(label=f"Running {st.session_state["current_step"].replace("_", " ").title()} ...", state="running")
+                label_str = f"Running {st.session_state["current_step"].replace("_", " ").title()} ..."
+                if st.session_state["current_step"] == "code_editor_agent":
+                    label_str += " This step may take a while, please be patient."
+                status.update(label=label_str, state="running")
                 display_progress_bar(st.session_state["current_step"], write_cur_step=False)
                 display_detailed_progress(st.session_state["current_step"])
                 current_time = datetime.now().strftime("%H:%M:%S")

@@ -8,7 +8,7 @@ from rmr_agent.utils import (
 
 app = FastAPI()
 
-CHECKPOINT_BASE_PATH = "rmr_agent/checkpoints"
+CHECKPOINT_BASE_PATH = os.environ.get("CHECKPOINT_BASE_PATH", "rmr_agent/checkpoints")
 
 # In-memory storage for workflow states
 # In a production environment, we'll want to use Redis or a database instead
