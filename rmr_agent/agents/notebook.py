@@ -5,10 +5,8 @@ from typing import Dict, Any
 import yaml
 import json
 
-
 def clean_prefix(path: str) -> str:
     return os.path.splitext(os.path.basename(path))[0].strip().lower()
-
 
 def normalize_node_name(name):
     return re.sub(r'\s+', '_', name.strip().lower())
@@ -127,7 +125,6 @@ def notebook_agent(verified_dag, cleaned_code, local_repo_path):
             if "attributes" in edge:
                 edge_attributes.setdefault(to_section, {}).setdefault(from_section, {}).update(edge["attributes"])
 
-
     print(f"\n Final dependencies mapping: {dependencies}")
     print(f" Final edge attributes mapping: {edge_attributes}\n")
 
@@ -146,9 +143,10 @@ def notebook_agent(verified_dag, cleaned_code, local_repo_path):
 
          # === Standard Code for RMR ===       
         with open(file_path, "w", encoding="utf-8") as f:
-            f.write("""## gsutil authentication
+            f.write("""# %%
+## gsutil authentication
 %ppauth
-                    
+# %%                    
 from rmr_config.simple_config import Config
 from rmr_config.state_manager import StateManager
 import os, sys, ast, json
@@ -168,6 +166,7 @@ os.makedirs(local_base_path, exist_ok=True)
 
 # set working directory
 os.chdir(working_path)
+# %%
 if not config:
     raise ValueError('config is not correctly setup')
                 
@@ -178,11 +177,12 @@ print(f'username={username}, working_path={working_path}')
 
             # === Section Name ===
             formatted_section_name = section_name.replace(" ", "_").lower()
-            f.write(f"# Section Name\n")
+            f.write(f"# %%\n")
             f.write(f"section_name = \"{formatted_section_name}\"\n\n")
 
             # === General Parameters from environment.ini === 
             # mo_name driver_dataset dataproc_project_name dataproc_storage_bucket gcs_base_path queue_name check_point state_file 
+            f.write(f"# %%\n")
             f.write("# General Parameters \n")
 
             required_keys = [
@@ -259,18 +259,20 @@ print(f'username={username}, working_path={working_path}')
 
                 research_code_lines = extracted_code[match_key]["code"].split("\n")  
                 cleaned_code_list = []
+                
                 for line in research_code_lines:
-                    cleaned_line = line.split("|", 1)[-1].strip()
-                    cleaned_code_list.append(cleaned_line)
+                    _, _, cleaned_line = line.partition("|")
+                    if cleaned_line.startswith(" "):
+                        cleaned_line = cleaned_line[1:]  # 只去掉一个空格
+                    cleaned_code_list.append(cleaned_line.rstrip("\n"))
 
                 research_code = "\n".join(cleaned_code_list)
-                f.write("\n" + "# === Research Code ===\n")
+                # f.write("\n" + "# === Research Code ===\n")
                 f.write(research_code + "\n")
-                f.write("\nprint('Script initialized')\n")
+                # f.write("\nprint('Script initialized')\n")
                 print(f"Research code inserted into {file_path}")
             else:
                 print(f"⚠️ WARNING: No research code found for {section_name}")
-
             print("All notebooks generated successfully!")
         print(f" Created: {file_path}")
     print("All sections processed. Python files are ready in notebooks/")
@@ -278,44 +280,42 @@ print(f'username={username}, working_path={working_path}')
     return  generated_files
   # might return a dict
 
-
 # #==========================simple test====================================
+# if __name__ == "__main__":
+#     # set up path
+#     BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
+#     NOTEBOOKS_DIR = os.path.join(BASE_DIR, "notebooks_test")
 
-if __name__ == "__main__":
-    # set up path
-    BASE_DIR = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent"
-    NOTEBOOKS_DIR = os.path.join(BASE_DIR, "notebooks")
+#     local_repo_path = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2"
 
-    local_repo_path = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/ql-store-recommendation-prod"
-
-    CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "ql-store-recommendation-prod","4")
-    dag_yaml = os.path.join(CHECKPOINTS_DIR, "dag.yaml")
-    json_path= os.path.join(CHECKPOINTS_DIR,"summarize.json" )
+#     CHECKPOINTS_DIR = os.path.join(BASE_DIR, "checkpoints", "bt-retry-v2","3")
+#     dag_yaml = os.path.join(CHECKPOINTS_DIR, "dag.yaml")
+#     json_path= os.path.join(CHECKPOINTS_DIR,"summarize.json" )
     
-    with open(json_path, "r", encoding="utf-8") as f:
-        json_file = json.load(f)
+#     with open(json_path, "r", encoding="utf-8") as f:
+#         json_file = json.load(f)
 
-    json = json_file.get('cleaned_code')
+#     json = json_file.get('cleaned_code')
     
-    with open(dag_yaml, "r", encoding="utf-8") as f:
-        verified_dag = yaml.safe_load(f)
+#     with open(dag_yaml, "r", encoding="utf-8") as f:
+#         verified_dag = yaml.safe_load(f)
 
-    # with open(dag_state, "r", encoding="utf-8") as f:
-    #     dag_file = json.load(f)
+#     # with open(dag_state, "r", encoding="utf-8") as f:
+#     #     dag_file = json.load(f)
 
-    generated_files = notebook_agent(verified_dag, json, local_repo_path)
+#     generated_files = notebook_agent(verified_dag, json, local_repo_path)
 
-    # check notebooks
-    if os.path.exists(NOTEBOOKS_DIR):
-        print(f" Notebooks directory exists: {NOTEBOOKS_DIR}")
-    else:
-        print(f" Notebooks directory missing: {NOTEBOOKS_DIR}")
+#     # check notebooks
+#     if os.path.exists(NOTEBOOKS_DIR):
+#         print(f" Notebooks directory exists: {NOTEBOOKS_DIR}")
+#     else:
+#         print(f" Notebooks directory missing: {NOTEBOOKS_DIR}")
 
-    # check py file
-    for section, file_path in generated_files.items():
-        if os.path.exists(file_path):
-            print(f" File exists: {file_path}")
-        else:
-            print(f" File missing: {file_path}")
+#     # check py file
+#     for section, file_path in generated_files.items():
+#         if os.path.exists(file_path):
+#             print(f" File exists: {file_path}")
+#         else:
+#             print(f" File missing: {file_path}")
 
-    print(" Notebook generation test completed!")
+#     print(" Notebook generation test completed!")

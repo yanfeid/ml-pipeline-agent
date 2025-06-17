@@ -228,6 +228,8 @@ class AzureGPTHandler(LLMHandler):
     def extract_response(self, response: requests.Response, model_name: str, input_tokens: int) -> litellm.ModelResponse:
         response_json = response.json()
         # response_text = response_json["generated_text"]
+        # print("=== Raw LLM Response ===")
+        # print(response_json)
         response_text = response_json["choices"][0]["message"]["content"]
         
         # Calculate usage stats

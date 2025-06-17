@@ -3,7 +3,6 @@ import litellm
 from rmr_agent.llms import LLMClient
 from rmr_agent.utils import convert_to_dict, preprocess_python_file
 
-
 def retry_component_identification(python_file_path, full_file_list, code_summary, model="gpt-4o", temperature=0, max_tokens=2048, 
                  frequency_penalty=0, presence_penalty=0):
     pass
@@ -142,6 +141,3 @@ def parse_component_identification(component_identification_response, file):
         metadata['line_range'] = f"1-{num_lines}"
 
     return parsed_text, parsed_dict
-
-
-
