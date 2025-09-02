@@ -501,6 +501,13 @@ def fork_and_clone_repo(github_url: str, run_id: int, local_base_dir: str = "rmr
             print("Using API to find the correct base branch for work...")
             target_branch = gh_api_client.get_target_branch()
 
+            # Ensure the target branch ref exists locally (shallow clone only fetched default branch)
+            try:
+                gh_local_runner.run_command(["git", "fetch", "--depth", "1", source_remote, target_branch])
+            except subprocess.CalledProcessError:
+                # If fetch by shorthand failed, try fetching the full refspec
+                gh_local_runner.run_command(["git", "fetch", "--depth", "1", source_remote, f"refs/heads/{target_branch}:refs/remotes/{source_remote}/{target_branch}"])
+
             # --- Robust Branch Creation/Reset --
             print(f"Ensuring branch '{branch_name}' is based on latest '{source_remote}/{target_branch}'...")
             try:
@@ -509,7 +516,7 @@ def fork_and_clone_repo(github_url: str, run_id: int, local_base_dir: str = "rmr
                 print(f"Created new branch '{branch_name}'.")
             except subprocess.CalledProcessError as e:
                 # If the branch already exists, check it out and reset it to the latest upstream
-                if "already exists" in e.stderr:
+                if "already exists" in getattr(e, "stderr", b"").decode() or "already exists" in getattr(e, "output", b"").decode():
                     print(f"Branch '{branch_name}' already exists. Switching to it and resetting to latest upstream code.")
                     gh_local_runner.run_command(["git", "checkout", branch_name])
                     gh_local_runner.run_command(["git", "reset", "--hard", f"{source_remote}/{target_branch}"])
