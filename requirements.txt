@@ -20,6 +20,7 @@ distro==1.9.0
 entrypoints==0.4
 executing==2.2.0
 fastapi==0.115.12
+fastjsonschema==2.21.2
 filelock==3.18.0
 frozenlist==1.6.0
 fsspec==2025.5.0
@@ -40,11 +41,17 @@ jiter==0.10.0
 jsonpickle==4.1.0
 jsonschema==4.23.0
 jsonschema-specifications==2025.4.1
+jupyter-core==5.8.1
+jupytext==1.17.3
 litellm==1.70.4
+markdown-it-py==4.0.0
 markupsafe==3.0.2
 matplotlib-inline==0.1.7
+mdit-py-plugins==0.5.0
+mdurl==0.1.2
 multidict==6.4.4
 narwhals==1.40.0
+nbformat==5.10.4
 networkx==3.4.2
 numpy==2.2.6
 openai==1.82.0
@@ -55,6 +62,7 @@ pexpect==4.9.0
 pillow==11.2.1
 pip==24.2
 pipdeptree==2.26.1
+platformdirs==4.4.0
 prompt-toolkit==3.0.51
 propcache==0.3.1
 protobuf==6.31.0

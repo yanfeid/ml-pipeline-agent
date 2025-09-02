@@ -78,7 +78,7 @@ def check_if_need_config_fill(attribute_text):
         # Convert the JSON response into a Python dictionary
         attribute_identification_dict = convert_to_dict(attribute_text)
 
-        if attribute_identification_dict == None:
+        if not attribute_identification_dict:
             raise ValueError("No JSON object found in the LLM attribute identification response")
         
         # Check if any component in the dictionary has 'needs_config_fill' set to True
@@ -173,7 +173,7 @@ def parse_attribute_identification(component_identification_dict, attribute_text
     # Convert the LLM response into a dictionary
     parsed_attributes_dict = convert_to_dict(parsed_attributes_text)
     if not parsed_attributes_dict:
-        raise ValueError("No valid JSON object found in the LLM attribute identification response")
+        print("No valid JSON object found in the LLM attribute identification response")
     
     # Add file name and line range to the result to bring all the node information together. Delete any extra components hallucinated by LLM. 
     components_to_delete = []

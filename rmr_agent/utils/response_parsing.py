@@ -30,11 +30,11 @@ def convert_to_dict(json_str):
     except json.JSONDecodeError as e:
         print(f"Error parsing JSON: {e}")
         print(f"JSON content attempted to parse: {json_content[:300]}...")
-        return None  # Returning None instead of an error dictionary
+        return {}  
     
     except Exception as e:
         print(f"Unexpected error: {e}")
-        return None  # Returning None to signal failure
+        return {}  
     
 
 

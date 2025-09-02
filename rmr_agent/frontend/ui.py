@@ -71,10 +71,14 @@ def display_welcome_page():
     default_run_id = st.session_state["run_id"] if st.session_state["run_id"] else "1"
     st.session_state["run_id"] = st.text_input("Run ID (optional)", default_run_id, help="Enter an existing run ID (e.g. 1, 2, 3) to resume, or leave blank for a new run")
     # Allow starting from specific step
-    start_from = st.session_state["start_from"] if st.session_state["start_from"] else st.selectbox(
+    options_start_from = [""] + get_steps_could_start_from(st.session_state["repo_name"], st.session_state["run_id"], STEPS)
+    current_start_from = st.session_state["start_from"] if st.session_state["start_from"] in options_start_from else ""
+    start_from = st.selectbox(
         "Start From (optional)",
-        [""] + get_steps_could_start_from(st.session_state["repo_name"], st.session_state["run_id"], STEPS),  # Empty option + all step names
-        help="Choose a step to start from, or leave blank to start from the beginning"
+        options_start_from,
+        index=options_start_from.index(current_start_from) if current_start_from in options_start_from else 0,
+        help="Choose a step to start from, or leave blank to start from the beginning",
+        key="start_from_select",
     )
     st.session_state["start_from"] = start_from.split('.')[-1].strip().lower().replace(" ", "_")
     print(st.session_state["start_from"])
@@ -297,23 +301,34 @@ def human_verification_of_components_ui(repo_name, run_id):
         else:
             # Load from the original components list
             current_components_dict = components[current_index]
-        file_name = next(iter(current_components_dict.values()))["file_name"]  # Get from first component
-        cleaned_file_name = clean_file_path(file_name, repo_name)
-
-        # Get the cleaned code for the current file
-        cleaned_code = get_cleaned_code(repo_name, run_id) # result.get("cleaned_code", {}) # loading from checkpoint instead of from API result
+        # Get the cleaned code for the current file (needed to derive file name if components are empty)
+        cleaned_code = get_cleaned_code(repo_name, run_id)  # loading from checkpoint instead of from API result
         if not cleaned_code:
-            st.error(f"Could not recover cleaned code for file {file_name}")
+            st.error("Could not recover cleaned code for current file")
+            
+
+        # Derive file name. If components exist, read from first component; otherwise use the cleaned_code order
+        if current_components_dict:
+            file_name = next(iter(current_components_dict.values()))["file_name"]
+        else:
+            cleaned_code_keys = list(cleaned_code.keys())
+            if current_index < len(cleaned_code_keys):
+                file_name = cleaned_code_keys[current_index]
+            else:
+                st.error("Unable to determine file name for current index")
+                return
+
+        cleaned_file_name = clean_file_path(file_name, repo_name)
 
         if file_name in cleaned_code:
             code_lines = cleaned_code[file_name].splitlines()
         else:
             st.error(f"file_name = {file_name} not found in cleaned_code dict, keys = {list(cleaned_code.keys())}")
-
+ 
         # Code that will be displayed
         code_display = code_lines if file_name in cleaned_code else []
         code_display = remove_line_numbers(code_display) # line numbers will already be shown by streamlit
-
+ 
         # Existing component names for this file
         existing_component_names = list(current_components_dict.keys())
 
@@ -333,7 +348,7 @@ def human_verification_of_components_ui(repo_name, run_id):
                 if comp_name not in multiselect_options:
                     multiselect_options.append(comp_name)
             if not existing_component_names:
-                st.warning("None of the available ML components could identified in this file. Please select the appropriate component(s).")
+                st.warning("None of the available ML components were identified in this file. Please select the appropriate component(s).")
             selected_components = st.multiselect(
                 "Components identified in this file (please verify):",
                 options=multiselect_options,

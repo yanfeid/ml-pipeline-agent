@@ -12,8 +12,9 @@ def get_relevant_component_definitions(component_identification_response):
         # Convert the JSON response into a Python dictionary
         component_identification_dict = convert_to_dict(component_identification_response)
 
-        if component_identification_dict == None:
-            raise ValueError("No JSON object found in the LLM component identification response")
+        if not component_identification_dict:
+            print("No JSON object found in the LLM component identification response")
+            return ""
         
         # Load all component definitions
         with open('rmr_agent/ml_components/component_definitions.json', 'r') as f:
@@ -115,7 +116,7 @@ def parse_component_identification(component_identification_response, file):
     # Create dictionary with parsed data
     parsed_dict = convert_to_dict(parsed_text)
     if not parsed_dict:
-        raise ValueError("No components identified in the response for file: " + file)
+        print("No components identified in the response for file: " + file)
     
     # Add the file name to each identified component and filter out invalid components
     components_to_delete = []
