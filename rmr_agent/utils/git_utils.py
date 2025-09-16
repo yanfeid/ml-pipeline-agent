@@ -511,8 +511,10 @@ def fork_and_clone_repo(github_url: str, run_id: int, local_base_dir: str = "rmr
             # --- Robust Branch Creation/Reset --
             print(f"Ensuring branch '{branch_name}' is based on latest '{source_remote}/{target_branch}'...")
             try:
-                # Attempt to create the new branch from the latest upstream code
-                gh_local_runner.run_command(["git", "checkout", "-b", branch_name, f"{source_remote}/{target_branch}"])
+                # Create the new branch first (without specifying starting point to avoid ref issues)
+                gh_local_runner.run_command(["git", "checkout", "-b", branch_name])
+                # Then reset it to the target branch
+                gh_local_runner.run_command(["git", "reset", "--hard", f"{source_remote}/{target_branch}"])
                 print(f"Created new branch '{branch_name}'.")
             except subprocess.CalledProcessError as e:
                 # If the branch already exists, check it out and reset it to the latest upstream
