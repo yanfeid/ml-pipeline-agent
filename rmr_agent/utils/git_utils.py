@@ -501,27 +501,17 @@ def fork_and_clone_repo(github_url: str, run_id: int, local_base_dir: str = "rmr
             print("Using API to find the correct base branch for work...")
             target_branch = gh_api_client.get_target_branch()
 
-            # Ensure the target branch ref exists locally (shallow clone only fetched default branch)
-            try:
-                gh_local_runner.run_command(["git", "fetch", "--depth", "1", source_remote, target_branch])
-            except subprocess.CalledProcessError:
-                # If fetch by shorthand failed, try fetching the full refspec
-                gh_local_runner.run_command(["git", "fetch", "--depth", "1", source_remote, f"refs/heads/{target_branch}:refs/remotes/{source_remote}/{target_branch}"])
-
             # --- Robust Branch Creation/Reset --
-            print(f"Ensuring branch '{branch_name}' is based on latest '{source_remote}/{target_branch}'...")
+            print(f"Creating branch '{branch_name}' from current HEAD...")
             try:
-                # Create the new branch first (without specifying starting point to avoid ref issues)
+                # Create the new branch from current HEAD
                 gh_local_runner.run_command(["git", "checkout", "-b", branch_name])
-                # Then reset it to the target branch
-                gh_local_runner.run_command(["git", "reset", "--hard", f"{source_remote}/{target_branch}"])
                 print(f"Created new branch '{branch_name}'.")
             except subprocess.CalledProcessError as e:
                 # If the branch already exists, check it out and reset it to the latest upstream
                 if "already exists" in getattr(e, "stderr", b"").decode() or "already exists" in getattr(e, "output", b"").decode():
-                    print(f"Branch '{branch_name}' already exists. Switching to it and resetting to latest upstream code.")
+                    print(f"Branch '{branch_name}' already exists. Switching to it.")
                     gh_local_runner.run_command(["git", "checkout", branch_name])
-                    gh_local_runner.run_command(["git", "reset", "--hard", f"{source_remote}/{target_branch}"])
                 else:
                     # If it's a different git error, re-raise it
                     raise
