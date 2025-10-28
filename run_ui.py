@@ -5,7 +5,7 @@ import sys
 import os
 
 def main():
-    ui_path = os.path.join(os.path.dirname(__file__), "rmr_agent", "frontend", "ui.py")
+    ui_path = os.path.join(os.path.dirname(__file__), "frontend", "ui.py")
     
     # Ensure the path exists
     if not os.path.isfile(ui_path):

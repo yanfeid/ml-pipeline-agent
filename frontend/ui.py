@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 from rmr_agent.utils import parse_github_url 
 from rmr_agent.workflow import STEPS, HUMAN_STEPS
-from rmr_agent.frontend.ui_utils import (
+from frontend.ui_utils import (
     clean_file_path, remove_line_numbers, clean_line_range,
     get_components, get_cleaned_code, get_dag_yaml, show_rmr_agent_results,
     get_default_line_range, get_steps_could_start_from,
@@ -17,7 +17,6 @@ from rmr_agent.frontend.ui_utils import (
 BASE_URL = os.environ.get("RMR_AGENT_API_BASE_URL", "http://localhost:8000")  # Default to local server if not set
 
 sys.stdout.flush()
-
 # Maximize layout width
 st.set_page_config(layout="wide")
 
@@ -110,19 +109,32 @@ def start_workflow():
 
     with st.spinner("Starting workflow..."):
         response = requests.post(url, json=payload)
+        # Comment out debug info to avoid displaying in the frontend
+        # st.write(f"Status code: {response.status_code}")
+        # st.write(f"Headers: {dict(response.headers)}")
+        # st.write(f"Response content: {response.content}")
     if response.status_code == 200:
-        data = response.json()
-        st.session_state["result"] = data
-        st.session_state["run_id"] = data["run_id"]
-        st.session_state["last_status"] = "running"
-        st.session_state['current_step'] = st.session_state["start_from"] if st.session_state["start_from"] else "starting"
-        st.session_state.workflow_running = True if st.session_state['current_step'] not in HUMAN_STEPS else False
-        st.session_state["display_welcome_page"] = False # remove welcome page now that workflow has started
-        st.success(f"Starting workflow for run_id={data["run_id"]}")
-        time.sleep(0.5)  # Brief pause to show the success message
-        st.rerun() # update UI
+        try:
+            data = response.json()
+            st.session_state["result"] = data
+            st.session_state["run_id"] = data["run_id"]
+            st.session_state["last_status"] = "running"
+            st.session_state['current_step'] = st.session_state["start_from"] if st.session_state["start_from"] else "starting"
+            st.session_state.workflow_running = True if st.session_state['current_step'] not in HUMAN_STEPS else False
+            st.session_state["display_welcome_page"] = False # remove welcome page now that workflow has started
+            st.success(f"Starting workflow for run_id={data["run_id"]}")
+            time.sleep(0.5)  # Brief pause to show the success message
+            st.rerun() # update UI
+        except Exception as e:
+            # Keep error message but simplify content for users
+            st.error("Error starting workflow. Please try again.")
+            # Uncomment the line below during development to see detailed error
+            # st.error(f"Error parsing JSON: {str(e)}")
     else:
-        st.error(f"Error: {response.text}")
+        # Keep error message but simplify content for users
+        st.error("Error connecting to the server. Please check if the API is running.")
+        # Uncomment the line below during development to see detailed error
+        # st.error(f"Error: {response.status_code} - {response.text}")
 
 
 def check_workflow_status():
