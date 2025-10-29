@@ -57,7 +57,10 @@ def display_welcome_page():
     if st.session_state.workflow_running == True:
         return
     # st.title("RMR Agent")
-    st.image("assets/rmr_agent_image.jpg", width=500)
+    col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
+    with col3:  # 使用正中间的列
+        st.image("assets/rmr_agent_image.png", use_container_width=True)
+        
     st.subheader("Welcome to RMR Agent!")
     st.write("Convert your ML research code into a robust, modular, and configurable RMR pipeline.")
     # Take in github url
