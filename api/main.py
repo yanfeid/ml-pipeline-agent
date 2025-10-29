@@ -186,6 +186,9 @@ async def run_workflow_endpoint(
         state["input_files"] = parsed.input_files
         state["repo_name"] = repo_name
         state["run_id"] = run_id
+        if parsed.existing_config_path:
+            state["existing_config_path"] = parsed.existing_config_path
+            print(f"Setting config file path: {parsed.existing_config_path}")
 
         # Add background task to run
         background_tasks.add_task(run_workflow_background, parsed, repo_name, run_id, start_idx)

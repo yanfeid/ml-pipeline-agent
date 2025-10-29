@@ -213,14 +213,27 @@ def run_attribute_parsing(state: WorkflowState) -> Dict[str, Any]:
     verified_components = state['verified_components']
     attribute_identification = state['attribute_identification']
     attribute_parsing = []
-    
+
+    # Get the config file path from the state if it exists
+    existing_config_path = state.get('existing_config_path', '')
+    config_file_path = ''
+
+    if existing_config_path:
+        # Convert relative path to absolute path using local_repo_path
+        if state.get('local_repo_path') and not os.path.isabs(existing_config_path):
+            config_file_path = os.path.join(state['local_repo_path'], existing_config_path)
+        else:
+            config_file_path = existing_config_path
+
+        print(f"Using config file path: {config_file_path}")
+
     with ThreadPoolExecutor() as executor:
-        # Map processing across threads using a lambda
+        # Map processing across threads using a lambda, pass the config file path
         results = executor.map(
-            lambda x: (x[0], *parse_attribute_identification(x[0], x[1])),
+            lambda x: (x[0], *parse_attribute_identification(x[0], x[1], config_file_path)),
             zip(verified_components, attribute_identification)
         )
-        
+
         for component_dict, parsed_attributes_text, parsed_attributes_dict in results:
             if is_cancelled(state):
                 print("Workflow cancelled during attribute parsing")

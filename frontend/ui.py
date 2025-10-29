@@ -32,6 +32,8 @@ if 'run_id' not in st.session_state:
     st.session_state["run_id"] = None
 if 'input_files' not in st.session_state:
     st.session_state["input_files"] = None
+if 'config_file_path' not in st.session_state:
+    st.session_state["config_file_path"] = None
 if 'start_from' not in st.session_state:
     st.session_state["start_from"] = None
 if "display_welcome_page" not in st.session_state:
@@ -66,6 +68,11 @@ def display_welcome_page():
     default_input_files = "\n".join(st.session_state["input_files"]) if st.session_state["input_files"] else "etl/01_etl.ipynb\netl/02_bq_to_dataproc.ipynb\nmodel-dev/train.ipynb\nmodel-dev/evaluate.ipynb\ndeployment/01_export_to_ume.ipynb\ndeployment/02_pyscoring_validation.ipynb"
     input_files = st.text_area("List the notebooks in your repo which contain the core ML logic (one per line, relative to repo root directory)", default_input_files).splitlines()
     st.session_state["input_files"] = [file for file in input_files if file]
+    # Take in config file path - completely optional
+    default_config_file = st.session_state["config_file_path"] if st.session_state["config_file_path"] else ""
+    st.session_state["config_file_path"] = st.text_input("Config file path (optional, relative to repo root directory)",
+                                                       default_config_file,
+                                                       help="If your ML code uses a configuration file (like JSON, YAML, or INI), specify its path here to automatically replace placeholder references like 'config[\"parameter_name\"]' with actual values from your config. This ensures your DAG will be generated with proper parameter values instead of generic placeholders. Supports nested configurations and path joining expressions.")
     # Take in run id
     default_run_id = st.session_state["run_id"] if st.session_state["run_id"] else "1"
     st.session_state["run_id"] = st.text_input("Run ID (optional)", default_run_id, help="Enter an existing run ID (e.g. 1, 2, 3) to resume, or leave blank for a new run")
@@ -101,6 +108,8 @@ def start_workflow():
         payload["run_id"] = st.session_state["run_id"]
     if st.session_state["start_from"]:
         payload["start_from"] = st.session_state["start_from"]
+    if st.session_state["config_file_path"]:
+        payload["config_file_path"] = st.session_state["config_file_path"]
     
     # Construct url with repo_name and run_id (if specified)
     url = f"{BASE_URL}/run-workflow/?repo_name={st.session_state["repo_name"]}"
