@@ -157,10 +157,22 @@ def format_next_steps():
     return (
         "## Next Steps for You\n"
         "1.  **Review the Code:** Carefully examine the generated notebooks and configuration files in this Pull Request.\n"
-        "2.  **Verify Functionality:** Run the refactored pipeline from start to finish. Ensure it executes correctly and produces the expected results. Pay close attention to variable definitions and data flow, as minor adjustments might be needed.\n"
-        "3.  **Consult [RMR Templates](https://github.paypal.com/FOCUS-ML/Automation/tree/master/examples/rmr_pipelines):** For best practices and recommended libraries for each component in the MDLC (e.g., driver creation, feature selection, model training), please consult our RMR Tempalate documentation and code.\n"
-        "4.  **Consider Deployment:** If your goal is to deploy this model, you may need to add a deployment-specific notebook or scripts.\n"
-        "5.  **Provide Feedback:** We value your input! Please reach out to matjacobs@paypal.com and yanfdai@paypal.com if you encounter any issues, have questions, or have suggestions for improvement."
+        "2.  **Test the Code Locally:** Follow these steps to fetch and test the PR branch locally:\n\n"
+        "    ```bash\n"
+        "    # Step 1: Add the fork as a remote (only needed once)\n"
+        "    git remote add rmr-fork [FORK_URL]\n\n"
+        "    # Step 2: Fetch the PR branch\n"
+        "    git fetch rmr-fork [BRANCH_NAME]\n\n"
+        "    # Step 3: Check out the branch locally\n"
+        "    git checkout rmr-fork/[BRANCH_NAME]\n\n"
+        "    # OR create a new local branch based on the PR\n"
+        "    git checkout -b test-rmr-changes rmr-fork/[BRANCH_NAME]\n"
+        "    ```\n\n"
+        "    *Note: Replace [FORK_URL] with the URL of the fork repository and [BRANCH_NAME] with the name of the PR branch.*\n\n"
+        "3.  **Verify Functionality:** Run the refactored pipeline from start to finish. Ensure it executes correctly and produces the expected results. Pay close attention to variable definitions and data flow, as minor adjustments might be needed.\n"
+        "4.  **Consult [RMR Templates](https://github.paypal.com/FOCUS-ML/Automation/tree/master/examples/rmr_pipelines):** For best practices and recommended libraries for each component in the MDLC (e.g., driver creation, feature selection, model training), please consult our RMR Template documentation and code.\n"
+        "5.  **Consider Deployment:** If your goal is to deploy this model, you may need to add a deployment-specific notebook or scripts.\n"
+        "6.  **Provide Feedback:** We value your input! Please reach out to matjacobs@paypal.com and yanfdai@paypal.com if you encounter any issues, have questions, or have suggestions for improvement."
     )
 
 def format_appendix_component_changes(initial_parsed_components_data, human_verified_components_data):
