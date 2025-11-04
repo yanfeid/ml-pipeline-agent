@@ -388,13 +388,25 @@ def push_code_changes(state: WorkflowState) -> Dict[str, Any]:
     return {"successfully_pushed_code": successfully_pushed_code}
 
 def run_pr_creation(state: WorkflowState) -> Dict[str, Any]:
+    # 添加环境变量检查，控制是否创建真实PR
+    env_mode = os.environ.get("ENVIRONMENT", "").lower()
+    if env_mode == "dev":
+        print("Running in DEV mode. Skipping actual PR creation.")
+        print(f"PR would have been created with title: 'RMR Agent Refactor - Run {state['run_id']}'")
+        print(f"PR body preview: {state['pr_body'][:200]}..." if state.get('pr_body') else "No PR body provided")
+
+        # 返回模拟的PR URL，避免后续步骤出错
+        mock_pr_url = f"https://github.com/example/repo/pull/DEV-MODE-{state['run_id']}"
+        print(f"Mock PR URL: {mock_pr_url}")
+        return {"pr_url": mock_pr_url}
+
     if "pr_url" in state and state["pr_url"]:
         print("Skipping PR creation: 'pr_url' already in state")
         return {}
     if "successfully_pushed_code" in state and not state["successfully_pushed_code"]:
         print("Skipping PR creation: Code changes must be successfully pushed before creating a PR.")
         return {}
-    
+
     from rmr_agent.utils import create_rmr_agent_pull_request
 
     pr_url = create_rmr_agent_pull_request(github_url=state["github_url"], pr_body_text=state["pr_body"], run_id=state["run_id"])
@@ -431,7 +443,7 @@ INITIAL_STATE = {
     "step": "",
     "status": "",
     "error": None,
-    
+
     # workflow related
     "github_url": "",
     "input_files": "",
@@ -446,12 +458,14 @@ INITIAL_STATE = {
     "component_identification": [],
     "component_parsing": [],
     "verified_components": [],
+    "component_corrections": {},  # Added for logging human corrections to components
     "attribute_identification": [],
     "attribute_parsing": [],
     "node_aggregator": [],
     "edges": [],
     "dag_yaml": "",
     "verified_dag": {},
+    "dag_corrections": {},  # Added for logging human corrections to DAG
     "config": {},
     "notebooks": [],
     "edited_notebooks": [],

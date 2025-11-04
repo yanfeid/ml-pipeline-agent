@@ -4,7 +4,8 @@ from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 from rmr_agent.workflow import *
 from rmr_agent.utils import (
-    get_next_run_id, load_step_output, save_step_output
+    get_next_run_id, load_step_output, save_step_output,
+    log_component_corrections, log_dag_corrections
     )
 
 app = FastAPI()
@@ -34,16 +35,65 @@ def save_human_feedback(request: ComponentsResponse | DagResponse, repo_name: st
     # Save the human verification response
     if not run_id:
         raise HTTPException(400, "run_id required for continuing")
-    
+
     # Check which human verification result this is
     if isinstance(request, ComponentsResponse):
         step_name = "human_verification_of_components"
         update_name = "verified_components"
-        update = {update_name: request.verified_components}
+
+        # Get original components for comparison
+        try:
+            original_output = load_step_output(
+                checkpoint_base_path=CHECKPOINT_BASE_PATH,
+                repo_name=repo_name,
+                run_id=run_id,
+                step="component_parsing"
+            )
+            original_components = original_output.get("component_parsing", [])
+
+            # Log the differences between original and verified components
+            component_corrections = log_component_corrections(original_components, request.verified_components)
+            print(f"Logged component corrections: {len(component_corrections.get('modified', []))} modified, "
+                  f"{component_corrections.get('summary', {}).get('added_count', 0)} added, "
+                  f"{component_corrections.get('summary', {}).get('deleted_count', 0)} deleted")
+
+            # Include corrections in the update
+            update = {
+                update_name: request.verified_components,
+                "component_corrections": component_corrections
+            }
+        except Exception as e:
+            print(f"Error logging component corrections: {e}")
+            update = {update_name: request.verified_components}
+
     elif isinstance(request, DagResponse):
         step_name = "human_verification_of_dag"
         update_name = "verified_dag"
-        update = {update_name: request.verified_dag}
+
+        # Get original DAG for comparison
+        try:
+            original_output = load_step_output(
+                checkpoint_base_path=CHECKPOINT_BASE_PATH,
+                repo_name=repo_name,
+                run_id=run_id,
+                step="generate_dag_yaml"
+            )
+            original_dag = original_output.get("dag_yaml", "")
+
+            # Log the differences between original and verified DAG
+            dag_corrections = log_dag_corrections(original_dag, request.verified_dag)
+            print(f"Logged DAG corrections: {len(dag_corrections.get('modified_edges', []))} modified edges, "
+                  f"{dag_corrections.get('summary', {}).get('added_edge_count', 0)} added, "
+                  f"{dag_corrections.get('summary', {}).get('deleted_edge_count', 0)} deleted")
+
+            # Include corrections in the update
+            update = {
+                update_name: request.verified_dag,
+                "dag_corrections": dag_corrections
+            }
+        except Exception as e:
+            print(f"Error logging DAG corrections: {e}")
+            update = {update_name: request.verified_dag}
     else:
         raise HTTPException(400, "Invalid request type for saving human feedback")
 
@@ -110,14 +160,38 @@ def get_workflow_status(
     # Check if the workflow exists
     if repo_name not in workflow_states:
         raise HTTPException(status_code=404, detail=f"Workflow with repo_name {repo_name} not found")
-    
+
     # Check if the run_id exists for this repository
     if run_id not in workflow_states[repo_name]:
         raise HTTPException(status_code=404, detail=f"Run ID {run_id} not found in repository {repo_name}")
-    
+
     # Return the current state for this specific run
     print("returning status update with current step being: ", workflow_states[repo_name][run_id]["step"])
     return workflow_states[repo_name][run_id]
+
+
+@app.get("/correction-logs/{repo_name}")
+def get_correction_logs(
+    repo_name: str,
+    run_id: str = Query(..., description="Run ID for the workflow")
+):
+    """Get logs of human corrections for a specific workflow run"""
+    # Check if the workflow exists
+    if repo_name not in workflow_states:
+        raise HTTPException(status_code=404, detail=f"Workflow with repo_name {repo_name} not found")
+
+    # Check if the run_id exists for this repository
+    if run_id not in workflow_states[repo_name]:
+        raise HTTPException(status_code=404, detail=f"Run ID {run_id} not found in repository {repo_name}")
+
+    # Get correction logs
+    state = workflow_states[repo_name][run_id]
+    logs = {
+        "component_corrections": state.get("component_corrections", {}),
+        "dag_corrections": state.get("dag_corrections", {})
+    }
+
+    return logs
 
 @app.post("/cancel-workflow/{repo_name}")
 def cancel_workflow(

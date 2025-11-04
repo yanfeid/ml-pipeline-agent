@@ -6,3 +6,9 @@ from .convert_ipynb_to_py import convert_notebooks
 from .save_file import save_ini_file
 from .convert_py_to_ipynb import py_to_notebook
 from .create_pr_body import generate_pr_body
+from .correction_logging import (
+    log_component_corrections,
+    log_dag_corrections,
+    format_component_corrections_for_pr,
+    format_dag_corrections_for_pr
+)

@@ -3,6 +3,8 @@ import yaml
 import os
 from pathlib import Path
 import re
+# Import locally to avoid circular imports
+from .correction_logging import format_component_corrections_for_pr, format_dag_corrections_for_pr
 
 # Helper function to load JSON files
 def load_json_file(filepath):
@@ -231,7 +233,7 @@ def generate_pr_body(checkpoints_dir_path: str, include_appendix: bool = False):
     # 2. Pipeline Summary from verified DAG
     final_dag_json_path = os.path.join(checkpoints_dir, "human_verification_of_dag.json")
     final_dag_json_content = load_json_file(final_dag_json_path) # This is the outer JSON
-    
+
     dag_data = None
     if final_dag_json_content:
         # The "verified_dag" key points to a YAML STRING.
@@ -267,21 +269,53 @@ def generate_pr_body(checkpoints_dir_path: str, include_appendix: bool = False):
             error_message = f"{error_message_base}There was an issue processing the DAG information from `human_verification_of_dag.json`.*"
         md_sections.append(error_message + " Please check the file and its format directly.*")
 
-
     # 3. Key Changes
     md_sections.append(format_key_changes())
 
-    # 4. Next Steps
+    # 4. Add Human Corrections Summary
+    md_sections.append("## Human Corrections Summary")
+    md_sections.append(
+        "This section outlines the changes you made during the verification process. "
+        "These corrections help improve the quality of the refactored code and enhance the system's ability to "
+        "accurately identify ML components and their relationships in the future."
+    )
+
+    # Component corrections
+    component_corrections_path = os.path.join(checkpoints_dir, "human_verification_of_components.json")
+    component_corrections_content = load_json_file(component_corrections_path)
+    if component_corrections_content and "component_corrections" in component_corrections_content:
+        corrections = component_corrections_content["component_corrections"]
+        md_sections.append(format_component_corrections_for_pr(corrections))
+    else:
+        md_sections.append(
+            "### ML Component Corrections\n"
+            "*No component correction data was found or the components were accepted without changes.*"
+        )
+
+    # DAG corrections
+    dag_corrections = None
+    if final_dag_json_content and "dag_corrections" in final_dag_json_content:
+        dag_corrections = final_dag_json_content["dag_corrections"]
+
+    if dag_corrections:
+        md_sections.append(format_dag_corrections_for_pr(dag_corrections))
+    else:
+        md_sections.append(
+            "### DAG Structure Corrections\n"
+            "*No DAG correction data was found or the DAG was accepted without changes.*"
+        )
+
+    # 5. Next Steps
     md_sections.append(format_next_steps())
 
-    # 5. Appendix (Optional)
+    # 6. Appendix (Optional)
     if include_appendix:
         initial_components_path = os.path.join(checkpoints_dir, "component_parsing.json")
         human_verified_components_path = os.path.join(checkpoints_dir, "human_verification_of_components.json")
 
         initial_data = load_json_file(initial_components_path)
         verified_data = load_json_file(human_verified_components_path)
-        
+
         md_sections.append(format_appendix_component_changes(initial_data, verified_data))
 
     return "\n\n".join(md_sections)
