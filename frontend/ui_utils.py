@@ -39,6 +39,16 @@ def get_components(repo_name, run_id):
     except IOError as e:
         raise IOError(f"Error reading component parsing file: {str(e)}")
 
+def get_verified_components(repo_name, run_id):
+    """Get the verified components from human verification step if available"""
+    try:
+        file_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'human_verification_of_components.json')
+        with open(file_path, 'r') as file:
+            content = json.load(file)
+        return content.get('verified_components', [])
+    except (FileNotFoundError, json.JSONDecodeError, IOError):
+        # If verified components don't exist, fall back to original components
+        return get_components(repo_name, run_id)
 
 def get_cleaned_code(repo_name, run_id):
     try:
@@ -55,12 +65,10 @@ def get_cleaned_code(repo_name, run_id):
     except IOError as e:
         raise IOError(f"Error reading summarize file: {str(e)}")
 
-
 def get_dag_yaml(repo_name, run_id):
     try:
         file_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'dag.yaml')
         with open(file_path, 'r') as file:
-            # dag_yaml = yaml.safe_load(file)
             dag_yaml_str = file.read()
             print("Successfully loaded dag.yaml")
         return dag_yaml_str
@@ -176,191 +184,321 @@ def get_steps_could_start_from(repo_name, run_id, all_steps):
 
 
 # === for dag verification ===
+def normalize_node_name(name):
+    """Normalize node names to handle variations in formatting"""
+    if not name:
+        return ""
+    # Remove extra spaces and standardize case
+    return " ".join(name.split()).strip()
+
+def get_valid_node_names_from_components(repo_name, run_id):
+    """Get valid node names from verified components"""
+    components = get_verified_components(repo_name, run_id)
+    valid_names = set()
+    
+    for comp in components:
+        # Try different possible name fields
+        name = comp.get("name") or comp.get("id") or comp.get("component_name")
+        if name:
+            valid_names.add(normalize_node_name(name))
+    
+    return valid_names
+
 # === Parsing Function ===
-def parse_dag_edges_from_yaml(dag_yaml):
+def parse_dag_edges_from_yaml(dag_yaml, repo_name=None, run_id=None):
+    """Parse DAG YAML and validate against actual components"""
     data = yaml.safe_load(dag_yaml)
     if not isinstance(data, dict):
         raise ValueError("Parsed YAML is not a dictionary.")
-
-    raw_edges = data.get("edges", [])
-    edges = []
-    for edge in raw_edges:
-        if isinstance(edge, dict) and "from" in edge and "to" in edge:
-            edges.append((edge["from"], edge["to"], edge))  # (src, tgt, full_edge_dict)
-
+    
+    # Get valid component names if repo_name and run_id are provided
+    valid_component_names = set()
+    if repo_name and run_id:
+        try:
+            valid_component_names = get_valid_node_names_from_components(repo_name, run_id)
+        except Exception as e:
+            st.warning(f"Could not load verified components: {e}")
+    
+    # Parse nodes
     raw_nodes = data.get("nodes", [])
     nodes = []
+    node_names_in_dag = set()
+    
     for item in raw_nodes:
         if isinstance(item, dict):
             for node_name, attrs in item.items():
-                nodes.append((node_name, attrs))
-
+                normalized_name = normalize_node_name(node_name)
+                nodes.append((normalized_name, attrs))
+                node_names_in_dag.add(normalized_name)
+    
+    # If we have valid component names, reconcile with DAG nodes
+    if valid_component_names:
+        # Find nodes that are in components but not in DAG
+        missing_in_dag = valid_component_names - node_names_in_dag
+        if missing_in_dag:
+            st.info(f"ℹ️ Components not in DAG: {', '.join(missing_in_dag)}")
+            # Add missing nodes to DAG
+            for missing_node in missing_in_dag:
+                nodes.append((missing_node, {}))
+                node_names_in_dag.add(missing_node)
+        
+        # Find nodes that are in DAG but not in components  
+        extra_in_dag = node_names_in_dag - valid_component_names
+        if extra_in_dag:
+            st.warning(f"⚠️ DAG nodes not in components: {', '.join(extra_in_dag)}")
+    
+    # Parse edges and validate
+    raw_edges = data.get("edges", [])
+    edges = []
+    invalid_edges = []
+    
+    for edge in raw_edges:
+        if isinstance(edge, dict) and "from" in edge and "to" in edge:
+            src = normalize_node_name(edge["from"])
+            tgt = normalize_node_name(edge["to"])
+            
+            # Check if both nodes exist
+            src_valid = src in node_names_in_dag or src in valid_component_names
+            tgt_valid = tgt in node_names_in_dag or tgt in valid_component_names
+            
+            if src_valid and tgt_valid:
+                # Update edge with normalized names
+                edge["from"] = src
+                edge["to"] = tgt
+                edges.append((src, tgt, edge))
+            else:
+                invalid_edges.append((src, tgt))
+                if not src_valid:
+                    st.warning(f"⚠️ Edge source '{src}' not found in nodes")
+                if not tgt_valid:
+                    st.warning(f"⚠️ Edge target '{tgt}' not found in nodes")
+    
+    if invalid_edges:
+        st.error(f"❌ {len(invalid_edges)} invalid edge(s) were filtered out")
+    
     return edges, nodes
 
 # === DAG Renderer ===
 def render_dag_graph(edges, nodes):
+    """Render DAG graph with robust error handling"""
     net = Network(height="450px", directed=True)
+    
+    # Create a set of valid nodes for validation
+    valid_nodes = set()
+    
+    # Add all nodes first
     for node in nodes:
-        net.add_node(
-            node,
-            label=node,
-            shape="box",
-            size=20,
-            font={"size": 18},
-            borderWidth=2,
+        # Handle both string nodes and (name, attrs) tuples
+        if isinstance(node, tuple):
+            node_name = node[0]
+        else:
+            node_name = node
             
-        )
-
-    for src, tgt in edges:
-        net.add_edge(src, tgt)
-
-#          "layout": {
-#     "hierarchical": {
-#       "enabled": true,
-#       "direction": "UD",
-#       "sortMethod": "directed",
-#       "nodeSpacing": 120,
-#       "levelSeparation": 150
-#     }
-#   },
-#   "physics": {
-#     "enabled": false
-#   },
-
+        node_name = normalize_node_name(node_name)
+        
+        if node_name:  # Only add non-empty nodes
+            try:
+                net.add_node(
+                    node_name,
+                    label=node_name,
+                    shape="box",
+                    size=20,
+                    font={"size": 18},
+                    borderWidth=2,
+                )
+                valid_nodes.add(node_name)
+            except Exception as e:
+                st.warning(f"Could not add node '{node_name}': {e}")
+    
+    # Track edge addition failures
+    failed_edges = []
+    
+    # Add edges with validation
+    for edge_info in edges:
+        # Handle both (src, tgt) tuples and more complex structures
+        if isinstance(edge_info, tuple) and len(edge_info) >= 2:
+            src, tgt = edge_info[0], edge_info[1]
+        else:
+            src, tgt = edge_info, None
+            
+        if not tgt:
+            continue
+            
+        src = normalize_node_name(src)
+        tgt = normalize_node_name(tgt)
+        
+        # Validate before adding
+        if src not in valid_nodes:
+            failed_edges.append(f"{src} → {tgt} (source missing)")
+            continue
+        if tgt not in valid_nodes:
+            failed_edges.append(f"{src} → {tgt} (target missing)")
+            continue
+            
+        try:
+            net.add_edge(src, tgt)
+        except Exception as e:
+            failed_edges.append(f"{src} → {tgt} ({str(e)})")
+    
+    # Report failures if any
+    if failed_edges:
+        with st.expander(f"⚠️ {len(failed_edges)} edge(s) could not be added", expanded=False):
+            for failed in failed_edges:
+                st.text(f"• {failed}")
+    
+    # Set network options
     net.set_options("""
     {
-            "layout": {
-    "hierarchical": {
-      "enabled": true,
-      "direction": "UD",
-      "sortMethod": "directed",
-      "nodeSpacing": 120,
-      "levelSeparation": 150
-    }
-  },
-
-    "edges": {
-        "arrows": {
-        "to": {
-            "enabled": true
-        }
+        "layout": {
+            "hierarchical": {
+                "enabled": true,
+                "direction": "UD",
+                "sortMethod": "directed",
+                "nodeSpacing": 120,
+                "levelSeparation": 150
+            }
         },
-        "smooth": {
-        "enabled": true,
-        "type": "cubicBezier",
-        "forceDirection": "vertical",
-        "roundness": 0.4
+        "edges": {
+            "arrows": {
+                "to": {
+                    "enabled": true
+                }
+            },
+            "smooth": {
+                "enabled": true,
+                "type": "cubicBezier",
+                "forceDirection": "vertical",
+                "roundness": 0.4
+            },
+            "color": {
+                "color": "#848484",
+                "inherit": false
+            }
         },
-        "color": {
-        "color": "#848484",
-        "inherit": false
+        "nodes": {
+            "shape": "box",
+            "margin": 10,
+            "borderWidth": 2,
+            "color": {
+                "border": "#2B7CE9",
+                "background": "#F0F8FF",
+                "highlight": {
+                    "border": "#1A1A1A",
+                    "background": "#E6F2FF"
+                }
+            },
+            "font": {
+                "color": "#000000",
+                "size": 18,
+                "face": "Arial"
+            }
         }
-    },
-    "nodes": {
-        "shape": "box",
-        "margin": 10,
-        "borderWidth": 2,
-        "color": {
-        "border": "#2B7CE9",
-        "background": "#F0F8FF",
-        "highlight": {
-            "border": "#1A1A1A",
-            "background": "#E6F2FF"
-        }
-        },
-        "font": {
-        "color": "#000000",
-        "size": 18,
-        "face": "Arial"
-        }
-    }
     }
     """)
-
+    
     temp_path = tempfile.NamedTemporaryFile(suffix=".html", delete=False)
     net.save_graph(temp_path.name)
     return temp_path.name
 
 # === Main DAG Editor App ===
-def dag_edge_editor(edited_dag_yaml):
+def dag_edge_editor(edited_dag_yaml, repo_name=None, run_id=None):
     st.subheader("Human Verification Of Dag")
-
-    # Step 0: Parse
-    edges, nodes = parse_dag_edges_from_yaml(edited_dag_yaml)
+    
+    # Step 0: Parse with validation
+    try:
+        edges, nodes = parse_dag_edges_from_yaml(edited_dag_yaml, repo_name, run_id)
+    except Exception as e:
+        st.error(f"Error parsing DAG YAML: {e}")
+        st.text_area("Current YAML", edited_dag_yaml, height=300)
+        return None
+    
     node_names = [name for name, _ in nodes]
-
+    
+    # Initialize session state
     if "edges_state" not in st.session_state:
         st.session_state.edges_state = edges.copy()
     if "nodes_state" not in st.session_state:
         st.session_state.nodes_state = nodes.copy()
     if "edge_index" not in st.session_state:
         st.session_state.edge_index = 0
-
+    
     # === Step 1: Structure Verification ===
     with st.expander("Step 1: Verify and Edit DAG Structure", expanded=True):
-        html_path = render_dag_graph(
-            [(e[0], e[1]) for e in st.session_state.edges_state],
-            node_names
-        )
-        components.html(open(html_path, "r", encoding="utf-8").read(), height=450, scrolling=True)
-
+        try:
+            html_path = render_dag_graph(
+                [(e[0], e[1]) for e in st.session_state.edges_state],
+                node_names
+            )
+            components.html(open(html_path, "r", encoding="utf-8").read(), height=450, scrolling=True)
+        except Exception as e:
+            st.error(f"Error rendering DAG: {e}")
+        
         st.markdown("##### Add a New Edge")
         col1, col2 = st.columns(2)
         with col1:
             src = st.selectbox("Source Node", node_names, key="src_add")
         with col2:
             tgt = st.selectbox("Target Node", node_names, key="tgt_add")
-
+        
         if st.button("Add Edge"):
             new_edge = {"from": src, "to": tgt, "attributes": {}}
             st.session_state.edges_state.append((src, tgt, new_edge))
             st.success(f"Edge {src} → {tgt} added.")
             rerun()
-
+        
         st.markdown("##### Remove an Edge")
-        edge_to_remove = st.selectbox(
-            "Select edge to remove",
-            st.session_state.edges_state,
-            format_func=lambda e: f"{e[0]} -> {e[1]}"
-        )
-        if st.button("Remove Selected Edge"):
-            st.session_state.edges_state.remove(edge_to_remove)
-            st.success("Edge removed.")
-            rerun()
-
+        if st.session_state.edges_state:
+            edge_to_remove = st.selectbox(
+                "Select edge to remove",
+                st.session_state.edges_state,
+                format_func=lambda e: f"{e[0]} → {e[1]}"
+            )
+            if st.button("Remove Selected Edge"):
+                st.session_state.edges_state.remove(edge_to_remove)
+                st.success("Edge removed.")
+                rerun()
+        else:
+            st.info("No edges to remove")
+    
     # === Step 2: Attribute Verification ===
     with st.expander("Step 2: Verify Attributes of Each Edge", expanded=True):
         if not st.session_state.edges_state:
             st.info("No edges to review.")
         else:
             index = st.session_state.edge_index
+            if index >= len(st.session_state.edges_state):
+                st.session_state.edge_index = 0
+                index = 0
+                
             src, tgt, edge_data = st.session_state.edges_state[index]
             attrs = edge_data.get("attributes", {})
-
+            
             st.markdown(
                 f"<p style='font-size:18px; font-weight:bold;'>Edge {index + 1} of {len(st.session_state.edges_state)}&nbsp;&nbsp;&nbsp;{src} → {tgt}</p>",
                 unsafe_allow_html=True
             )
-
+            
             # Get source node outputs
             source_node_attrs = dict(st.session_state.nodes_state).get(src, {})
             output_attrs = source_node_attrs.get("outputs", {})
             candidate_keys = list(output_attrs.keys())
-
+            
             # Init session state
-            if ("attr_rows" not in st.session_state or st.session_state.attr_rows is None or st.session_state.get("prev_edge_index") != index):
+            if ("attr_rows" not in st.session_state or 
+                st.session_state.attr_rows is None or 
+                st.session_state.get("prev_edge_index") != index):
                 st.session_state.attr_rows = [
                     {"key": k, "value": v, "custom": k not in candidate_keys}
                     for k, v in attrs.items()
                 ]
                 st.session_state.prev_edge_index = index
-
+            
             st.markdown("##### Edit / Add Attributes")
-
+            
             updated_rows = []
             for i, row in enumerate(st.session_state.attr_rows):
                 col1, col2, col3 = st.columns([4, 4, 1])
-
+                
                 with col1:
                     used_keys = [
                         r["key"] for j, r in enumerate(st.session_state.attr_rows)
@@ -368,7 +506,7 @@ def dag_edge_editor(edited_dag_yaml):
                     ]
                     available_keys = [k for k in candidate_keys if k not in used_keys]
                     options = available_keys + ["Custom Attribute"]
-
+                    
                     if row.get("custom", False):
                         key = st.text_input("Select Attribute", value=row.get("key", ""), key=f"custom_key_{i}_{index}")
                         row["key"] = key
@@ -382,15 +520,12 @@ def dag_edge_editor(edited_dag_yaml):
                         if selected == "Custom Attribute":
                             row["custom"] = True
                             row["key"] = ""
-                            row["value"] = ""  # ✅ 这行是关键：清空 value
-                            key = ""
+                            row["value"] = ""
                             st.rerun()
                         else:
                             row["custom"] = False
                             row["key"] = selected
-                            key = selected
-                     
-
+                
                 with col2:
                     if row.get("custom", False):
                         val = st.text_input("Value", value=row.get("value", ""), key=f"val_{i}_{index}")
@@ -399,15 +534,15 @@ def dag_edge_editor(edited_dag_yaml):
                         auto_val = output_attrs.get(row["key"], "")
                         val = st.text_input("Value", value=auto_val, key=f"val_{i}_{index}")
                         row["value"] = val
-
+                
                 with col3:
-                    if st.checkbox("🗑️ Delete", key=f"delete_{i}_{index}"):
+                    if st.checkbox("🗑️", key=f"delete_{i}_{index}"):
                         continue
-
+                
                 updated_rows.append(row)
-
+            
             st.session_state.attr_rows = updated_rows
-
+            
             # Add Attribute row
             if st.button("➕ Add Attribute"):
                 default_key = next((k for k in candidate_keys if k not in [r["key"] for r in st.session_state.attr_rows]), "")
@@ -417,7 +552,7 @@ def dag_edge_editor(edited_dag_yaml):
                     "custom": False if default_key else True
                 })
                 st.rerun()
-
+            
             # Save Attributes
             if st.button("💾 Save"):
                 new_attr_dict = {
@@ -429,7 +564,7 @@ def dag_edge_editor(edited_dag_yaml):
                 st.session_state.edges_state[index] = (src, tgt, new_edge_data)
                 st.success("Attributes updated.")
                 st.session_state.attr_rows = None  # Reset
-
+            
             # Navigation
             col1, col2 = st.columns([8, 0.67])
             with col1:
@@ -442,29 +577,27 @@ def dag_edge_editor(edited_dag_yaml):
                     st.session_state.edge_index += 1
                     st.session_state.attr_rows = None
                     rerun()
-
-
-
-    # Step 3: Finalize and Export YAML (in expander)
+    
+    # Step 3: Finalize and Export YAML
     reconstructed_nodes = [{name: attrs} for name, attrs in st.session_state.nodes_state]
     reconstructed_edges = [edge_dict for _, _, edge_dict in st.session_state.edges_state]
-
+    
     new_yaml = yaml.dump({
         "nodes": reconstructed_nodes,
         "edges": reconstructed_edges
-    }, sort_keys=False)
-
+    }, sort_keys=False, default_flow_style=False)
+    
     with st.expander("Step 3: Finalize and Export YAML", expanded=False):
         st.markdown("Here is the final DAG YAML you can review before saving or submitting.")
         st.text_area("Final DAG YAML", new_yaml, height=300, key="final_yaml_preview")
-
-    # Save YAML into session state (can be submitted later)
+    
+    # Save and Submit buttons
     col1, col2 = st.columns([8, 0.75])
     with col1:
         if st.button("Save Changes"):
             st.session_state.final_dag_yaml = new_yaml
             st.success("YAML saved.")
-
+    
     with col2:
         if st.button("Submit DAG"):
             if new_yaml:
@@ -472,9 +605,5 @@ def dag_edge_editor(edited_dag_yaml):
                 return new_yaml
             else:
                 st.warning("No DAG YAML to submit.")
-
-    # default return if no action
+    
     return None
-
-
-
