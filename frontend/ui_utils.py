@@ -176,7 +176,7 @@ def get_steps_could_start_from(repo_name, run_id, all_steps):
     # Clean up step names
     display_available_steps = []
     for i, step in enumerate(available_steps):
-        display_step = f"{i + 1}. {step.replace("_", " ").title()}"
+        display_step = f"{i + 1}. {step.replace('_', ' ').title()}"
         display_available_steps.append(display_step)
 
     
@@ -400,6 +400,31 @@ def render_dag_graph(edges, nodes):
     net.save_graph(temp_path.name)
     return temp_path.name
 
+# === New sorting functions ===
+def get_node_order(nodes):
+    """Create a mapping of node names to their order for sorting"""
+    return {name: idx for idx, (name, _) in enumerate(nodes)}
+
+def sort_edges_by_topology(edges, nodes):
+    """Sort edges in a more logical order based on node positions"""
+    node_order = get_node_order(nodes)
+    
+    def edge_sort_key(edge):
+        src, tgt, _ = edge
+        # Sort by source node position first, then by target node position
+        src_order = node_order.get(src, float('inf'))
+        tgt_order = node_order.get(tgt, float('inf'))
+        return (src_order, tgt_order)
+    
+    return sorted(edges, key=edge_sort_key)
+
+def find_edge_index(edges, src, tgt):
+    """Find the index of an edge with given source and target"""
+    for idx, edge in enumerate(edges):
+        if edge[0] == src and edge[1] == tgt:
+            return idx
+    return -1
+
 # === Main DAG Editor App ===
 def dag_edge_editor(edited_dag_yaml, repo_name=None, run_id=None):
     st.subheader("Human Verification Of Dag")
@@ -421,6 +446,10 @@ def dag_edge_editor(edited_dag_yaml, repo_name=None, run_id=None):
         st.session_state.nodes_state = nodes.copy()
     if "edge_index" not in st.session_state:
         st.session_state.edge_index = 0
+    if "attr_rows" not in st.session_state:
+        st.session_state.attr_rows = None
+    if "prev_edge_index" not in st.session_state:
+        st.session_state.prev_edge_index = -1
     
     # === Step 1: Structure Verification ===
     with st.expander("Step 1: Verify and Edit DAG Structure", expanded=True):
@@ -441,21 +470,61 @@ def dag_edge_editor(edited_dag_yaml, repo_name=None, run_id=None):
             tgt = st.selectbox("Target Node", node_names, key="tgt_add")
         
         if st.button("Add Edge"):
-            new_edge = {"from": src, "to": tgt, "attributes": {}}
-            st.session_state.edges_state.append((src, tgt, new_edge))
-            st.success(f"Edge {src} → {tgt} added.")
-            rerun()
+            # Check if edge already exists
+            existing_idx = find_edge_index(st.session_state.edges_state, src, tgt)
+            if existing_idx != -1:
+                st.warning(f"Edge {src} → {tgt} already exists at position {existing_idx + 1}.")
+            else:
+                new_edge = {"from": src, "to": tgt, "attributes": {}}
+                st.session_state.edges_state.append((src, tgt, new_edge))
+                
+                # Sort edges to maintain logical order
+                st.session_state.edges_state = sort_edges_by_topology(
+                    st.session_state.edges_state, 
+                    st.session_state.nodes_state
+                )
+                
+                # Find the index of the newly added edge
+                new_idx = find_edge_index(st.session_state.edges_state, src, tgt)
+                if new_idx != -1:
+                    st.session_state.edge_index = new_idx
+                    # Reset attribute rows for the new edge
+                    st.session_state.attr_rows = None
+                    st.session_state.prev_edge_index = -1
+                    st.success(f"Edge {src} → {tgt} added at position {new_idx + 1}.")
+                else:
+                    st.error("Failed to find the newly added edge.")
+                
+                rerun()
         
         st.markdown("##### Remove an Edge")
         if st.session_state.edges_state:
-            edge_to_remove = st.selectbox(
+            # Create options with index for uniqueness
+            edge_options = [(i, e) for i, e in enumerate(st.session_state.edges_state)]
+            selected_edge_with_idx = st.selectbox(
                 "Select edge to remove",
-                st.session_state.edges_state,
-                format_func=lambda e: f"{e[0]} → {e[1]}"
+                edge_options,
+                format_func=lambda x: f"{x[1][0]} → {x[1][1]} (Position {x[0] + 1})",
+                key="edge_to_remove"
             )
+            
             if st.button("Remove Selected Edge"):
-                st.session_state.edges_state.remove(edge_to_remove)
-                st.success("Edge removed.")
+                idx_to_remove, edge_to_remove = selected_edge_with_idx
+                
+                # Remove the edge
+                st.session_state.edges_state.pop(idx_to_remove)
+                
+                # Adjust edge_index if necessary
+                if st.session_state.edge_index >= len(st.session_state.edges_state):
+                    st.session_state.edge_index = max(0, len(st.session_state.edges_state) - 1) if st.session_state.edges_state else 0
+                elif st.session_state.edge_index > idx_to_remove:
+                    st.session_state.edge_index -= 1
+                
+                # Reset attribute rows
+                st.session_state.attr_rows = None
+                st.session_state.prev_edge_index = -1
+                
+                st.success(f"Edge {edge_to_remove[0]} → {edge_to_remove[1]} removed.")
                 rerun()
         else:
             st.info("No edges to remove")
@@ -465,11 +534,11 @@ def dag_edge_editor(edited_dag_yaml, repo_name=None, run_id=None):
         if not st.session_state.edges_state:
             st.info("No edges to review.")
         else:
-            index = st.session_state.edge_index
-            if index >= len(st.session_state.edges_state):
+            # Validate and fix edge_index
+            if st.session_state.edge_index >= len(st.session_state.edges_state):
                 st.session_state.edge_index = 0
-                index = 0
-                
+            
+            index = st.session_state.edge_index
             src, tgt, edge_data = st.session_state.edges_state[index]
             attrs = edge_data.get("attributes", {})
             
@@ -483,10 +552,9 @@ def dag_edge_editor(edited_dag_yaml, repo_name=None, run_id=None):
             output_attrs = source_node_attrs.get("outputs", {})
             candidate_keys = list(output_attrs.keys())
             
-            # Init session state
-            if ("attr_rows" not in st.session_state or 
-                st.session_state.attr_rows is None or 
-                st.session_state.get("prev_edge_index") != index):
+            # Initialize or reset attr_rows when edge changes
+            if (st.session_state.attr_rows is None or 
+                st.session_state.prev_edge_index != index):
                 st.session_state.attr_rows = [
                     {"key": k, "value": v, "custom": k not in candidate_keys}
                     for k, v in attrs.items()
@@ -508,36 +576,49 @@ def dag_edge_editor(edited_dag_yaml, repo_name=None, run_id=None):
                     options = available_keys + ["Custom Attribute"]
                     
                     if row.get("custom", False):
-                        key = st.text_input("Select Attribute", value=row.get("key", ""), key=f"custom_key_{i}_{index}")
+                        key = st.text_input("Attribute Key", value=row.get("key", ""), key=f"custom_key_{i}_{index}")
                         row["key"] = key
                     else:
-                        selected = st.selectbox(
-                            "Select Attribute",
-                            options,
-                            index=options.index(row["key"]) if row["key"] in options else 0,
-                            key=f"key_select_{i}_{index}"
-                        )
-                        if selected == "Custom Attribute":
-                            row["custom"] = True
-                            row["key"] = ""
-                            row["value"] = ""
-                            st.rerun()
+                        # Ensure the current key is in options or default to first option
+                        current_key = row.get("key", "")
+                        if current_key and current_key in options:
+                            default_idx = options.index(current_key)
+                        elif options:
+                            default_idx = 0
                         else:
-                            row["custom"] = False
-                            row["key"] = selected
+                            default_idx = None
+                            
+                        if options and default_idx is not None:
+                            selected = st.selectbox(
+                                "Select Attribute",
+                                options,
+                                index=default_idx,
+                                key=f"key_select_{i}_{index}"
+                            )
+                            if selected == "Custom Attribute":
+                                row["custom"] = True
+                                row["key"] = ""
+                                row["value"] = ""
+                                st.rerun()
+                            else:
+                                row["custom"] = False
+                                row["key"] = selected
+                        else:
+                            st.info("No available attributes")
+                            continue
                 
                 with col2:
                     if row.get("custom", False):
                         val = st.text_input("Value", value=row.get("value", ""), key=f"val_{i}_{index}")
                         row["value"] = val
                     else:
-                        auto_val = output_attrs.get(row["key"], "")
+                        auto_val = output_attrs.get(row["key"], row.get("value", ""))
                         val = st.text_input("Value", value=auto_val, key=f"val_{i}_{index}")
                         row["value"] = val
                 
                 with col3:
-                    if st.checkbox("🗑️", key=f"delete_{i}_{index}"):
-                        continue
+                    if st.button("🗑️", key=f"delete_{i}_{index}"):
+                        continue  # Skip this row, effectively deleting it
                 
                 updated_rows.append(row)
             
@@ -545,7 +626,10 @@ def dag_edge_editor(edited_dag_yaml, repo_name=None, run_id=None):
             
             # Add Attribute row
             if st.button("➕ Add Attribute"):
-                default_key = next((k for k in candidate_keys if k not in [r["key"] for r in st.session_state.attr_rows]), "")
+                # Find a default key that's not already used
+                used_keys = [r["key"] for r in st.session_state.attr_rows if r["key"]]
+                default_key = next((k for k in candidate_keys if k not in used_keys), "")
+                
                 st.session_state.attr_rows.append({
                     "key": default_key,
                     "value": output_attrs.get(default_key, "") if default_key else "",
@@ -554,26 +638,37 @@ def dag_edge_editor(edited_dag_yaml, repo_name=None, run_id=None):
                 st.rerun()
             
             # Save Attributes
-            if st.button("💾 Save"):
-                new_attr_dict = {
-                    row["key"]: row["value"]
-                    for row in st.session_state.attr_rows
-                    if row["key"]
-                }
-                new_edge_data = {"from": src, "to": tgt, "attributes": new_attr_dict}
-                st.session_state.edges_state[index] = (src, tgt, new_edge_data)
-                st.success("Attributes updated.")
-                st.session_state.attr_rows = None  # Reset
+            col_save, col_reset = st.columns([1, 1])
+            with col_save:
+                if st.button("💾 Save Attributes"):
+                    new_attr_dict = {
+                        row["key"]: row["value"]
+                        for row in st.session_state.attr_rows
+                        if row["key"]  # Only include non-empty keys
+                    }
+                    new_edge_data = {"from": src, "to": tgt, "attributes": new_attr_dict}
+                    st.session_state.edges_state[index] = (src, tgt, new_edge_data)
+                    st.success("Attributes saved.")
+                    # Don't reset attr_rows here to keep the state
+            
+            with col_reset:
+                if st.button("🔄 Reset Attributes"):
+                    st.session_state.attr_rows = None
+                    st.session_state.prev_edge_index = -1
+                    st.rerun()
             
             # Navigation
-            col1, col2 = st.columns([8, 0.67])
+            st.markdown("---")
+            col1, col2, col3 = st.columns([1, 2, 1])
             with col1:
-                if st.button("Previous Edge") and index > 0:
+                if st.button("⬅️ Previous Edge", disabled=(index == 0)):
                     st.session_state.edge_index -= 1
                     st.session_state.attr_rows = None
                     rerun()
             with col2:
-                if st.button("Next Edge") and index < len(st.session_state.edges_state) - 1:
+                st.markdown(f"<center>Edge {index + 1} of {len(st.session_state.edges_state)}</center>", unsafe_allow_html=True)
+            with col3:
+                if st.button("Next Edge ➡️", disabled=(index >= len(st.session_state.edges_state) - 1)):
                     st.session_state.edge_index += 1
                     st.session_state.attr_rows = None
                     rerun()
@@ -592,14 +687,14 @@ def dag_edge_editor(edited_dag_yaml, repo_name=None, run_id=None):
         st.text_area("Final DAG YAML", new_yaml, height=300, key="final_yaml_preview")
     
     # Save and Submit buttons
-    col1, col2 = st.columns([8, 0.75])
+    col1, col2 = st.columns([8, 1])
     with col1:
-        if st.button("Save Changes"):
+        if st.button("💾 Save DAG Changes", type="primary"):
             st.session_state.final_dag_yaml = new_yaml
-            st.success("YAML saved.")
+            st.success("DAG YAML saved to session.")
     
     with col2:
-        if st.button("Submit DAG"):
+        if st.button("✅ Submit DAG", type="primary"):
             if new_yaml:
                 st.session_state.workflow_running = True
                 return new_yaml
