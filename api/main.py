@@ -91,6 +91,45 @@ def save_human_feedback(request: ComponentsResponse | DagResponse, repo_name: st
                 update_name: request.verified_dag,
                 "dag_corrections": dag_corrections
             }
+            
+            # IMPORTANT: Also save the verified DAG to dag.yaml file
+            dag_yaml_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, "dag.yaml")
+            try:
+                with open(dag_yaml_path, 'w') as yaml_file:
+                    yaml_file.write(request.verified_dag)
+                print(f"Updated dag.yaml file with verified DAG at {dag_yaml_path}")
+            except Exception as e:
+                print(f"Error updating dag.yaml file: {e}")
+
+                        # NEW: Update verified_components if there are renamed nodes
+            if dag_corrections.get("renamed_nodes"):
+                try:
+                    # Load existing verified_components
+                    components_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'human_verification_of_components.json')
+                    if os.path.exists(components_path):
+                        with open(components_path, 'r') as file:
+                            components_data = json.load(file)
+                            verified_components = components_data.get('verified_components', [])
+                        
+                        # Update component names based on renames
+                        updated_components = []
+                        for file_components in verified_components:
+                            updated_file_components = {}
+                            for comp_name, comp_data in file_components.items():
+                                # Check if this component was renamed
+                                new_name = dag_corrections["renamed_nodes"].get(comp_name, comp_name)
+                                updated_file_components[new_name] = comp_data
+                            updated_components.append(updated_file_components)
+                        
+                        # Save updated components back
+                        components_data['verified_components'] = updated_components
+                        with open(components_path, 'w') as file:
+                            json.dump(components_data, file, indent=2)
+                        print(f"Updated verified_components with renamed nodes")
+                        
+                except Exception as e:
+                    print(f"Error updating verified_components: {e}")
+                    
         except Exception as e:
             print(f"Error logging DAG corrections: {e}")
             update = {update_name: request.verified_dag}
@@ -106,7 +145,6 @@ def save_human_feedback(request: ComponentsResponse | DagResponse, repo_name: st
     step_name = STEPS[start_idx][0]
     background_tasks.add_task(run_workflow_background, WorkflowRequest(github_url="", input_files=[]), repo_name, run_id, start_idx)
     return {"repo_name": repo_name, "run_id": run_id, "step": step_name, "status": "running"}
-
 
 def run_workflow_background(request: WorkflowRequest, repo_name: str, run_id: str, start_idx: int):
     # Get the global state

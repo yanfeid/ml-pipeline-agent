@@ -60,7 +60,7 @@ def display_welcome_page():
     col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
     with col3:  # 使用正中间的列
         st.image("assets/rmr_agent_image.png", use_container_width=True)
-        
+
     st.subheader("Welcome to RMR Agent!")
     st.write("Convert your ML research code into a robust, modular, and configurable RMR pipeline.")
     # Take in github url
@@ -99,6 +99,20 @@ def display_welcome_page():
 
 def start_workflow():
     """Function to start the workflow after the user presses Start Workflow button"""
+    # Clear any cached DAG YAML from previous sessions
+    if "cached_dag_yaml" in st.session_state:
+        del st.session_state.cached_dag_yaml
+        print("Cleared cached DAG YAML from previous session")
+
+    # Clear node and edge state from previous sessions
+    if "nodes_state" in st.session_state:
+        del st.session_state.nodes_state
+        print("Cleared nodes_state from previous session")
+
+    if "edges_state" in st.session_state:
+        del st.session_state.edges_state
+        print("Cleared edges_state from previous session")
+
     if not st.session_state["repo_name"]:
         _, st.session_state["repo_name"] = parse_github_url(st.session_state["github_url"])
     print('Repo name:', st.session_state["repo_name"])
@@ -197,6 +211,18 @@ def check_workflow_status():
 def submit_human_feedback(payload, repo_name, run_id):
     url = f"{BASE_URL}/run-workflow/?repo_name={repo_name}&run_id={run_id}"
     print(f"Submitting human feedback to: {url}, Payload: {payload}")
+
+    # Save a backup copy of the payload before submitting
+    if "verified_dag" in payload:
+        try:
+            os.makedirs("temp", exist_ok=True)
+            backup_path = os.path.join("temp", f"feedback_payload_{repo_name}_{run_id}.json")
+            with open(backup_path, "w") as f:
+                json.dump(payload, f, indent=2)
+            print(f"Saved backup of feedback payload to {backup_path}")
+        except Exception as e:
+            print(f"Warning: Could not save backup of feedback payload: {e}")
+
     response = requests.post(url, json=payload)
     print(f"Submit Status: {response.status_code}, Response: '{response.text}'")
     if response.status_code == 200:
@@ -205,6 +231,18 @@ def submit_human_feedback(payload, repo_name, run_id):
         st.session_state.workflow_running = True
         st.session_state["current_step"] = data["step"]
         st.session_state["last_status"] = data["status"]
+
+        # Clear any cached DAG state to ensure fresh reload
+        if "cached_dag_yaml" in st.session_state:
+            del st.session_state.cached_dag_yaml
+            print("Cleared cached_dag_yaml after successful submission")
+        if "nodes_state" in st.session_state:
+            del st.session_state.nodes_state
+            print("Cleared nodes_state after successful submission")
+        if "edges_state" in st.session_state:
+            del st.session_state.edges_state
+            print("Cleared edges_state after successful submission")
+
         st.success("Feedback submitted successfully!")
         time.sleep(1)  # Brief pause to show the success message
         st.rerun()
@@ -266,6 +304,20 @@ def cancel_workflow_button():
             if cancel_response.status_code == 200:
                 st.session_state.workflow_running = False
                 st.session_state["display_welcome_page"] = True
+
+                # Clear any cached DAG YAML and state
+                if "cached_dag_yaml" in st.session_state:
+                    del st.session_state.cached_dag_yaml
+                    print("Cleared cached DAG YAML after canceling workflow")
+
+                if "nodes_state" in st.session_state:
+                    del st.session_state.nodes_state
+                    print("Cleared nodes_state after canceling workflow")
+
+                if "edges_state" in st.session_state:
+                    del st.session_state.edges_state
+                    print("Cleared edges_state after canceling workflow")
+
                 st.success("Workflow cancelled successfully")
                 time.sleep(1)  # Give user time to see the success message
                 st.rerun()
@@ -280,6 +332,20 @@ def back_to_home_button(key="back_to_home"):
         st.session_state.workflow_running = False
         st.session_state["display_welcome_page"] = True
         st.session_state.pop("result", None)  # Clear result if needed
+
+        # Clear any cached DAG YAML and state
+        if "cached_dag_yaml" in st.session_state:
+            del st.session_state.cached_dag_yaml
+            print("Cleared cached DAG YAML when returning to home")
+
+        if "nodes_state" in st.session_state:
+            del st.session_state.nodes_state
+            print("Cleared nodes_state when returning to home")
+
+        if "edges_state" in st.session_state:
+            del st.session_state.edges_state
+            print("Cleared edges_state when returning to home")
+
         st.success("Returning to home screen...")
         # time.sleep(1)  # Brief delay for user feedback
         st.rerun()
@@ -494,10 +560,33 @@ def human_verification_of_dag_ui(repo_name, run_id):
         print("🔁 Step changed – not rendering DAG editor UI")
         return
 
-    dag_yaml = get_dag_yaml(repo_name, run_id)
-    updated_dag_yaml = dag_edge_editor(dag_yaml)
+    # Check if we have a cached DAG YAML in the session state from a previous rename operation
+    if "cached_dag_yaml" in st.session_state:
+        print("Using cached DAG YAML from session state")
+        dag_yaml = st.session_state.cached_dag_yaml
+    else:
+        print("Loading DAG YAML from file")
+        dag_yaml = get_dag_yaml(repo_name, run_id)
+
+    updated_dag_yaml = dag_edge_editor(dag_yaml, repo_name, run_id)
 
     if updated_dag_yaml:
+        # Create a backup of the updated YAML
+        try:
+            os.makedirs("temp", exist_ok=True)
+            temp_file_path = os.path.join("temp", f"submitted_dag_{repo_name}_{run_id}.yaml")
+            with open(temp_file_path, "w") as f:
+                f.write(updated_dag_yaml)
+            print(f"Created backup of submitted DAG YAML: {temp_file_path}")
+        except Exception as e:
+            print(f"Warning: Could not create backup file: {e}")
+
+        # Clear cached DAG YAML to ensure we load from file next time
+        # This forces the system to use the updated file from the backend
+        if "cached_dag_yaml" in st.session_state:
+            del st.session_state.cached_dag_yaml
+            print("Cleared cached_dag_yaml from session state")
+
         payload = {
             "verified_dag": updated_dag_yaml,
             "github_url": st.session_state["github_url"],

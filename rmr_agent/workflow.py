@@ -274,9 +274,28 @@ def run_edge_identification(state: WorkflowState) -> Dict[str, Any]:
     return {"edges": edges}
 
 def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
+    # First check if we already have a verified DAG (from human verification)
+    if "verified_dag" in state and state["verified_dag"]:
+        print("Using verified_dag from human verification")
+        dag_yaml_str = state["verified_dag"]
+        
+        # Save the verified DAG to dag.yaml
+        dag_yaml_path = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'], "dag.yaml")
+        try:
+            with open(dag_yaml_path, 'w') as yaml_file:
+                yaml_file.write(dag_yaml_str)
+            print(f"Verified DAG YAML successfully exported to {dag_yaml_path}")
+        except Exception as e:
+            print(f"Error exporting verified YAML to {dag_yaml_path}: {type(e).__name__}: {str(e)}")
+            
+        return {"dag_yaml": dag_yaml_str}
+    
+    # Otherwise, check if we already have generated DAG
     if "dag_yaml" in state and state["dag_yaml"]:
         print("Skipping generate_dag_yaml: 'dag_yaml' already in state")
         return {}
+    
+    # Generate new DAG
     from rmr_agent.agents.dag import generage_dag_yaml
     dag_yaml_str = generage_dag_yaml(aggregated_nodes=state["node_aggregator"], edges=state["edges"])
     dag_yaml_path = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'], "dag.yaml")
@@ -308,7 +327,13 @@ def run_config_agent(state: WorkflowState) -> Dict[str, Any]:
         print("Skipping run_config_agent: 'config' already in state")
         return {}
     from rmr_agent.agents.ini_config import config_agent
-    config = config_agent(state["dag_yaml"]) 
+    
+    # Use verified_dag if available, otherwise use dag_yaml
+    dag_to_use = state.get("verified_dag") or state.get("dag_yaml")
+    if not dag_to_use:
+        raise ValueError("No DAG available for config generation")
+        
+    config = config_agent(dag_to_use) 
 
     config_dir = os.path.join(state["local_repo_path"], "config")
     os.makedirs(config_dir, exist_ok=True)
@@ -325,7 +350,13 @@ def run_notebook_agent(state: WorkflowState) -> Dict[str, Any]:
         return {}
 
     from rmr_agent.agents.notebook import notebook_agent
-    notebooks = notebook_agent(yaml.safe_load(state["dag_yaml"]),state["cleaned_code"],state["local_repo_path"])
+    
+    # Use verified_dag if available, otherwise use dag_yaml
+    dag_to_use = state.get("verified_dag") or state.get("dag_yaml")
+    if not dag_to_use:
+        raise ValueError("No DAG available for notebook generation")
+        
+    notebooks = notebook_agent(yaml.safe_load(dag_to_use), state["cleaned_code"], state["local_repo_path"])
     return {"notebooks": notebooks}
 
 def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:

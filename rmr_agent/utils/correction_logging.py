@@ -183,7 +183,7 @@ def get_edge_key(edge: Dict[str, Any]) -> str:
 def log_dag_corrections(original_dag: str, verified_dag: str) -> Dict[str, Any]:
     """
     Compare original agent-generated DAG with human-verified DAG
-    and log the differences.
+    and log the differences, including node renames.
 
     Args:
         original_dag: Original DAG YAML string
@@ -191,6 +191,7 @@ def log_dag_corrections(original_dag: str, verified_dag: str) -> Dict[str, Any]:
 
     Returns:
         Dictionary with structured data about:
+        - Renamed nodes (nodes that were renamed)
         - Added edges (not in original but in verified)
         - Deleted edges (in original but not in verified)
         - Modified edge properties
@@ -198,6 +199,9 @@ def log_dag_corrections(original_dag: str, verified_dag: str) -> Dict[str, Any]:
         - Summary statistics
     """
     corrections = {
+        "renamed_nodes": {},  # NEW: Track node renames
+        "added_nodes": [],    # NEW: Track truly added nodes
+        "deleted_nodes": [],  # NEW: Track truly deleted nodes
         "added_edges": [],
         "deleted_edges": [],
         "modified_edges": [],
@@ -207,6 +211,9 @@ def log_dag_corrections(original_dag: str, verified_dag: str) -> Dict[str, Any]:
             "total_edges_verified": 0,
             "total_nodes_original": 0,
             "total_nodes_verified": 0,
+            "renamed_node_count": 0,  # NEW
+            "added_node_count": 0,     # NEW
+            "deleted_node_count": 0,   # NEW
             "added_edge_count": 0,
             "deleted_edge_count": 0,
             "modified_edge_count": 0,
@@ -232,18 +239,104 @@ def log_dag_corrections(original_dag: str, verified_dag: str) -> Dict[str, Any]:
     corrections["summary"]["total_nodes_original"] = len(original_nodes)
     corrections["summary"]["total_nodes_verified"] = len(verified_nodes)
 
+    # ========== NEW: Detect renamed nodes ==========
+    # Find potential renamed nodes by comparing attributes
+    original_node_names = set(original_nodes.keys())
+    verified_node_names = set(verified_nodes.keys())
+    
+    potentially_deleted = original_node_names - verified_node_names
+    potentially_added = verified_node_names - original_node_names
+    
+    renamed_nodes = {}
+    actually_deleted = set()
+    actually_added = set()
+    
+    # Try to match renamed nodes based on file_name and line_range
+    for deleted_name in potentially_deleted:
+        deleted_node = original_nodes[deleted_name]
+        deleted_file = deleted_node.get('file_name', '')
+        deleted_lines = deleted_node.get('line_range', '')
+        
+        matched = False
+        for added_name in potentially_added:
+            if added_name in actually_added:
+                continue
+                
+            added_node = verified_nodes[added_name]
+            added_file = added_node.get('file_name', '')
+            added_lines = added_node.get('line_range', '')
+            
+            # Check if this is likely a rename (same file and line range)
+            if (deleted_file and added_file and deleted_file == added_file and 
+                deleted_lines and added_lines and deleted_lines == added_lines):
+                renamed_nodes[deleted_name] = added_name
+                matched = True
+                actually_added.add(added_name)
+                break
+        
+        if not matched:
+            actually_deleted.add(deleted_name)
+    
+    # Any remaining added nodes are truly new
+    for added_name in potentially_added:
+        if added_name not in actually_added:
+            corrections["added_nodes"].append({
+                "name": added_name,
+                "attributes": verified_nodes[added_name]
+            })
+            actually_added.add(added_name)
+    
+    # Record renamed nodes
+    corrections["renamed_nodes"] = renamed_nodes
+    corrections["summary"]["renamed_node_count"] = len(renamed_nodes)
+    
+    # Record deleted nodes (excluding renamed ones)
+    for name in actually_deleted:
+        corrections["deleted_nodes"].append({
+            "name": name,
+            "attributes": original_nodes[name]
+        })
+    corrections["summary"]["deleted_node_count"] = len(actually_deleted)
+    corrections["summary"]["added_node_count"] = len(corrections["added_nodes"])
+    
+    # ========== Update edge processing to handle renamed nodes ==========
     # Create dictionaries with edge key -> edge data for easy lookup
-    original_edges_dict = {get_edge_key(edge): edge for edge in original_edges}
-    verified_edges_dict = {get_edge_key(edge): edge for edge in verified_edges}
+    # But first, normalize edge node names based on renames
+    def normalize_edge_for_comparison(edge, rename_map):
+        """Normalize edge node names using rename map."""
+        normalized_edge = edge.copy()
+        from_node = edge.get("from", "")
+        to_node = edge.get("to", "")
+        
+        # Apply rename map
+        normalized_edge["from"] = rename_map.get(from_node, from_node)
+        normalized_edge["to"] = rename_map.get(to_node, to_node)
+        return normalized_edge
+    
+    # Create reverse rename map (new_name -> old_name) for verified edges
+    reverse_rename_map = {v: k for k, v in renamed_nodes.items()}
+    
+    original_edges_dict = {}
+    for edge in original_edges:
+        normalized = normalize_edge_for_comparison(edge, renamed_nodes)
+        key = get_edge_key(normalized)
+        original_edges_dict[key] = edge
+    
+    verified_edges_dict = {}
+    for edge in verified_edges:
+        key = get_edge_key(edge)
+        verified_edges_dict[key] = edge
 
-    # Find added edges (in verified but not in original)
+    # Find added edges (in verified but not in original, accounting for renames)
     for key, edge in verified_edges_dict.items():
         if key not in original_edges_dict:
             corrections["added_edges"].append(edge)
             corrections["summary"]["added_edge_count"] += 1
 
-    # Find deleted edges (in original but not in verified)
-    for key, edge in original_edges_dict.items():
+    # Find deleted edges (in original but not in verified, accounting for renames)
+    for edge in original_edges:
+        normalized = normalize_edge_for_comparison(edge, renamed_nodes)
+        key = get_edge_key(normalized)
         if key not in verified_edges_dict:
             corrections["deleted_edges"].append(edge)
             corrections["summary"]["deleted_edge_count"] += 1
@@ -279,9 +372,39 @@ def log_dag_corrections(original_dag: str, verified_dag: str) -> Dict[str, Any]:
                 })
                 corrections["summary"]["modified_edge_count"] += 1
 
-    # Find modified nodes (in both but with different attributes)
+    # Find modified nodes (excluding renamed nodes)
     for node_name, verified_node in verified_nodes.items():
-        if node_name in original_nodes:
+        # Skip if this is a renamed node (we already tracked it)
+        if node_name in reverse_rename_map:
+            original_name = reverse_rename_map[node_name]
+            if original_name in original_nodes:
+                # This is a renamed node, check if attributes changed besides the name
+                original_node = original_nodes[original_name]
+                changes = {}
+                
+                # Compare all properties except the name itself
+                all_props = set(original_node.keys()) | set(verified_node.keys())
+                
+                for prop in all_props:
+                    original_value = original_node.get(prop)
+                    verified_value = verified_node.get(prop)
+                    
+                    if original_value != verified_value:
+                        changes[prop] = {
+                            "original": original_value,
+                            "modified": verified_value
+                        }
+                
+                if changes:
+                    corrections["modified_nodes"].append({
+                        "name": node_name,
+                        "original_name": original_name,  # Track original name
+                        "changed_properties": list(changes.keys()),
+                        "changes": changes
+                    })
+                    corrections["summary"]["modified_node_count"] += 1
+        elif node_name in original_nodes:
+            # Node exists in both with same name, check for modifications
             original_node = original_nodes[node_name]
             changes = {}
 
@@ -307,8 +430,11 @@ def log_dag_corrections(original_dag: str, verified_dag: str) -> Dict[str, Any]:
                 })
                 corrections["summary"]["modified_node_count"] += 1
 
-    # Calculate correction ratio (percentage of edges + nodes that were modified in any way)
+    # Calculate correction ratio
     total_corrections = (
+        corrections["summary"]["renamed_node_count"] +
+        corrections["summary"]["added_node_count"] +
+        corrections["summary"]["deleted_node_count"] +
         corrections["summary"]["added_edge_count"] +
         corrections["summary"]["deleted_edge_count"] +
         corrections["summary"]["modified_edge_count"] +
