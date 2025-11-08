@@ -274,12 +274,10 @@ def run_edge_identification(state: WorkflowState) -> Dict[str, Any]:
     return {"edges": edges}
 
 def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
-    # First check if we already have a verified DAG (from human verification)
     if "verified_dag" in state and state["verified_dag"]:
         print("Using verified_dag from human verification")
         dag_yaml_str = state["verified_dag"]
         
-        # Save the verified DAG to dag.yaml
         dag_yaml_path = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'], "dag.yaml")
         try:
             with open(dag_yaml_path, 'w') as yaml_file:
@@ -290,7 +288,6 @@ def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
             
         return {"dag_yaml": dag_yaml_str}
     
-    # Otherwise, check if we already have generated DAG
     if "dag_yaml" in state and state["dag_yaml"]:
         print("Skipping generate_dag_yaml: 'dag_yaml' already in state")
         return {}
@@ -298,6 +295,25 @@ def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
     # Generate new DAG
     from rmr_agent.agents.dag import generage_dag_yaml
     dag_yaml_str = generage_dag_yaml(aggregated_nodes=state["node_aggregator"], edges=state["edges"])
+    
+    # Clean the DAG to remove any component_details that might have been added
+    dag_data = yaml.safe_load(dag_yaml_str)
+    if dag_data and "nodes" in dag_data:
+        cleaned_nodes = []
+        for node in dag_data["nodes"]:
+            if isinstance(node, dict):
+                cleaned_node = {}
+                for name, attrs in node.items():
+                    # Remove component_details if present
+                    if attrs and isinstance(attrs, dict) and 'component_details' in attrs:
+                        attrs = {k: v for k, v in attrs.items() if k != 'component_details'}
+                    cleaned_node[name] = attrs
+                cleaned_nodes.append(cleaned_node)
+        dag_data["nodes"] = cleaned_nodes
+        
+        # Convert back to YAML
+        dag_yaml_str = yaml.dump(dag_data, sort_keys=False, default_flow_style=False)
+    
     dag_yaml_path = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'], "dag.yaml")
     try:
         with open(dag_yaml_path, 'w') as yaml_file:
@@ -305,6 +321,7 @@ def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
         print(f"DAG YAML successfully exported to {dag_yaml_path}")
     except Exception as e:
         print(f"Error exporting YAML to {dag_yaml_path}: {type(e).__name__}: {str(e)}")
+    
     return {"dag_yaml": dag_yaml_str}
 
 def human_verification_of_dag(state: WorkflowState) -> Dict[str, Any]:

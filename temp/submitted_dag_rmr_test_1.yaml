@@ -1,0 +1,107 @@
+nodes:
+- Data Creation:
+    file_name: rmr_agent/repos/rmr_test/notebooks/pipeline.py
+    line_range: 7-11
+    inputs:
+      customer_data_path: gs://my-bucket/data/customer_data.csv
+    outputs:
+      processed_customer_data_path: gs://my-bucket/data/processed/customer_data_processed.parquet
+    component_details:
+      file: notebooks/pipeline.ipynb
+      line_range: 7-11
+      full_path: rmr_agent/repos/rmr_test/notebooks/pipeline.py
+- Feature Engineering:
+    file_name: rmr_agent/repos/rmr_test/notebooks/pipeline.py
+    line_range: 13-17
+    inputs:
+      customer_data_path: gs://my-bucket/data/customer_data.csv
+      age_bins: '[0, 30, 50, 100]'
+      age_bin_labels: '[''Young'', ''Middle'', ''Senior'']'
+    outputs:
+      processed_customer_data_path: gs://my-bucket/data/processed/customer_data_processed.parquet
+    component_details:
+      file: notebooks/pipeline.ipynb
+      line_range: 13-17
+      full_path: rmr_agent/repos/rmr_test/notebooks/pipeline.py
+- Feature Selection:
+    file_name: rmr_agent/repos/rmr_test/notebooks/pipeline.py
+    line_range: 19-38
+    inputs:
+      processed_data_path: gs://my-bucket/data/processed/customer_data_processed.parquet
+      test_size: '0.2'
+      random_state: '42'
+    outputs:
+      train_data_path: gs://my-bucket/data/processed/train_data.parquet
+      test_data_path: gs://my-bucket/data/processed/test_data.parquet
+    component_details:
+      file: notebooks/pipeline.ipynb
+      line_range: 19-38
+      full_path: rmr_agent/repos/rmr_test/notebooks/pipeline.py
+- Data Preprocessing:
+    file_name: rmr_agent/repos/rmr_test/notebooks/pipeline.py
+    line_range: 40-49
+    inputs:
+      train_data_path: gs://my-bucket/data/processed/train_data.parquet
+    outputs:
+      normalized_train_data_path: gs://my-bucket/data/processed/normalized_train_data.parquet
+      scaler_save_path: /home/user/models/scaler.pkl
+    component_details:
+      file: notebooks/pipeline.ipynb
+      line_range: 40-49
+      full_path: rmr_agent/repos/rmr_test/notebooks/pipeline.py
+- Model Training:
+    file_name: rmr_agent/repos/rmr_test/notebooks/pipeline.py
+    line_range: 51-61
+    inputs:
+      normalized_train_data_path: gs://my-bucket/data/processed/normalized_train_data.parquet
+      n_estimators: '100'
+      random_state: '42'
+      training_label_column: label
+    outputs:
+      model_artifact_path: /home/user/models/random_forest.pkl
+    component_details:
+      file: notebooks/pipeline.ipynb
+      line_range: 51-61
+      full_path: rmr_agent/repos/rmr_test/notebooks/pipeline.py
+- Model Evaluation:
+    file_name: rmr_agent/repos/rmr_test/notebooks/pipeline.py
+    line_range: 63-74
+    inputs:
+      model_path: /home/user/models/random_forest.pkl
+      scaler_path: /home/user/models/scaler.pkl
+      test_data_path: gs://my-bucket/data/processed/test_data.parquet
+    outputs:
+      evaluation_results_path: /home/user/models/eval_results.txt
+    component_details:
+      file: notebooks/pipeline.ipynb
+      line_range: 63-74
+      full_path: rmr_agent/repos/rmr_test/notebooks/pipeline.py
+edges:
+- from: Data Creation
+  to: Feature Selection
+  attributes:
+    processed_customer_data_path: gs://my-bucket/data/processed/customer_data_processed.parquet
+- from: Feature Engineering
+  to: Feature Selection
+  attributes:
+    processed_customer_data_path: gs://my-bucket/data/processed/customer_data_processed.parquet
+- from: Feature Selection
+  to: Data Preprocessing
+  attributes:
+    train_data_path: gs://my-bucket/data/processed/train_data.parquet
+- from: Feature Selection
+  to: Model Evaluation
+  attributes:
+    test_data_path: gs://my-bucket/data/processed/test_data.parquet
+- from: Data Preprocessing
+  to: Model Training
+  attributes:
+    normalized_train_data_path: gs://my-bucket/data/processed/normalized_train_data.parquet
+- from: Data Preprocessing
+  to: Model Evaluation
+  attributes:
+    scaler_save_path: /home/user/models/scaler.pkl
+- from: Model Training
+  to: Model Evaluation
+  attributes:
+    model_artifact_path: /home/user/models/random_forest.pkl
