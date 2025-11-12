@@ -1,7 +1,12 @@
 import yaml
 import litellm
+import logging
 from rmr_agent.llms import LLMClient
 from rmr_agent.utils import yaml_to_dict, dict_to_yaml
+from rmr_agent.utils.logging_config import setup_logger
+
+# 设置模块日志记录器
+logger = setup_logger(__name__)
 
 
 def identify_strict_edges_from_dicts(nodes_dict_list):
@@ -26,7 +31,7 @@ def identify_strict_edges_from_dicts(nodes_dict_list):
               Returns an empty list if errors occur or no edges are found.
     """
     if not isinstance(nodes_dict_list, list):
-        print("Error: Expected a list of component dictionaries.")
+        logger.error("Error: Expected a list of component dictionaries.")
         return []
     if not nodes_dict_list:
         return []
@@ -35,14 +40,14 @@ def identify_strict_edges_from_dicts(nodes_dict_list):
     processed_nodes = []
     for i, item in enumerate(nodes_dict_list):
         if not isinstance(item, dict) or len(item) != 1:
-            print(f"Warning: Skipping item at index {i} as it's not a single-key dictionary representing a component: {item}")
+            logger.warning(f"Skipping item at index {i} as it's not a single-key dictionary representing a component: {item}")
             continue
         
         component_name = list(item.keys())[0]
         component_data = item[component_name]
 
         if not isinstance(component_data, dict):
-            print(f"Warning: Skipping component '{component_name}' as its data is not a dictionary.")
+            logger.warning(f"Skipping component '{component_name}' as its data is not a dictionary.")
             continue
             
         # Ensure inputs and outputs are dictionaries, defaulting to empty if null/missing in component_data
@@ -50,10 +55,10 @@ def identify_strict_edges_from_dicts(nodes_dict_list):
         outputs = component_data.get('outputs') or {}
 
         if not isinstance(inputs, dict):
-            print(f"Warning: Inputs for component '{component_name}' is not a dictionary. Treating as empty.")
+            logger.warning(f"Inputs for component '{component_name}' is not a dictionary. Treating as empty.")
             inputs = {}
         if not isinstance(outputs, dict):
-            print(f"Warning: Outputs for component '{component_name}' is not a dictionary. Treating as empty.")
+            logger.warning(f"Outputs for component '{component_name}' is not a dictionary. Treating as empty.")
             outputs = {}
 
         processed_nodes.append({
@@ -61,7 +66,7 @@ def identify_strict_edges_from_dicts(nodes_dict_list):
             'inputs': inputs,
             'outputs': outputs
         })
-    print("Processed nodes:", processed_nodes)
+    logger.debug("Processed nodes: %s", processed_nodes)
 
     edges_map = {}  # To store "from_name" -> "to_name" -> {attributes} to consolidate
 
@@ -104,7 +109,7 @@ def identify_strict_edges_from_dicts(nodes_dict_list):
                     }
                 edges_map[edge_key]['attributes'].update(current_matching_attributes)
     
-    print("Edges map after processing:", edges_map)
+    logger.debug("Edges map after processing: %s", edges_map)
     final_edges_list = list(edges_map.values())
     return final_edges_list
 
@@ -114,7 +119,7 @@ def clean_edges(edge_yaml_str, nodes_yaml_str):
     Clean and validate edges from edge_yaml_str based on nodes_yaml_str.
     Returns the cleaned edges as a YAML string.
     """
-    print("Cleaning edges based on nodes YAML string...")
+    logger.info("Cleaning edges based on nodes YAML string...")
     # Parse YAML strings into dictionaries
     nodes_dict_list = yaml_to_dict(nodes_yaml_str)  # {ComponentName: {inputs: {}, outputs: {}}}
     edge_dict = yaml_to_dict(edge_yaml_str)   # {'edges': [{from: ..., to: ..., attributes: {...}}]}
@@ -162,14 +167,14 @@ def edge_identification_agent(nodes_yaml_str):
 
     # First we will find edges between components programmatically based on exact value matching
     nodes_dict_list = yaml_to_dict(nodes_yaml_str)  # Convert YAML string to list of dictionaries:  {ComponentName: {inputs: {}, outputs: {}}}
-    print("Nodes dictionary list:", nodes_dict_list)
+    logger.debug("Nodes dictionary list: %s", nodes_dict_list)
     if not nodes_dict_list:
         raise ValueError("No valid components found in the provided YAML string.")
     strict_edges = identify_strict_edges_from_dicts(nodes_dict_list)
-    print("Strict edges", strict_edges)
+    logger.debug("Strict edges: %s", strict_edges)
     if strict_edges:
         pre_identified_edges_yaml_str = yaml.dump({'edges': strict_edges}, sort_keys=False, indent=2)
-        print("Pre-identified edges YAML string:", pre_identified_edges_yaml_str)
+        logger.debug("Pre-identified edges YAML string: %s", pre_identified_edges_yaml_str)
     else:
         pre_identified_edges_yaml_str = """No exact matches were found. Plase use the following output format (YAML):
 edges:
@@ -179,7 +184,7 @@ edges:
       [shared_attribute_1_name]: [shared_attribute_1_value]
       [shared_attribute_2_name]: [shared_attribute_2_value]
 """
-        print("No strict edges found based on exact value matching.")
+        logger.info("No strict edges found based on exact value matching.")
 
     
 
@@ -313,7 +318,7 @@ Pre-identified Edges:
     )
     choices: litellm.types.utils.Choices = response.choices
     edge_identification_response = choices[0].message.content or ""
-    print("Edge identification response from LLM:", edge_identification_response)
+    logger.debug("Edge identification response from LLM: %s", edge_identification_response)
 
     # Extract only the edges YAML content, and filter out any edge attributes which are not actually the output of the `from` component 
     filtered_edges = clean_edges(edge_identification_response, nodes_yaml_str)

@@ -1,9 +1,13 @@
 import re
 import json
 import difflib
+import logging
 from rmr_agent.llms import LLMClient
 from rmr_agent.utils import py_to_notebook
 from collections import defaultdict
+from rmr_agent.utils.logging_config import setup_logger
+
+logger = setup_logger(__name__)
 
 def infer_section_name(code_lines, attribute_parsing_json):
     pattern = re.compile(r'section_name\s*=\s*["\']([\w_]+)["\']')
@@ -21,15 +25,15 @@ def infer_section_name(code_lines, attribute_parsing_json):
         section_names.extend(block.keys())
 
     if section_candidate in section_names:
-        print(f"📌 Exact section name match: {section_candidate}")
+        logger.info("Exact section name match: %s", section_candidate)
         return section_candidate
 
     closest_matches = difflib.get_close_matches(section_candidate or "", section_names, n=1, cutoff=0.4)
     if closest_matches:
-        print(f"🤖 Section name '{section_candidate}' not found. Using closest match: {closest_matches[0]}")
+        logger.info("Section name '%s' not found. Using closest match: %s", section_candidate, closest_matches[0])
         return closest_matches[0]
 
-    print("❌ Could not determine section name from code or JSON.")
+    logger.warning("Could not determine section name from code or JSON.")
     return None
 
 def scoped_variable_renaming(code_lines, value_to_newname):
@@ -47,7 +51,7 @@ def scoped_variable_renaming(code_lines, value_to_newname):
                 var_name = m.group(1)
                 var_value = m.group(3)
                 if var_value == value:
-                    print(f"🔄 Scoped replacing {var_name} → {new_var_name} for value={value} (deleting line {i+1})")
+                    logger.debug("Scoped replacing %s → %s for value=%s (deleting line %d)", var_name, new_var_name, value, i+1)
                     updated_lines[i] = None  
                     j = i + 1
                     while j < len(updated_lines):
@@ -70,14 +74,6 @@ def extract_cross_section_variables(code_text: str, attribute_parsing_json: dict
     """
     Extracts config variables from other sections (not the current section or 'general') 
     based on config.get('section', 'key') calls found in the code.
-
-    Args:
-        code_text (str): The source code as a string.
-        attribute_parsing_json (dict): The JSON containing all section definitions.
-        current_section_name (str): The original name of the current section (e.g., "Model Evaluation").
-
-    Returns:
-        list: A list of variable dictionaries (same format as in JSON) to be added to relevant_vars.
     """
     def normalize(name: str) -> str:
         return name.lower().replace(" ", "_")
@@ -112,7 +108,7 @@ def extract_cross_section_variables(code_text: str, attribute_parsing_json: dict
         # Look up actual section name from normalized version
         actual_section_name = section_name_map.get(ref_section_norm)
         if not actual_section_name:
-            print(f"⚠️ No matching section in JSON for '{ref_section_clean}'")
+            logger.warning("No matching section in JSON for '%s'", ref_section_clean)
             continue
 
         found = False
@@ -122,30 +118,124 @@ def extract_cross_section_variables(code_text: str, attribute_parsing_json: dict
                 all_vars = section_data.get("inputs", []) + section_data.get("outputs", [])
                 for var in all_vars:
                     if var["name"] == ref_key:
-                        print(f"✅ Found cross-section variable: {actual_section_name}.{ref_key}")
+                        logger.debug("Found cross-section variable: %s.%s", actual_section_name, ref_key)
                         extra_vars.append(var)
                         found = True
                         break
                 break
 
         if not found:
-            print(f"⚠️ Could not find variable '{ref_key}' in section '{actual_section_name}'")
+            logger.warning("Could not find variable '%s' in section '%s'", ref_key, actual_section_name)
 
     return extra_vars
 
+def disambiguate_with_llm(single_value_str, value_to_names, code_lines, idx, llm_model="gpt-4o"):
+    """
+    Use LLM to disambiguate which variable name to use for an ambiguous value.
+    Returns the chosen variable name or None if disambiguation fails.
+    """
+    # Find all rows including the values
+    usage_lines = [(i, l) for i, l in enumerate(code_lines) if single_value_str in l]
+    if not usage_lines:
+        logger.warning("No usage lines found for value `%s` → using first candidate", single_value_str)
+        return list(value_to_names[single_value_str])[0]
+
+    # Collect contexts
+    context_blocks = []
+    for i, _ in usage_lines:
+        block = "\n".join(code_lines[max(0, i - 3) : i + 4])
+        context_blocks.append({"line_index": i, "context": block})
+    
+    if not context_blocks:
+        logger.warning("No code context generated for value `%s` → using first candidate", single_value_str)
+        return list(value_to_names[single_value_str])[0]
+
+    try:
+        llm_client = LLMClient(model_name=llm_model)
+        prompt = f"""
+You are an expert Python code refactoring assistant.
+
+We are replacing hardcoded values with config variable names.
+However, the same value `{single_value_str}` appears multiple times in the code
+and maps to more than one candidate variable name: {list(value_to_names[single_value_str])}
+
+Your task:
+- Read each code context provided below.
+- For each occurrence, choose the best-matching config variable name from the list above.
+- Use only the local code context to make your decision.
+- Only return a JSON list. NO explanation needed.
+
+Instructions:
+- Return a JSON list of objects: one for each usage.
+- Each object must contain:
+    - `line_index`: the line number in the original file
+    - `name`: the best variable name from the candidate list
+
+Example Output:
+[
+  {{ "line_index": 27, "name": "train_parquet_path" }},
+  {{ "line_index": 32, "name": "val_parquet_path" }}
+]
+
+Now analyze the following code contexts:
+{json.dumps(context_blocks, indent=2)}
+"""
+        response = llm_client.call_llm(
+            prompt=prompt,
+            max_tokens=500,
+            temperature=0,
+            repetition_penalty=1.0,
+            top_p=0.1
+        )
+        
+        # Check if response is valid
+        if not response or "choices" not in response:
+            logger.error("LLM response is invalid or empty")
+            return list(value_to_names[single_value_str])[0]
+        
+        if not response["choices"] or len(response["choices"]) == 0:
+            logger.error("LLM response has no choices")
+            return list(value_to_names[single_value_str])[0]
+        
+        raw = response["choices"][0].get("message", {}).get("content", "")
+        
+        # Check if content is empty
+        if not raw or raw.strip() == "":
+            logger.error("LLM returned empty content")
+            return list(value_to_names[single_value_str])[0]
+        
+        # Clean markdown code block markers
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip())
+        
+        # Check cleaned content again
+        if not cleaned:
+            logger.error("Cleaned LLM output is empty")
+            return list(value_to_names[single_value_str])[0]
+        
+        mappings = json.loads(cleaned)
+        return mappings  # Return full mapping list
+        
+    except json.JSONDecodeError as e:
+        logger.error("Failed to parse LLM output: %s", e)
+        logger.error("Raw LLM output was: %s", raw if 'raw' in locals() else 'N/A')
+        return list(value_to_names[single_value_str])[0]
+    except Exception as e:
+        logger.error("Unexpected error during LLM disambiguation: %s", e)
+        return list(value_to_names[single_value_str])[0]
+    
 def code_editor_agent(python_file_path: str, attribute_parsing_json: dict, llm_model: str = "gpt-4o") -> str:
     with open(python_file_path, "r", encoding="utf-8") as f:
         code_lines = f.readlines()
     code_text = "".join(code_lines)
 
-    # infer current section
+    # Infer current section
     section_name = infer_section_name(code_lines, attribute_parsing_json)
     if not section_name:
-        print(f"❌ Could not find section_name in {python_file_path}")
+        logger.warning("No matching section in JSON for '%s'", python_file_path.split('/')[-1])
         return code_text
-    print(f"📌 Inferred section name: '{section_name}'")
+    logger.info("Inferred section name: '%s'", section_name)
 
-    # collect vars from attribute_parsing_json 
+    # Collect vars from attribute_parsing_json 
     relevant_vars = []
     for block in attribute_parsing_json.get("attribute_parsing", []):
         if section_name in block:
@@ -156,40 +246,42 @@ def code_editor_agent(python_file_path: str, attribute_parsing_json: dict, llm_m
     cross_section_vars = extract_cross_section_variables(code_text, attribute_parsing_json, section_name)
     relevant_vars.extend(cross_section_vars)
 
-    print("✅ Final relevant_vars:")
-    print(json.dumps(relevant_vars, indent=2, ensure_ascii=False))
+    logger.debug("Final relevant_vars: %d variables", len(relevant_vars))
 
     if not relevant_vars:
-        print(f"❌ Section '{section_name}' not found in attribute_parsing.")
+        logger.warning("No relevant variables found for section '%s'", section_name)
         return code_text
     
-    #  initial mapping
+    # Initial mapping for renamed variables
     value_to_newname = {}
     for var in relevant_vars:
         if var.get("already_exists") and var.get("renamed"):
-            print(f"[mapping] {var['value']} → {var['name']}")
+            logger.debug("[mapping] %s → %s", var['value'], var['name'])
             value_to_newname[var["value"]] = var["name"]
 
-    # use scoped_variable_renaming handle renamed
+    # Use scoped_variable_renaming to handle renamed
     code_lines, scope_mod = scoped_variable_renaming(code_lines, value_to_newname)
     new_lines = []
     has_modifications = scope_mod
     skip_until_idx = -1
 
-    # initial to record processed values
+    # Initialize to record processed values
     processed_values = set()
-    value_to_names = defaultdict(list)
+    
+    # Use set to avoid duplicates
+    value_to_names = defaultdict(set)
     for var in relevant_vars:
         val = var["value"]
         key = str(val[0] if isinstance(val, list) else val)
-        value_to_names[key].append(var["name"])
+        value_to_names[key].add(var["name"])
 
     for idx, line in enumerate(code_lines):
         if idx < skip_until_idx:
             continue
 
         modified_line = line
-        # skip config.get
+        
+        # Skip config.get lines
         if "config.get" in line:
             new_lines.append(line)
             continue
@@ -207,9 +299,10 @@ def code_editor_agent(python_file_path: str, attribute_parsing_json: dict, llm_m
                     if count > 0:
                         modified_line = modified_line_new
                         has_modifications = True
-                # match “name = …”, ignorecase
+                        
+                # Match "name = …", ignorecase
                 if re.match(rf"^\s*{re.escape(name)}\s*=", line, flags=re.IGNORECASE):
-                    # single row vs multiple rows
+                    # Single row vs multiple rows
                     if (not line.rstrip().endswith('\\')
                         and (line.count('(') - line.count(')') == 0)
                         and (line.count('[') - line.count(']') == 0)
@@ -242,9 +335,12 @@ def code_editor_agent(python_file_path: str, attribute_parsing_json: dict, llm_m
 
                 if single_value_str in processed_values:
                     continue
-                is_ambiguous = len(value_to_names[single_value_str]) > 1
+                    
+                # Check if ambiguous (more than one unique name)
+                unique_names = value_to_names[single_value_str]
+                is_ambiguous = len(unique_names) > 1
 
-                # list replacement
+                # List replacement
                 if isinstance(value, list) and all(isinstance(v, str) for v in value):
                     pat_vals = ',\s*'.join(rf'["\']{re.escape(v)}["\']' for v in value)
                     full_pat = re.compile(rf'\(\s*{pat_vals}\s*\)')
@@ -252,92 +348,59 @@ def code_editor_agent(python_file_path: str, attribute_parsing_json: dict, llm_m
                         modified_line = full_pat.sub(name, modified_line)
                         has_modifications = True
 
-                # single value replacement
+                # Single value replacement (non-ambiguous)
                 elif not is_ambiguous:
+                    # Use the single unique name
+                    var_name = list(unique_names)[0]
                     pat = re.compile(
                         rf'(?:["\']{re.escape(single_value_str)}["\']|(?<!\w){re.escape(single_value_str)}(?!\w))'
                     )
                     if pat.search(modified_line):
-                        modified_line = pat.sub(name, modified_line)
+                        modified_line = pat.sub(var_name, modified_line)
                         has_modifications = True
 
-                # ambigious value with LLM disambiguation
+                # Ambiguous value with LLM disambiguation
                 else:
-                    print(f"⚠️ Ambiguous value `{single_value_str}` shared by: {value_to_names[single_value_str]}")
-                    # find all rows including the values
-                    usage_lines = [(i, l) for i, l in enumerate(code_lines) if single_value_str in l]
-                    if not usage_lines:
-                        print(f"⚠️ No usage lines found for value `{single_value_str}` → skipping LLM disambiguation.")
-                        processed_values.add(single_value_str)
-                        continue
-
-                    # collect contexts
-                    context_blocks = []
-                    for i, _ in usage_lines:
-                        block = "\n".join(code_lines[max(0, i - 3) : i + 4])
-                        context_blocks.append({"line_index": i, "context": block})
-                    if not context_blocks:
-                        print(f"⚠️ No code context generated for value `{single_value_str}` → skipping LLM step.")
-                        processed_values.add(single_value_str)
-                        continue
-
-                    llm_client = LLMClient(model_name=llm_model)
-                    prompt = f"""
-You are an expert Python code refactoring assistant.
-
-We are replacing hardcoded values with config variable names.
-However, the same value `{single_value_str}` appears multiple times in the code
-and maps to more than one candidate variable name: {value_to_names[single_value_str]}
-
-Your task:
-- Read each code context provided below.
-- For each occurrence, choose the best-matching config variable name from the list above.
-- Use only the local code context to make your decision.
-
-Instructions:
-- Return a JSON list of objects: one for each usage.
-- Each object must contain:
-    - `line_index`: the line number in the original file
-    - `name`: the best variable name from the candidate list
-
-Example Output:
-[
-  {{ "line_index": 27, "name": "train_parquet_path" }},
-  {{ "line_index": 32, "name": "val_parquet_path" }}
-]
-Now analyze the following code contexts:
-{json.dumps(context_blocks, indent=2)}
-"""
-                    response = llm_client.call_llm(
-                        prompt=prompt,
-                        max_tokens=500,
-                        temperature=0,
-                        repetition_penalty=1.0,
-                        top_p=0.1
-                    )
-                    raw = response["choices"][0]["message"]["content"]
-                    cleaned = re.sub(r"^```json\s*|\s*```$", "", raw.strip())
-                    try:
-                        mappings = json.loads(cleaned)
-                    except json.JSONDecodeError as e:
-                        print("❌ Failed to parse LLM output:", e)
-                        processed_values.add(single_value_str)
-                        continue
-
-                    for m in mappings:
-                        i2 = m["line_index"]
-                        tgt = m["name"]
+                    logger.warning("Ambiguous value `%s` shared by: %s", single_value_str, list(unique_names))
+                    
+                    # Try LLM disambiguation
+                    mappings = disambiguate_with_llm(single_value_str, value_to_names, code_lines, idx, llm_model)
+                    
+                    if isinstance(mappings, list):
+                        # LLM returned full mappings
+                        for m in mappings:
+                            i2 = m.get("line_index", -1)
+                            tgt = m.get("name", "")
+                            
+                            if i2 < 0 or i2 >= len(code_lines):
+                                continue
+                                
+                            # Validate that the chosen name is in our candidate list
+                            if tgt not in unique_names:
+                                logger.warning("LLM suggested '%s' which is not in candidates %s", tgt, list(unique_names))
+                                tgt = list(unique_names)[0]  # Fallback to first candidate
+                            
+                            pat = re.compile(
+                                rf'(?:["\']{re.escape(single_value_str)}["\']|(?<!\w){re.escape(single_value_str)}(?!\w))'
+                            )
+                            updated = pat.sub(tgt, code_lines[i2], count=1)
+                            code_lines[i2] = updated
+                            if i2 == idx:
+                                modified_line = updated
+                            has_modifications = True
+                    else:
+                        # LLM returned a single name or fallback was used
+                        var_name = mappings if isinstance(mappings, str) else list(unique_names)[0]
                         pat = re.compile(
                             rf'(?:["\']{re.escape(single_value_str)}["\']|(?<!\w){re.escape(single_value_str)}(?!\w))'
                         )
-                        updated = pat.sub(tgt, code_lines[i2], count=1)
-                        code_lines[i2] = updated
-                        if i2 == idx:
-                            modified_line = updated
-                        has_modifications = True
+                        if pat.search(modified_line):
+                            modified_line = pat.sub(var_name, modified_line)
+                            has_modifications = True
 
-                    # record
+                    # Record as processed
                     processed_values.add(single_value_str)
+                    
         if modified_line is not None:
             new_lines.append(modified_line)
         else:
@@ -348,20 +411,10 @@ Now analyze the following code contexts:
     if has_modifications:
         with open(python_file_path, "w", encoding="utf-8") as f:
             f.write(final_code)
-        print(f"✅ Code overwritten: {python_file_path}")
+        logger.info("Code overwritten: %s", python_file_path)
     else:
-        print("✅ No modifications were made to the code.")
+        logger.info("No modifications were made to the code.")
 
-    # convert .py to Notebooks
+    # Convert .py to Notebooks
     py_to_notebook(python_file_path)
     return final_code
-
-
-# # ============= for test ================
-# json_file = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/checkpoints/bt-retry-v2/3/attribute_parsing.json"
-# # python_code = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2/notebooks_test/1_driver_creation_2.py"
-# python_code = "/Users/yanfdai/Desktop/codespace/DAG_FULLSTACK/rmr_agent/rmr_agent/repos/bt-retry-v2/notebooks/0_driver_creation.py"
-
-# with open(json_file, "r", encoding="utf-8") as f:
-#     attribute_config = json.load(f)
-# edited_code = code_editor_agent(python_code, attribute_config)

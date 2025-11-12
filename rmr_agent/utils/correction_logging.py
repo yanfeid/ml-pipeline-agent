@@ -2,6 +2,10 @@ import json
 import yaml
 from typing import Dict, List, Any, Tuple, Set
 import copy
+from rmr_agent.utils.logging_config import setup_logger
+
+# Set up module logger
+logger = setup_logger(__name__)
 
 
 def get_component_key(component: Dict[str, Any]) -> str:
@@ -138,7 +142,7 @@ def parse_dag_yaml(dag_yaml: str) -> Dict[str, Any]:
     try:
         return yaml.safe_load(dag_yaml) or {}
     except Exception as e:
-        print(f"Error parsing DAG YAML: {e}")
+        logger.error(f"Error parsing DAG YAML: {e}")
         return {}
 
 
@@ -288,9 +292,9 @@ def debug_dag_differences(original_dag: str, verified_dag: str) -> None:
     Debug function to print the exact differences between original and verified DAG.
     This will help identify why changes are being detected when none were made.
     """
-    print("\n" + "="*80)
-    print("DAG DIFFERENCES DEBUG REPORT")
-    print("="*80)
+    logger.debug("\n" + "="*80)
+    logger.debug("DAG DIFFERENCES DEBUG REPORT")
+    logger.debug("="*80)
     
     # Parse both DAGs
     orig_data = parse_dag_yaml(original_dag)
@@ -302,8 +306,8 @@ def debug_dag_differences(original_dag: str, verified_dag: str) -> None:
     
     # Check Feature Engineering specifically
     if "Feature Engineering" in orig_nodes and "Feature Engineering" in ver_nodes:
-        print("\n🔍 FEATURE ENGINEERING NODE COMPARISON:")
-        print("-" * 40)
+        logger.debug("\n🔍 FEATURE ENGINEERING NODE COMPARISON:")
+        logger.debug("-" * 40)
         
         orig_fe = orig_nodes["Feature Engineering"]
         ver_fe = ver_nodes["Feature Engineering"]
@@ -316,36 +320,36 @@ def debug_dag_differences(original_dag: str, verified_dag: str) -> None:
             ver_val = ver_fe.get(key)
             
             if key == "inputs":
-                print(f"\n📌 INPUTS comparison:")
-                print(f"  Original type: {type(orig_val)}")
-                print(f"  Original value: {repr(orig_val)}")
-                print(f"  Verified type: {type(ver_val)}")
-                print(f"  Verified value: {repr(ver_val)}")
-                
+                logger.debug(f"\n📌 INPUTS comparison:")
+                logger.debug(f"  Original type: {type(orig_val)}")
+                logger.debug(f"  Original value: {repr(orig_val)}")
+                logger.debug(f"  Verified type: {type(ver_val)}")
+                logger.debug(f"  Verified value: {repr(ver_val)}")
+
                 if orig_val != ver_val:
-                    print(f"  ⚠️ INPUTS ARE DIFFERENT!")
+                    logger.debug(f"  ⚠️ INPUTS ARE DIFFERENT!")
                     
                     # If they're dicts, compare keys
                     if isinstance(orig_val, dict) and isinstance(ver_val, dict):
                         orig_keys = set(orig_val.keys())
                         ver_keys = set(ver_val.keys())
                         
-                        print(f"  Keys only in original: {orig_keys - ver_keys}")
-                        print(f"  Keys only in verified: {ver_keys - orig_keys}")
-                        print(f"  Common keys with different values:")
-                        
+                        logger.debug(f"  Keys only in original: {orig_keys - ver_keys}")
+                        logger.debug(f"  Keys only in verified: {ver_keys - orig_keys}")
+                        logger.debug(f"  Common keys with different values:")
+
                         for k in orig_keys & ver_keys:
                             if orig_val[k] != ver_val[k]:
-                                print(f"    '{k}': {repr(orig_val[k])} -> {repr(ver_val[k])}")
+                                logger.debug(f"    '{k}': {repr(orig_val[k])} -> {repr(ver_val[k])}")
                 else:
-                    print(f"  ✅ Inputs are identical")
+                    logger.debug(f"  ✅ Inputs are identical")
             
             elif orig_val != ver_val:
-                print(f"\n{key}:")
-                print(f"  Original: {repr(orig_val)}")
-                print(f"  Verified: {repr(ver_val)}")
+                logger.debug(f"\n{key}:")
+                logger.debug(f"  Original: {repr(orig_val)}")
+                logger.debug(f"  Verified: {repr(ver_val)}")
     
-    print("\n" + "="*80)
+    logger.debug("\n" + "="*80)
 
 
 def log_dag_corrections(original_dag: str, verified_dag: str, debug: bool = False) -> Dict[str, Any]:

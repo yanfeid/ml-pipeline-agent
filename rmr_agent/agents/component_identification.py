@@ -1,7 +1,12 @@
 import os
 import json
 import litellm
+import logging
 from rmr_agent.llms import LLMClient
+from rmr_agent.utils.logging_config import setup_logger
+
+# 设置模块日志记录器
+logger = setup_logger(__name__)
     
 def get_component_definitions_str():
     with open('rmr_agent/ml_components/component_definitions.json', 'r') as f:
@@ -15,7 +20,7 @@ def component_identification_agent(python_file_path, full_file_list, code_summar
                  frequency_penalty=0, presence_penalty=0):
     base_name = os.path.basename(python_file_path)  
     file_name = base_name.replace('.py', '.ipynb')
-    print(f"Running component identification for {file_name}")
+    logger.info("Running component identification for %s", file_name)
 
     # Get the component definitions as a string
     component_definitions_str = get_component_definitions_str()

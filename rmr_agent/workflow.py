@@ -5,6 +5,7 @@ import tempfile
 import requests
 import argparse
 import subprocess
+import logging
 from typing import Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor
 from rmr_agent.utils import (
@@ -13,6 +14,10 @@ from rmr_agent.utils import (
     save_ini_file
 )
 import time
+from rmr_agent.utils.logging_config import setup_logger
+
+# Set up module logger
+logger = setup_logger(__name__)
 
 # State
 WorkflowState = Dict[str, Any]
@@ -27,7 +32,7 @@ def is_cancelled(state: WorkflowState) -> bool:
 
 def fork_and_clone_repository(state: WorkflowState) -> Dict[str, Any]:
     if "files" in state and state["files"]:
-        print("Skipping fork_and_clone_repository: 'files' already in state")
+        logger.info("Skipping fork_and_clone_repository: 'files' already in state")
         return {}
     # Fork and clone the repository and prepare the local path
     local_repo_path, fork_clone_url = fork_and_clone_repo(state["github_url"], state['run_id'])
@@ -43,27 +48,27 @@ def fork_and_clone_repository(state: WorkflowState) -> Dict[str, Any]:
 
 def summarize(state: WorkflowState) -> Dict[str, Any]:
     if "summaries" in state and state["summaries"]:
-        print("Skipping summarize: 'summaries' already in state")
+        logger.info("Skipping summarize: 'summaries' already in state")
         return {}
     from rmr_agent.agents.summarization import summarize_code
     full_file_list = state["files"]
     summaries = {}
     cleaned_code = {}
-    
+
     with ThreadPoolExecutor() as executor:
         # Map processing across threads using a lambda
         results = executor.map(
             lambda file: (file, *summarize_code(file, full_file_list)),
             full_file_list
         )
-        
+
         for file, clean_code, summary_text in results:
             if is_cancelled(state):
-                print("Workflow cancelled during code summarization")
+                logger.warning("Workflow cancelled during code summarization")
                 return {}
             summaries[file] = summary_text
             cleaned_code[file] = clean_code
-            print(f"Generated summary for {file}")
+            logger.info(f"Generated summary for {file}")
 
     return {
         "summaries": summaries,
@@ -72,69 +77,70 @@ def summarize(state: WorkflowState) -> Dict[str, Any]:
 
 def run_component_identification(state: WorkflowState) -> Dict[str, Any]:
     if "component_identification" in state and state["component_identification"]:
-        print("Skipping run_component_identification: 'component_identification' already in state")
+        logger.info("Skipping run_component_identification: 'component_identification' already in state")
         return {}
     from rmr_agent.agents.component_identification import component_identification_agent
     full_file_list = state["files"]
     summaries = state["summaries"]
     component_identification = []
-    
+
     with ThreadPoolExecutor() as executor:
         # Map processing across threads using a lambda
         results = executor.map(
             lambda file: (file, component_identification_agent(file, full_file_list, code_summary=summaries[file])),
             full_file_list
         )
-        
+
         for file, component_id_str in results:
             if is_cancelled(state):
-                print("Workflow cancelled during component identification")
+                logger.warning("Workflow cancelled during component identification")
                 return {}
             component_identification.append(component_id_str)
-            print(f"Identified components for {file}")
+            logger.info(f"Identified components for {file}")
 
     return {"component_identification": component_identification}
 
 def run_component_parsing(state: WorkflowState) -> Dict[str, Any]:
     if "component_parsing" in state and state["component_parsing"]:
-        print("Skipping run_component_parsing: 'component_parsing' already in state")
+        logger.info("Skipping run_component_parsing: 'component_parsing' already in state")
         return {}
     from rmr_agent.agents.component_parsing import parse_component_identification
     full_file_list = state["files"]
     component_identification = state["component_identification"]
     component_parsing = []
-    
+
     with ThreadPoolExecutor() as executor:
         # Map processing across threads using a lambda
         results = executor.map(
             lambda pair: (pair[0], *parse_component_identification(pair[1], pair[0])),
             zip(full_file_list, component_identification)
         )
-        
+
         for file, parsed_component_id_text, parsed_component_id_dict in results:
             if is_cancelled(state):
-                print("Workflow cancelled during component parsing")
+                logger.warning("Workflow cancelled during component parsing")
                 return {}
             component_parsing.append(parsed_component_id_dict)
-            print(f"Parsed the component identification response for {file}")
+            logger.info(f"Parsed the component identification response for {file}")
 
     return {"component_parsing": component_parsing}
 
 def human_verification_of_components(state: WorkflowState) -> Dict[str, Any]:
     """This is a mock function that simulates human verification of the identified ML Components."""
     if "verified_components" in state and state["verified_components"]:
-        print("Skipping human_verification_of_components: 'verified_components' already in state")
+        logger.info("Skipping human_verification_of_components: 'verified_components' already in state")
         return {}
     components = state.get("component_parsing", [])
     if not components:
+        logger.error("No components to verify")
         raise ValueError("No components to verify")
 
     editor = os.environ.get('EDITOR', 'vim')  # Default to vim if EDITOR not set
-    
+
     while True:  # Keep trying until we get valid JSON
         with tempfile.NamedTemporaryFile(suffix='.json', mode='w', delete=False) as temp_file:
             json_path = temp_file.name
-            # Add a "verified" field to each component 
+            # Add a "verified" field to each component
             editable_components = []
             for component in components:
                 editable_component = component.copy()
@@ -142,14 +148,19 @@ def human_verification_of_components(state: WorkflowState) -> Dict[str, Any]:
 
             # Write to the temp file
             json.dump(editable_components, temp_file, indent=2)
-        
+
         # Instructions for the user
+        # Keep print statements for direct user feedback but also log the information
+        logger.info(f"Temporary file created at: {json_path}")
         print(f"\nTemporary file created at: {json_path}")
         print("\nPlease review and edit the components in the editor that will open:")
         print("- You can modify component details as needed")
         print("- To delete a component, delete its entire JSON object (including the comma)")
         print("- Save and close the editor when done\n")
-        
+
+        # Log the user instructions for record-keeping
+        logger.info("User instructed to review and edit components in the editor")
+
         # Open the editor for the user to make changes
         input("Press Enter to open the editor...")
         subprocess.call([editor, json_path])
@@ -158,56 +169,67 @@ def human_verification_of_components(state: WorkflowState) -> Dict[str, Any]:
         try:
             with open(json_path, 'r') as file:
                 verified_components = json.load(file)
+                # Keep print for user feedback, but make sure it's also logged
+                logger.info("Verification complete! JSON is valid.")
                 print("\nVerification complete! JSON is valid.")
                 # Clean up the temp file
                 os.unlink(json_path)
                 return {"verified_components": verified_components}
         except json.JSONDecodeError as e:
+            # Log the error with detail
+            logger.error(f"Error: The file contains invalid JSON: {str(e)}")
+            logger.error("The error is likely caused by missing/extra commas or brackets.")
+
+            # Print for immediate user feedback
             print(f"\nError: The file contains invalid JSON: {str(e)}")
             print("The error is usually caused by missing/extra commas or brackets.")
-            
+
             retry = input("Would you like to try editing again? (y/n): ")
             if retry.lower() != 'y':
+                logger.warning("Verification cancelled.")
                 print("Verification cancelled.")
                 os.unlink(json_path)
                 raise
             # If retry, the loop continues and opens the editor again
         except Exception as e:
+            # Log error for debugging and monitoring
+            logger.error(f"Unexpected error: {str(e)}")
+
+            # Print for immediate user feedback
             print(f"\nUnexpected error: {str(e)}")
             os.unlink(json_path)
             raise
 
 
 def run_attribute_identification(state: WorkflowState) -> Dict[str, Any]:
-    # print(f"run_attribute_identification state: {state}")
     if 'attribute_identification' in state and state['attribute_identification']:
-        print("Skipping run_attribute_identification: 'attribute_identification' already in state")
+        logger.info("Skipping run_attribute_identification: 'attribute_identification' already in state")
         return {}
     from rmr_agent.agents.attribute_identification import attribute_identification_agent
     full_file_list = state["files"]
     verified_components = state['verified_components']
     cleaned_code = state['cleaned_code']
     attribute_identification = []
-    
+
     with ThreadPoolExecutor() as executor:
         # Map processing across threads using a lambda
         results = executor.map(
             lambda pair: (pair[0], attribute_identification_agent(pair[0], pair[1], cleaned_code[pair[0]])),
             zip(full_file_list, verified_components)
         )
-        
+
         for file, attribution_text in results:
             if is_cancelled(state):
-                print("Workflow cancelled during attribute identification")
+                logger.warning("Workflow cancelled during attribute identification")
                 return {}
             attribute_identification.append(attribution_text)
-            print(f"Identified attributes for components in {file}")
+            logger.info(f"Identified attributes for components in {file}")
 
     return {"attribute_identification": attribute_identification}
 
 def run_attribute_parsing(state: WorkflowState) -> Dict[str, Any]:
     if 'attribute_parsing' in state and state['attribute_parsing']:
-        print("Skipping run_attribute_parsing: 'attribute_parsing' already in state")
+        logger.info("Skipping run_attribute_parsing: 'attribute_parsing' already in state")
         return {}
     from rmr_agent.agents.attribute_parsing import parse_attribute_identification
     verified_components = state['verified_components']
@@ -225,7 +247,7 @@ def run_attribute_parsing(state: WorkflowState) -> Dict[str, Any]:
         else:
             config_file_path = existing_config_path
 
-        print(f"Using config file path: {config_file_path}")
+        logger.info(f"Using config file path: {config_file_path}")
 
     with ThreadPoolExecutor() as executor:
         # Map processing across threads using a lambda, pass the config file path
@@ -236,7 +258,7 @@ def run_attribute_parsing(state: WorkflowState) -> Dict[str, Any]:
 
         for component_dict, parsed_attributes_text, parsed_attributes_dict in results:
             if is_cancelled(state):
-                print("Workflow cancelled during attribute parsing")
+                logger.warning("Workflow cancelled during attribute parsing")
                 return {}
             attribute_parsing.append(parsed_attributes_dict)
 
@@ -244,7 +266,7 @@ def run_attribute_parsing(state: WorkflowState) -> Dict[str, Any]:
 
 def run_node_aggregator(state: WorkflowState) -> Dict[str, Any]:
     if "node_aggregator" in state and state["node_aggregator"]:
-        print("Skipping run_node_aggregator: 'node_aggregator' already in state")
+        logger.info("Skipping run_node_aggregator: 'node_aggregator' already in state")
         return {}
     from rmr_agent.agents.node_aggregator import node_aggregator_agent
     nodes_yaml = node_aggregator_agent(state["attribute_parsing"])
@@ -252,15 +274,15 @@ def run_node_aggregator(state: WorkflowState) -> Dict[str, Any]:
     try:
         with open(nodes_yaml_path, 'w') as yaml_file:
             yaml_file.write(nodes_yaml)
-        print(f"YAML successfully exported to {nodes_yaml_path}")
+        logger.info(f"YAML successfully exported to {nodes_yaml_path}")
     except Exception as e:
-        print(f"Error exporting YAML to {nodes_yaml_path}: {type(e).__name__}: {str(e)}")
+        logger.error(f"Error exporting YAML to {nodes_yaml_path}: {type(e).__name__}: {str(e)}")
 
     return {"node_aggregator": nodes_yaml}
 
 def run_edge_identification(state: WorkflowState) -> Dict[str, Any]:
     if "edges" in state and state["edges"]:
-        print("Skipping run_edge_identification: 'edges' already in state")
+        logger.info("Skipping run_edge_identification: 'edges' already in state")
         return {}
     from rmr_agent.agents.edge_identification import edge_identification_agent
     edges, edge_identification_response = edge_identification_agent(state["node_aggregator"])
@@ -268,34 +290,34 @@ def run_edge_identification(state: WorkflowState) -> Dict[str, Any]:
     try:
         with open(edge_id_justification_path, 'w') as file:
             file.write(edge_identification_response)
-        print(f"Edge identification response successfully exported to {edge_id_justification_path}")
+        logger.info(f"Edge identification response successfully exported to {edge_id_justification_path}")
     except Exception as e:
-        print(f"Error exporting edge identification response to {edge_id_justification_path}: {type(e).__name__}: {str(e)}")
+        logger.error(f"Error exporting edge identification response to {edge_id_justification_path}: {type(e).__name__}: {str(e)}")
     return {"edges": edges}
 
 def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
     if "verified_dag" in state and state["verified_dag"]:
-        print("Using verified_dag from human verification")
+        logger.info("Using verified_dag from human verification")
         dag_yaml_str = state["verified_dag"]
-        
+
         dag_yaml_path = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'], "dag.yaml")
         try:
             with open(dag_yaml_path, 'w') as yaml_file:
                 yaml_file.write(dag_yaml_str)
-            print(f"Verified DAG YAML successfully exported to {dag_yaml_path}")
+            logger.info(f"Verified DAG YAML successfully exported to {dag_yaml_path}")
         except Exception as e:
-            print(f"Error exporting verified YAML to {dag_yaml_path}: {type(e).__name__}: {str(e)}")
-            
+            logger.error(f"Error exporting verified YAML to {dag_yaml_path}: {type(e).__name__}: {str(e)}")
+
         return {"dag_yaml": dag_yaml_str}
-    
+
     if "dag_yaml" in state and state["dag_yaml"]:
-        print("Skipping generate_dag_yaml: 'dag_yaml' already in state")
+        logger.info("Skipping generate_dag_yaml: 'dag_yaml' already in state")
         return {}
-    
+
     # Generate new DAG
     from rmr_agent.agents.dag import generage_dag_yaml
     dag_yaml_str = generage_dag_yaml(aggregated_nodes=state["node_aggregator"], edges=state["edges"])
-    
+
     # Clean the DAG to remove any component_details that might have been added
     dag_data = yaml.safe_load(dag_yaml_str)
     if dag_data and "nodes" in dag_data:
@@ -310,154 +332,277 @@ def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
                     cleaned_node[name] = attrs
                 cleaned_nodes.append(cleaned_node)
         dag_data["nodes"] = cleaned_nodes
-        
+
         # Convert back to YAML
         dag_yaml_str = yaml.dump(dag_data, sort_keys=False, default_flow_style=False)
-    
+
     dag_yaml_path = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'], "dag.yaml")
     try:
         with open(dag_yaml_path, 'w') as yaml_file:
             yaml_file.write(dag_yaml_str)
-        print(f"DAG YAML successfully exported to {dag_yaml_path}")
+        logger.info(f"DAG YAML successfully exported to {dag_yaml_path}")
     except Exception as e:
-        print(f"Error exporting YAML to {dag_yaml_path}: {type(e).__name__}: {str(e)}")
-    
+        logger.error(f"Error exporting YAML to {dag_yaml_path}: {type(e).__name__}: {str(e)}")
+
     return {"dag_yaml": dag_yaml_str}
 
+# def human_verification_of_dag(state: WorkflowState) -> Dict[str, Any]:
+#     """This is a mock function that simulates human verification of the DAG."""
+#     if "verified_dag" in state and state["verified_dag"]:
+#         logger.info("Skipping human_verification: 'verified_dag' already in state")
+#         return {}
+#     response = requests.post("http://localhost:8000/verify_dag", json={"dag_yaml": state["dag_yaml"]})
+#     if response.status_code != 200:
+#         logger.error("Failed to send DAG for verification")
+#         raise Exception("Failed to send DAG for verification")
+
+#     logger.info("DAG sent for human verification, waiting for response")
+#     while True:
+#         verification_response = requests.get("http://localhost:8000/get_verified_dag")
+#         if verification_response.status_code == 200 and verification_response.json().get("dag"):
+#             logger.info("Received verified DAG from human verification")
+#             result = {"verified_dag": verification_response.json()["dag"]}
+
+#             # 检查是否有实际的修改
+#             dag_corrections = verification_response.json().get("dag_corrections", {})
+#             if dag_corrections and any([
+#                 dag_corrections.get("renamed_nodes"),
+#                 dag_corrections.get("added_nodes"),
+#                 dag_corrections.get("deleted_nodes"),
+#                 dag_corrections.get("added_edges"),
+#                 dag_corrections.get("deleted_edges"),
+#                 dag_corrections.get("modified_edges"),
+#                 dag_corrections.get("modified_nodes")
+#             ]):
+#                 # 如果有修改，则添加标记
+#                 result["human_verification_of_dag_corrections"] = True
+#                 # 同时保存修改信息
+#                 result["dag_corrections"] = dag_corrections
+
+#             return result
+#         time.sleep(2)
 def human_verification_of_dag(state: WorkflowState) -> Dict[str, Any]:
     """This is a mock function that simulates human verification of the DAG."""
     if "verified_dag" in state and state["verified_dag"]:
-        print("Skipping human_verification: 'verified_dag' already in state")
+        logger.info("Skipping human_verification: 'verified_dag' already in state")
         return {}
-    response = requests.post("http://localhost:8000/verify_dag", json={"dag_yaml": state["dag_yaml"]})
+    
+    # 保存发送给验证的原始DAG
+    original_dag_for_verification = state["dag_yaml"]
+    
+    # 添加调试：保存发送前的DAG到文件
+    debug_path = f"rmr_agent/checkpoints/{state['repo_name']}/{state['run_id']}/debug_dag_sent.yaml"
+    with open(debug_path, 'w') as f:
+        f.write(original_dag_for_verification)
+    logger.info(f"Saved DAG sent for verification to: {debug_path}")
+    
+    # 计算发送前的DAG哈希值
+    import hashlib
+    original_hash = hashlib.md5(original_dag_for_verification.encode()).hexdigest()
+    logger.info(f"DAG sent for verification hash: {original_hash}")
+    
+    response = requests.post("http://localhost:8000/verify_dag", json={"dag_yaml": original_dag_for_verification})
     if response.status_code != 200:
+        logger.error("Failed to send DAG for verification")
         raise Exception("Failed to send DAG for verification")
+
+    logger.info("DAG sent for human verification, waiting for response")
     while True:
         verification_response = requests.get("http://localhost:8000/get_verified_dag")
         if verification_response.status_code == 200 and verification_response.json().get("dag"):
-            return {"verified_dag": verification_response.json()["dag"]}
+            logger.info("Received verified DAG from human verification")
+            verified_dag = verification_response.json()["dag"]
+            
+            # 保存收到的验证后DAG
+            debug_path_verified = f"rmr_agent/checkpoints/{state['repo_name']}/{state['run_id']}/debug_dag_received.yaml"
+            with open(debug_path_verified, 'w') as f:
+                f.write(verified_dag)
+            logger.info(f"Saved received verified DAG to: {debug_path_verified}")
+            
+            # 计算验证后的DAG哈希值
+            verified_hash = hashlib.md5(verified_dag.encode()).hexdigest()
+            logger.info(f"DAG received after verification hash: {verified_hash}")
+            
+            # 直接比较两个DAG字符串
+            if original_dag_for_verification == verified_dag:
+                logger.info("✅ DAG完全未被修改（字符串完全相同）")
+                return {"verified_dag": verified_dag}
+            else:
+                logger.warning("⚠️ 检测到DAG被修改")
+                
+                # 尝试比较YAML内容（忽略格式差异）
+                import yaml
+                try:
+                    original_parsed = yaml.safe_load(original_dag_for_verification)
+                    verified_parsed = yaml.safe_load(verified_dag)
+                    
+                    if original_parsed == verified_parsed:
+                        logger.info("📝 DAG内容相同，只是格式不同（YAML解析后相同）")
+                        # 内容相同，只是格式不同，不应该记录为修改
+                        return {"verified_dag": verified_dag}
+                    else:
+                        logger.warning("❌ DAG内容确实被修改了")
+                        
+                        # 只有在内容真正被修改时才计算corrections
+                        from rmr_agent.utils.correction_logging import log_dag_corrections
+                        dag_corrections = log_dag_corrections(original_dag_for_verification, verified_dag)
+                        
+                        # 打印修改的摘要
+                        logger.info(f"修改摘要: {dag_corrections.get('summary', {})}")
+                        
+                        result = {"verified_dag": verified_dag}
+                        # 只有在有实际修改时才添加corrections
+                        if dag_corrections and dag_corrections.get('summary', {}).get('correction_ratio', 0) > 0:
+                            result["dag_corrections"] = dag_corrections
+                            result["human_verification_of_dag_corrections"] = True
+                        
+                        return result
+                except Exception as e:
+                    logger.error(f"YAML解析失败: {e}")
+                    # 如果解析失败，保守地认为有修改
+                    from rmr_agent.utils.correction_logging import log_dag_corrections
+                    dag_corrections = log_dag_corrections(original_dag_for_verification, verified_dag)
+                    return {
+                        "verified_dag": verified_dag,
+                        "dag_corrections": dag_corrections,
+                        "human_verification_of_dag_corrections": True
+                    }
         time.sleep(2)
-
+        
 def run_config_agent(state: WorkflowState) -> Dict[str, Any]:
-    print(state.keys())
+    logger.debug(f"Current state keys: {state.keys()}")
     if "config" in state and state["config"]:
-        print("Skipping run_config_agent: 'config' already in state")
+        logger.info("Skipping run_config_agent: 'config' already in state")
         return {}
     from rmr_agent.agents.ini_config import config_agent
-    
+
     # Use verified_dag if available, otherwise use dag_yaml
     dag_to_use = state.get("verified_dag") or state.get("dag_yaml")
     if not dag_to_use:
+        logger.error("No DAG available for config generation")
         raise ValueError("No DAG available for config generation")
-        
-    config = config_agent(dag_to_use) 
+
+    config = config_agent(dag_to_use)
 
     config_dir = os.path.join(state["local_repo_path"], "config")
     os.makedirs(config_dir, exist_ok=True)
 
     save_ini_file("environment.ini", config["environment_ini"], config_dir)
     save_ini_file("solution.ini", config["solution_ini"], config_dir)
+    logger.info(f"Config files saved to {config_dir}")
 
     return {"config": config}
 
 def run_notebook_agent(state: WorkflowState) -> Dict[str, Any]:
-    print("DEBUG - json type:", (state["cleaned_code"]))
+    logger.debug(f"DEBUG - cleaned_code type: {type(state['cleaned_code'])}")
     if "notebooks" in state and state["notebooks"]:
-        print("Skipping run_notebook_agent: 'notebooks' already in state")
+        logger.info("Skipping run_notebook_agent: 'notebooks' already in state")
         return {}
 
     from rmr_agent.agents.notebook import notebook_agent
-    
+
     # Use verified_dag if available, otherwise use dag_yaml
     dag_to_use = state.get("verified_dag") or state.get("dag_yaml")
     if not dag_to_use:
+        logger.error("No DAG available for notebook generation")
         raise ValueError("No DAG available for notebook generation")
-        
+
     notebooks = notebook_agent(yaml.safe_load(dag_to_use), state["cleaned_code"], state["local_repo_path"])
+    logger.info(f"Generated {len(notebooks)} notebooks")
     return {"notebooks": notebooks}
 
 def run_code_editor_agent(state: WorkflowState) -> Dict[str, Any]:
     if "edited_notebooks" in state and state["edited_notebooks"]:
-        print("Skipping run_notebook_agent: 'notebooks' already in state")
+        logger.info("Skipping run_code_editor_agent: 'edited_notebooks' already in state")
         return {}
-    
+
     from rmr_agent.agents.code_editor import code_editor_agent
     edited_notebooks = {}
 
-    attribute_parsing_list = state["attribute_parsing"] 
-    attribute_config = {"attribute_parsing": attribute_parsing_list} 
+    attribute_parsing_list = state["attribute_parsing"]
+    attribute_config = {"attribute_parsing": attribute_parsing_list}
 
+    logger.info("Starting code editing for notebooks")
     with ThreadPoolExecutor() as executor:
         results = executor.map(
             lambda item: (item[0], code_editor_agent(item[1], attribute_config)),
             state["notebooks"].items()
         )
-        edited_notebooks = dict(results) 
+        edited_notebooks = dict(results)
+
+    logger.info(f"Edited {len(edited_notebooks)} notebooks")
     return {"edited_notebooks": edited_notebooks}
 
 
 def create_pr_body(state: WorkflowState) -> Dict[str, Any]:
     if "pr_body" in state and state["pr_body"]:
-        print("Skipping create_pr_body: 'pr_body' already in state")
+        logger.info("Skipping create_pr_body: 'pr_body' already in state")
         return {}
-    
+
     from rmr_agent.utils import generate_pr_body
 
     checkpoint_dir = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'])
     if not os.path.exists(checkpoint_dir):
+        logger.error(f"Checkpoint directory {checkpoint_dir} does not exist. Please run the workflow first.")
         raise FileNotFoundError(f"Checkpoint directory {checkpoint_dir} does not exist. Please run the workflow first.")
-    
+
     # Generate the PR body (markdown file) to include in the push & PR
     pr_body = generate_pr_body(checkpoints_dir_path=checkpoint_dir)
-    print("Generated PR body:\n", pr_body)
+    logger.info("Generated PR body")
+    logger.debug(f"PR body content:\n{pr_body}")
+
     # Save the PR body to a markdown file
     pr_body_save_path = os.path.join('rmr_agent', 'repos', state['repo_name'], "rmr_agent_results.md")
     try:
         with open(pr_body_save_path, 'w') as f:
             f.write(pr_body)
-        print(f"PR body saved to {pr_body_save_path}")
+        logger.info(f"PR body saved to {pr_body_save_path}")
     except Exception as e:
-        print(f"Error saving PR body to {pr_body_save_path}: {type(e).__name__}: {str(e)}")
+        logger.error(f"Error saving PR body to {pr_body_save_path}: {type(e).__name__}: {str(e)}")
 
     return {"pr_body": pr_body}
 
 def push_code_changes(state: WorkflowState) -> Dict[str, Any]:
     if "successfully_pushed_code" in state and state["successfully_pushed_code"]:
-        print("Skipping push_code_changes: 'successfully_pushed_code' already True in state")
+        logger.info("Skipping push_code_changes: 'successfully_pushed_code' already True in state")
         return {}
     from rmr_agent.utils import push_refactored_code
 
     checkpoint_dir = os.path.join(CHECKPOINT_BASE_PATH, state['repo_name'], state['run_id'])
     if not os.path.exists(checkpoint_dir):
+        logger.error(f"Checkpoint directory {checkpoint_dir} does not exist. Please run the workflow first.")
         raise FileNotFoundError(f"Checkpoint directory {checkpoint_dir} does not exist. Please run the workflow first.")
 
-    # Push the refactored code and pr_body markdown file to the repository 
-    successfully_pushed_code = push_refactored_code(github_url=state['github_url'], run_id=state['run_id']) 
+    # Push the refactored code and pr_body markdown file to the repository
+    logger.info("Pushing refactored code to repository")
+    successfully_pushed_code = push_refactored_code(github_url=state['github_url'], run_id=state['run_id'])
+    logger.info(f"Code push successful: {successfully_pushed_code}")
     return {"successfully_pushed_code": successfully_pushed_code}
 
 def run_pr_creation(state: WorkflowState) -> Dict[str, Any]:
-    # 添加环境变量检查，控制是否创建真实PR
+    # Check environment variable to control whether to create a real PR
     env_mode = os.environ.get("ENVIRONMENT", "").lower()
     if env_mode == "dev":
-        print("Running in DEV mode. Skipping actual PR creation.")
-        print(f"PR would have been created with title: 'RMR Agent Refactor - Run {state['run_id']}'")
-        print(f"PR body preview: {state['pr_body'][:200]}..." if state.get('pr_body') else "No PR body provided")
+        logger.info("Running in DEV mode. Skipping actual PR creation.")
+        logger.info(f"PR would have been created with title: 'RMR Agent Refactor - Run {state['run_id']}'")
 
-        # 返回模拟的PR URL，避免后续步骤出错
+        # Return mock PR URL to avoid errors in subsequent steps
         mock_pr_url = f"https://github.com/example/repo/pull/DEV-MODE-{state['run_id']}"
-        print(f"Mock PR URL: {mock_pr_url}")
+        logger.info(f"Mock PR URL: {mock_pr_url}")
         return {"pr_url": mock_pr_url}
 
     if "pr_url" in state and state["pr_url"]:
-        print("Skipping PR creation: 'pr_url' already in state")
+        logger.info("Skipping PR creation: 'pr_url' already in state")
         return {}
     if "successfully_pushed_code" in state and not state["successfully_pushed_code"]:
-        print("Skipping PR creation: Code changes must be successfully pushed before creating a PR.")
+        logger.warning("Skipping PR creation: Code changes must be successfully pushed before creating a PR.")
         return {}
 
     from rmr_agent.utils import create_rmr_agent_pull_request
 
+    logger.info("Creating pull request")
     pr_url = create_rmr_agent_pull_request(github_url=state["github_url"], pr_body_text=state["pr_body"], run_id=state["run_id"])
+    logger.info(f"Pull request created: {pr_url}")
     return {"pr_url": pr_url}
 
 
@@ -552,7 +697,11 @@ def run_workflow(github_url: str, input_files: List[str], run_id: str | None = N
     start_idx = 0 if not start_from else next(i for i, (s, _) in enumerate(STEPS) if s == start_from)
     step_name = STEPS[start_idx][0]
     status = "initializing"
-    
+
+    logger.info(f"Starting workflow for {github_url}, run_id: {run_id}")
+    if start_from:
+        logger.info(f"Starting from step: {start_from}")
+
     state = INITIAL_STATE.copy()
     state["step"] = step_name
     state["status"] = status
@@ -560,33 +709,60 @@ def run_workflow(github_url: str, input_files: List[str], run_id: str | None = N
     state["input_files"] = input_files
     state["repo_name"] = repo_name
     state["run_id"] = run_id
+    if existing_config_path:
+        state["existing_config_path"] = existing_config_path
+        logger.info(f"Using existing config path: {existing_config_path}")
 
     # Load state up to the start_from step
     start_idx = 0 if not start_from else next(i for i, (step, _) in enumerate(STEPS) if step == start_from)
     for step_name, _ in STEPS[:start_idx]:
+        logger.info(f"Loading previous step output: {step_name}")
         step_output = load_step_output(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name, run_id=run_id, step=step_name)
         state.update(step_output)
 
     # Run from start_from onward
     for step_name, step_func in STEPS[start_idx:]:
-        update = step_func(state)
-        state.update(update)
-        save_step_output(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name, run_id=run_id, step=step_name, output=update)
+        if step_name in HUMAN_STEPS:
+            logger.info(f"Starting human verification step: {step_name}")
+        else:
+            logger.info(f"Starting step: {step_name}")
 
+        update = step_func(state)
+
+        # 如果没有实质性更新内容，则不保存（例如，空字典返回）
+        if update:
+            state.update(update)
+            # 对于人工验证步骤，只有在有明确修改时才保存
+            if step_name in HUMAN_STEPS and not update.get(f"{step_name}_corrections"):
+                logger.debug(f"Skipping save for {step_name} as no corrections were made")
+            else:
+                save_step_output(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name, run_id=run_id, step=step_name, output=update)
+        logger.info(f"Completed step: {step_name}")
+
+    logger.info("Workflow completed successfully")
     return state
 
 
 
 if __name__ == "__main__":
+    # Configure logging for CLI usage
+    logger = setup_logger(__name__, level=logging.INFO)
+
     parser = argparse.ArgumentParser(description="Run the workflow with a GitHub URL and input files.")
     parser.add_argument("--github-url", type=str, required=True, help="GitHub repository URL")
     parser.add_argument("--input-files", type=str, nargs="+", required=True, help="List of input file paths (e.g., 'notebooks/notebook1.ipynb') from the root directory of repo")
     parser.add_argument("--run-id", type=str, default=None, help="Set if want to use 'start-from' tag, we will load checkpoints from this run_id (e.g. 1, 2, 3, etc.)")
     parser.add_argument("--start-from", type=str, default=None, help="Step to start from (e.g., 'summarize', 'component_identification')")
     parser.add_argument("--existing-config-path", type=str, default=None, help="If you already have a config in research code, specify its path from root directory of repo")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     args = parser.parse_args()
 
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Debug logging enabled")
+
+    logger.info("Starting RMR Agent workflow")
     result = run_workflow(
         github_url=args.github_url,
         input_files=args.input_files,
@@ -594,8 +770,10 @@ if __name__ == "__main__":
         start_from=args.start_from,
         existing_config_path=args.existing_config_path
     )
-    print("Final Config:", result["config"])
-    print("Final Notebooks:", result["notebooks"])
+
+    logger.info("Workflow completed successfully")
+    logger.info(f"Config files created: {list(result.get('config', {}).keys())}")
+    logger.info(f"Number of generated notebooks: {len(result.get('notebooks', []))}")
 
 
 

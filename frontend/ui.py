@@ -5,7 +5,7 @@ import requests
 import json
 import time
 from datetime import datetime
-from rmr_agent.utils import parse_github_url 
+from rmr_agent.utils import parse_github_url
 from rmr_agent.workflow import STEPS, HUMAN_STEPS
 from frontend.ui_utils import (
     clean_file_path, remove_line_numbers, clean_line_range,
@@ -13,6 +13,10 @@ from frontend.ui_utils import (
     get_default_line_range, get_steps_could_start_from,
     dag_edge_editor
 )
+from rmr_agent.utils.logging_config import setup_logger
+
+# Set up module logger
+logger = setup_logger(__name__)
 
 BASE_URL = os.environ.get("RMR_AGENT_API_BASE_URL", "http://localhost:8000")  # Default to local server if not set
 
@@ -58,7 +62,7 @@ def display_welcome_page():
         return
     # st.title("RMR Agent")
     col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
-    with col3:  # 使用正中间的列
+    with col3:  # Use the middle column
         st.image("assets/rmr_agent_image.png", use_container_width=True)
 
     st.subheader("Welcome to RMR Agent!")
@@ -90,7 +94,7 @@ def display_welcome_page():
         key="start_from_select",
     )
     st.session_state["start_from"] = start_from.split('.')[-1].strip().lower().replace(" ", "_")
-    print(st.session_state["start_from"])
+    logger.debug(f"Selected start_from: {st.session_state['start_from']}")
     # allow specifying existing config file if their code leverages one
     # TO DO: let user set config file path in their repo if they are using a configuration file already during research
 
@@ -102,20 +106,20 @@ def start_workflow():
     # Clear any cached DAG YAML from previous sessions
     if "cached_dag_yaml" in st.session_state:
         del st.session_state.cached_dag_yaml
-        print("Cleared cached DAG YAML from previous session")
+        logger.debug("Cleared cached DAG YAML from previous session")
 
     # Clear node and edge state from previous sessions
     if "nodes_state" in st.session_state:
         del st.session_state.nodes_state
-        print("Cleared nodes_state from previous session")
+        logger.debug("Cleared nodes_state from previous session")
 
     if "edges_state" in st.session_state:
         del st.session_state.edges_state
-        print("Cleared edges_state from previous session")
+        logger.debug("Cleared edges_state from previous session")
 
     if not st.session_state["repo_name"]:
         _, st.session_state["repo_name"] = parse_github_url(st.session_state["github_url"])
-    print('Repo name:', st.session_state["repo_name"])
+    logger.info(f"Repo name: {st.session_state['repo_name']}")
     payload = {
         "github_url": st.session_state["github_url"],
         "input_files": st.session_state["input_files"]
@@ -169,32 +173,32 @@ def check_workflow_status():
         response = requests.get(
             f"{BASE_URL}/workflow-status/{st.session_state["repo_name"]}?run_id={st.session_state.run_id}"
         )
-        
-        print(response.status_code)
+
+        logger.debug(f"Status code: {response.status_code}")
 
         if response.status_code == 200:
             data = response.json()
             status = data.get("status")
             current_step = data.get("step")
-            print(f"{datetime.now().strftime("%H:%M:%S")} Poll API returned - Status: {status}, Step: {current_step}")
+            logger.info(f"{datetime.now().strftime('%H:%M:%S')} Poll API returned - Status: {status}, Step: {current_step}")
 
             step_changed = False
             prev_step = st.session_state.get("current_step", "")
             if prev_step != current_step:
                 step_changed = True
-                print(f"Step changed from '{prev_step}' to '{current_step}'")
+                logger.info(f"Step changed from '{prev_step}' to '{current_step}'")
             
             # Update the session state with latest info
             st.session_state["result"] = data
             st.session_state["last_status"] = status
             st.session_state["current_step"] = current_step
-            
+
             if st.session_state["current_step"] in HUMAN_STEPS:
                 # Found a human verification step - stop auto-polling
-                print(f"Human verification step detected: {current_step}")
+                logger.info(f"Human verification step detected: {current_step}")
                 st.session_state.workflow_running = False
             elif st.session_state["current_step"] == "complete":
-                print("✅ backend returned complete status")
+                logger.info("✅ Backend returned complete status")
                 st.session_state.workflow_running = False
                 st.session_state["workflow_complete"] = True
                 st.rerun()
@@ -210,21 +214,12 @@ def check_workflow_status():
 
 def submit_human_feedback(payload, repo_name, run_id):
     url = f"{BASE_URL}/run-workflow/?repo_name={repo_name}&run_id={run_id}"
-    print(f"Submitting human feedback to: {url}, Payload: {payload}")
-
-    # Save a backup copy of the payload before submitting
-    if "verified_dag" in payload:
-        try:
-            os.makedirs("temp", exist_ok=True)
-            backup_path = os.path.join("temp", f"feedback_payload_{repo_name}_{run_id}.json")
-            with open(backup_path, "w") as f:
-                json.dump(payload, f, indent=2)
-            print(f"Saved backup of feedback payload to {backup_path}")
-        except Exception as e:
-            print(f"Warning: Could not save backup of feedback payload: {e}")
+    logger.info(f"Submitting human feedback to: {url}")
+    logger.debug(f"Feedback payload: {payload}")
 
     response = requests.post(url, json=payload)
-    print(f"Submit Status: {response.status_code}, Response: '{response.text}'")
+    logger.info(f"Submit Status: {response.status_code}")
+    logger.debug(f"Response: '{response.text}'")
     if response.status_code == 200:
         data = response.json()
         st.session_state["result"] = data
@@ -235,13 +230,13 @@ def submit_human_feedback(payload, repo_name, run_id):
         # Clear any cached DAG state to ensure fresh reload
         if "cached_dag_yaml" in st.session_state:
             del st.session_state.cached_dag_yaml
-            print("Cleared cached_dag_yaml after successful submission")
+            logger.debug("Cleared cached_dag_yaml after successful submission")
         if "nodes_state" in st.session_state:
             del st.session_state.nodes_state
-            print("Cleared nodes_state after successful submission")
+            logger.debug("Cleared nodes_state after successful submission")
         if "edges_state" in st.session_state:
             del st.session_state.edges_state
-            print("Cleared edges_state after successful submission")
+            logger.debug("Cleared edges_state after successful submission")
 
         st.success("Feedback submitted successfully!")
         time.sleep(1)  # Brief pause to show the success message
@@ -308,15 +303,15 @@ def cancel_workflow_button():
                 # Clear any cached DAG YAML and state
                 if "cached_dag_yaml" in st.session_state:
                     del st.session_state.cached_dag_yaml
-                    print("Cleared cached DAG YAML after canceling workflow")
+                    logger.debug("Cleared cached DAG YAML after canceling workflow")
 
                 if "nodes_state" in st.session_state:
                     del st.session_state.nodes_state
-                    print("Cleared nodes_state after canceling workflow")
+                    logger.debug("Cleared nodes_state after canceling workflow")
 
                 if "edges_state" in st.session_state:
                     del st.session_state.edges_state
-                    print("Cleared edges_state after canceling workflow")
+                    logger.debug("Cleared edges_state after canceling workflow")
 
                 st.success("Workflow cancelled successfully")
                 time.sleep(1)  # Give user time to see the success message
@@ -336,15 +331,15 @@ def back_to_home_button(key="back_to_home"):
         # Clear any cached DAG YAML and state
         if "cached_dag_yaml" in st.session_state:
             del st.session_state.cached_dag_yaml
-            print("Cleared cached DAG YAML when returning to home")
+            logger.debug("Cleared cached DAG YAML when returning to home")
 
         if "nodes_state" in st.session_state:
             del st.session_state.nodes_state
-            print("Cleared nodes_state when returning to home")
+            logger.debug("Cleared nodes_state when returning to home")
 
         if "edges_state" in st.session_state:
             del st.session_state.edges_state
-            print("Cleared edges_state when returning to home")
+            logger.debug("Cleared edges_state when returning to home")
 
         st.success("Returning to home screen...")
         # time.sleep(1)  # Brief delay for user feedback
@@ -380,7 +375,7 @@ def human_verification_of_components_ui(repo_name, run_id):
     if current_index >= total_files:
         st.success("All files verified! Submitting...")
     else:
-        # Current file’s components dictionary
+        # Current file's components dictionary
         if (
             "edited_components_list" in st.session_state and
             current_index < len(st.session_state["edited_components_list"]) and
@@ -553,46 +548,36 @@ def human_verification_of_components_ui(repo_name, run_id):
                 st.error("Could not display code for this file")
 
 def human_verification_of_dag_ui(repo_name, run_id):
-    print("\n=== 🚧 ENTER DAG UI ===")
-    print("📍 current_step =", st.session_state.get("result", {}).get("step"))
+    logger.info("=== 🚧 ENTER DAG UI ===")
+    logger.info(f"📍 current_step = {st.session_state.get('result', {}).get('step')}")
 
     if st.session_state.get("result", {}).get("step") != "human_verification_of_dag":
-        print("🔁 Step changed – not rendering DAG editor UI")
+        logger.info("🔁 Step changed – not rendering DAG editor UI")
         return
 
     # Check if we have a cached DAG YAML in the session state from a previous rename operation
     if "cached_dag_yaml" in st.session_state:
-        print("Using cached DAG YAML from session state")
+        logger.info("Using cached DAG YAML from session state")
         dag_yaml = st.session_state.cached_dag_yaml
     else:
-        print("Loading DAG YAML from file")
+        logger.info("Loading DAG YAML from file")
         dag_yaml = get_dag_yaml(repo_name, run_id)
 
     updated_dag_yaml = dag_edge_editor(dag_yaml, repo_name, run_id)
 
     if updated_dag_yaml:
-        # Create a backup of the updated YAML
-        try:
-            os.makedirs("temp", exist_ok=True)
-            temp_file_path = os.path.join("temp", f"submitted_dag_{repo_name}_{run_id}.yaml")
-            with open(temp_file_path, "w") as f:
-                f.write(updated_dag_yaml)
-            print(f"Created backup of submitted DAG YAML: {temp_file_path}")
-        except Exception as e:
-            print(f"Warning: Could not create backup file: {e}")
-
         # Clear cached DAG YAML to ensure we load from file next time
         # This forces the system to use the updated file from the backend
         if "cached_dag_yaml" in st.session_state:
             del st.session_state.cached_dag_yaml
-            print("Cleared cached_dag_yaml from session state")
+            logger.debug("Cleared cached_dag_yaml from session state")
 
         payload = {
             "verified_dag": updated_dag_yaml,
             "github_url": st.session_state["github_url"],
             "input_files": st.session_state["input_files"]
         }
-        print("📤 Submitting human feedback from DAG UI...")
+        logger.info("📤 Submitting human feedback from DAG UI...")
         submit_human_feedback(payload=payload, repo_name=repo_name, run_id=run_id)
 
 
@@ -646,7 +631,7 @@ def main():
                 display_progress_bar(st.session_state["current_step"], write_cur_step=False)
                 display_detailed_progress(st.session_state["current_step"])
                 current_time = datetime.now().strftime("%H:%M:%S")
-                print(f"Displayed - Last updated: {current_time}, Running step: {st.session_state["current_step"]}")
+                logger.debug(f"Displayed - Last updated: {current_time}, Running step: {st.session_state['current_step']}")
         
         st.rerun()
 
@@ -668,7 +653,7 @@ def main():
         repo_name = result.get("repo_name")
         run_id = result.get("run_id")
         current_step = result["step"]
-        print('handling a human step: ', current_step)
+        logger.info(f"Handling a human step: {current_step}")
 
         # Calculate and display progress bar
         display_progress_bar(current_step, write_cur_step=False)

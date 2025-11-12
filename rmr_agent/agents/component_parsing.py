@@ -1,7 +1,12 @@
 import json
 import litellm
+import logging
 from rmr_agent.llms import LLMClient
 from rmr_agent.utils import convert_to_dict, preprocess_python_file
+from rmr_agent.utils.logging_config import setup_logger
+
+# 设置模块日志记录器
+logger = setup_logger(__name__)
 
 def retry_component_identification(python_file_path, full_file_list, code_summary, model="gpt-4o", temperature=0, max_tokens=2048, 
                  frequency_penalty=0, presence_penalty=0):
@@ -13,7 +18,7 @@ def get_relevant_component_definitions(component_identification_response):
         component_identification_dict = convert_to_dict(component_identification_response)
 
         if not component_identification_dict:
-            print("No JSON object found in the LLM component identification response")
+            logger.warning("No JSON object found in the LLM component identification response")
             return ""
         
         # Load all component definitions
@@ -25,11 +30,11 @@ def get_relevant_component_definitions(component_identification_response):
             if component_name in component_definitions:
                 relevant_component_definitions += f"    - {component_name}: {component_definitions[component_name]}\n"
             else:
-                print("Component definition not found for component:", component_name)
+                logger.warning("Component definition not found for component: %s", component_name)
         
         return relevant_component_definitions
     except Exception as e:
-        print(f"Error in get_relevant_component_definitions: {e}")
+        logger.error("Error in get_relevant_component_definitions: %s", e)
         return ""
 
 def parse_component_identification(component_identification_response, file):
@@ -116,14 +121,14 @@ def parse_component_identification(component_identification_response, file):
     # Create dictionary with parsed data
     parsed_dict = convert_to_dict(parsed_text)
     if not parsed_dict:
-        print("No components identified in the response for file: " + file)
+        logger.warning("No components identified in the response for file: %s", file)
     
     # Add the file name to each identified component and filter out invalid components
     components_to_delete = []
     for component, metadata in parsed_dict.items():
         # Check if component is in the allowed set of components
         if component not in allowed_components:
-            print(f'Found identified component outside of allowed set of components for {file}: "{component}"')
+            logger.warning('Found identified component outside of allowed set of components for %s: "%s"', file, component)
             # Delete this extra component category (do later so we do not edit dictionary we are iterating over)
             components_to_delete.append(component)
             continue

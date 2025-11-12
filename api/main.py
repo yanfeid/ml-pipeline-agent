@@ -7,6 +7,10 @@ from rmr_agent.utils import (
     get_next_run_id, load_step_output, save_step_output,
     log_component_corrections, log_dag_corrections
     )
+from rmr_agent.utils.logging_config import setup_logger
+
+# Set up module logger
+logger = setup_logger(__name__)
 
 app = FastAPI()
 
@@ -53,7 +57,7 @@ def save_human_feedback(request: ComponentsResponse | DagResponse, repo_name: st
 
             # Log the differences between original and verified components
             component_corrections = log_component_corrections(original_components, request.verified_components)
-            print(f"Logged component corrections: {len(component_corrections.get('modified', []))} modified, "
+            logger.info(f"Logged component corrections: {len(component_corrections.get('modified', []))} modified, "
                   f"{component_corrections.get('summary', {}).get('added_count', 0)} added, "
                   f"{component_corrections.get('summary', {}).get('deleted_count', 0)} deleted")
 
@@ -63,7 +67,7 @@ def save_human_feedback(request: ComponentsResponse | DagResponse, repo_name: st
                 "component_corrections": component_corrections
             }
         except Exception as e:
-            print(f"Error logging component corrections: {e}")
+            logger.error(f"Error logging component corrections: {e}")
             update = {update_name: request.verified_components}
 
     elif isinstance(request, DagResponse):
@@ -82,7 +86,7 @@ def save_human_feedback(request: ComponentsResponse | DagResponse, repo_name: st
 
             # Log the differences between original and verified DAG
             dag_corrections = log_dag_corrections(original_dag, request.verified_dag)
-            print(f"Logged DAG corrections: {len(dag_corrections.get('modified_edges', []))} modified edges, "
+            logger.info(f"Logged DAG corrections: {len(dag_corrections.get('modified_edges', []))} modified edges, "
                   f"{dag_corrections.get('summary', {}).get('added_edge_count', 0)} added, "
                   f"{dag_corrections.get('summary', {}).get('deleted_edge_count', 0)} deleted")
 
@@ -97,9 +101,9 @@ def save_human_feedback(request: ComponentsResponse | DagResponse, repo_name: st
             try:
                 with open(dag_yaml_path, 'w') as yaml_file:
                     yaml_file.write(request.verified_dag)
-                print(f"Updated dag.yaml file with verified DAG at {dag_yaml_path}")
+                logger.info(f"Updated dag.yaml file with verified DAG at {dag_yaml_path}")
             except Exception as e:
-                print(f"Error updating dag.yaml file: {e}")
+                logger.error(f"Error updating dag.yaml file: {e}")
 
                         # NEW: Update verified_components if there are renamed nodes
             if dag_corrections.get("renamed_nodes"):
@@ -125,13 +129,13 @@ def save_human_feedback(request: ComponentsResponse | DagResponse, repo_name: st
                         components_data['verified_components'] = updated_components
                         with open(components_path, 'w') as file:
                             json.dump(components_data, file, indent=2)
-                        print(f"Updated verified_components with renamed nodes")
+                        logger.info(f"Updated verified_components with renamed nodes")
                         
                 except Exception as e:
-                    print(f"Error updating verified_components: {e}")
+                    logger.error(f"Error updating verified_components: {e}")
                     
         except Exception as e:
-            print(f"Error logging DAG corrections: {e}")
+            logger.error(f"Error logging DAG corrections: {e}")
             update = {update_name: request.verified_dag}
     else:
         raise HTTPException(400, "Invalid request type for saving human feedback")
@@ -157,17 +161,17 @@ def run_workflow_background(request: WorkflowRequest, repo_name: str, run_id: st
         # Load from checkpoints folder all previous steps output
         for step_name, _ in STEPS[:start_idx]:
             if state.get("status") == "cancelled":
-                print("Cancelling workflow while loading checkpoints")
+                logger.warning("Cancelling workflow while loading checkpoints")
                 return
             state.update(load_step_output(checkpoint_base_path=CHECKPOINT_BASE_PATH, repo_name=repo_name, run_id=run_id, step=step_name))
         
         # Continue running the workflow starting from the provided start index
         for step_name, step_func in STEPS[start_idx:]:
             if state.get("status") == "cancelled":
-                print("Cancelling workflow at step", step_name)
+                logger.warning(f"Cancelling workflow at step {step_name}")
                 return
             state["step"] = step_name
-            print("Running step", step_name)
+            logger.info(f"Running step {step_name}")
             if step_name in HUMAN_STEPS:
                 break
             step_output = step_func(state)
@@ -204,7 +208,7 @@ def get_workflow_status(
         raise HTTPException(status_code=404, detail=f"Run ID {run_id} not found in repository {repo_name}")
 
     # Return the current state for this specific run
-    print("returning status update with current step being: ", workflow_states[repo_name][run_id]["step"])
+    logger.info(f"Returning status update with current step: {workflow_states[repo_name][run_id]['step']}")
     return workflow_states[repo_name][run_id]
 
 
@@ -258,11 +262,12 @@ async def run_workflow_endpoint(
     background_tasks: BackgroundTasks = None
 ):
     payload = await raw_request.json()
-    print("📥 Received payload:", payload)
+    logger.info("📥 Received payload")
+    logger.debug(f"Payload content: {payload}")
 
     # === DAG Feedback ===
     if "verified_dag" in payload:
-        print("🧩 Detected: DagResponse")
+        logger.info("🧩 Detected: DagResponse")
         parsed = DagResponse(**payload)
         workflow_states[repo_name][run_id]["step"] = "human_verification_of_dag"
         workflow_states[repo_name][run_id]["status"] = "saving_feedback"
@@ -270,7 +275,7 @@ async def run_workflow_endpoint(
 
     # === Component Feedback ===
     elif "verified_components" in payload:
-        print("🧩 Detected: ComponentsResponse")
+        logger.info("🧩 Detected: ComponentsResponse")
         parsed = ComponentsResponse(**payload)
         workflow_states[repo_name][run_id]["step"] = "human_verification_of_components"
         workflow_states[repo_name][run_id]["status"] = "saving_feedback"
@@ -278,7 +283,7 @@ async def run_workflow_endpoint(
 
     # === Workflow Init / Start ===
     elif "github_url" in payload and "input_files" in payload:
-        print("🚀 Detected: WorkflowRequest")
+        logger.info("🚀 Detected: WorkflowRequest")
         parsed = WorkflowRequest(**payload)
 
         # Start or continue workflow
@@ -300,7 +305,7 @@ async def run_workflow_endpoint(
         state["run_id"] = run_id
         if parsed.existing_config_path:
             state["existing_config_path"] = parsed.existing_config_path
-            print(f"Setting config file path: {parsed.existing_config_path}")
+            logger.info(f"Setting config file path: {parsed.existing_config_path}")
 
         # Add background task to run
         background_tasks.add_task(run_workflow_background, parsed, repo_name, run_id, start_idx)
@@ -312,4 +317,11 @@ async def run_workflow_endpoint(
 # Uvicorn entry point
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="debug")
+    import logging
+
+    # Configure the root logger for the FastAPI application
+    logging.basicConfig(level=logging.INFO)
+    logger.info("Starting RMR Agent API server")
+
+    # Run the server
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

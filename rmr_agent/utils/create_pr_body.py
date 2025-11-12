@@ -1,10 +1,15 @@
 import json
 import yaml
 import os
+import logging
 from pathlib import Path
 import re
 # Import locally to avoid circular imports
 from .correction_logging import format_component_corrections_for_pr, format_dag_corrections_for_pr
+from .logging_config import setup_logger
+
+# 设置模块日志记录器
+logger = setup_logger(__name__)
 
 # Helper function to load JSON files
 def load_json_file(filepath):
@@ -13,10 +18,10 @@ def load_json_file(filepath):
         with open(filepath, 'r') as f:
             return json.load(f)
     except FileNotFoundError:
-        print(f"Warning: File not found - {filepath}")
+        logger.warning("File not found - %s", filepath)
         return None
     except json.JSONDecodeError:
-        print(f"Warning: Could not decode JSON from - {filepath}")
+        logger.warning("Could not decode JSON from - %s", filepath)
         return None
 
 # Helper function to load YAML files or YAML strings
@@ -27,19 +32,19 @@ def load_yaml_data(data_source):
             with open(data_source, 'r') as f:
                 return yaml.safe_load(f)
         except FileNotFoundError:
-            print(f"Warning: File not found - {data_source}")
+            logger.warning("File not found - %s", data_source)
             return None
         except yaml.YAMLError:
-            print(f"Warning: Could not parse YAML from file - {data_source}")
+            logger.warning("Could not parse YAML from file - %s", data_source)
             return None
     elif isinstance(data_source, str): # If it's a YAML string
         try:
             return yaml.safe_load(data_source)
         except yaml.YAMLError:
-            print(f"Warning: Could not parse YAML from string: '{data_source[:100]}...'") # Log part of string
+            logger.warning("Could not parse YAML from string: '%s...'", data_source[:100]) # Log part of string
             return None
     else:
-        print(f"Warning: Invalid YAML data source type: {type(data_source)}")
+        logger.warning("Invalid YAML data source type: %s", type(data_source))
         return None
 
 def sanitize_mermaid_id(name):
@@ -86,7 +91,7 @@ def format_pipeline_summary_from_dag(dag_data):
                 continue
             
             node_name = list(node_item.keys())[0]
-            #print(f"Processing node: {node_name}")
+            #logger.debug("Processing node: %s", node_name)
             node_details = node_item[node_name]
 
             if not isinstance(node_details, dict):
@@ -107,7 +112,7 @@ def format_pipeline_summary_from_dag(dag_data):
             md_parts.append(f"- **{node_name}**")
             md_parts.append(f"  - *Original Source:* `{file_name}`")
             sanitized_node_id = sanitize_mermaid_id(node_name)
-            #print(f"Sanitized node ID: {sanitized_node_id}")
+            #logger.debug("Sanitized node ID: %s", sanitized_node_id)
             processed_nodes_for_mermaid.append({"name": node_name, "id": sanitized_node_id})
 
 
@@ -253,13 +258,13 @@ def generate_pr_body(checkpoints_dir_path: str, include_appendix: bool = False):
         if dag_yaml_string and isinstance(dag_yaml_string, str):
             dag_data = load_yaml_data(dag_yaml_string) # Parse the YAML string
             if not dag_data:
-                print(f"Warning: Successfully extracted YAML string from 'verified_dag' in {final_dag_json_path}, but failed to parse it as YAML.")
+                logger.warning("Successfully extracted YAML string from 'verified_dag' in %s, but failed to parse it as YAML.", final_dag_json_path)
         elif not dag_yaml_string:
-            print(f"Warning: 'verified_dag' key not found in {final_dag_json_path} or its value is empty.")
+            logger.warning("'verified_dag' key not found in %s or its value is empty.", final_dag_json_path)
         else: # dag_yaml_string is not a string
-            print(f"Warning: Value of 'verified_dag' in {final_dag_json_path} is not a string (found type: {type(dag_yaml_string)}). Expected a YAML string.")
+            logger.warning("Value of 'verified_dag' in %s is not a string (found type: %s). Expected a YAML string.", final_dag_json_path, type(dag_yaml_string))
     else:
-        print(f"Warning: Could not load {final_dag_json_path}.")
+        logger.warning("Could not load %s.", final_dag_json_path)
 
 
     if dag_data and 'nodes' in dag_data: # Ensure 'nodes' key exists in the parsed YAML data

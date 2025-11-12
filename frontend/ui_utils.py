@@ -16,6 +16,10 @@ import streamlit as st
 from streamlit import rerun
 from streamlit_mermaid import st_mermaid
 import streamlit.components.v1 as components
+from rmr_agent.utils.logging_config import setup_logger
+
+# Set up module logger
+logger = setup_logger(__name__)
 
 
 # ============================================================================
@@ -98,11 +102,11 @@ def get_component_details_from_verified(repo_name: str, run_id: str) -> Dict[str
             content = json.load(file)
         verified_components = content.get('verified_components', [])
     except (FileNotFoundError, json.JSONDecodeError, IOError) as e:
-        print(f"Warning: Could not load verified components: {e}")
+        logger.warning(f"Could not load verified components: {e}")
         try:
             verified_components = get_components(repo_name, run_id)
         except Exception as e2:
-            print(f"Error: Could not load any components: {e2}")
+            logger.error(f"Could not load any components: {e2}")
             return {}
     
     component_details = {}
@@ -148,7 +152,7 @@ def get_dag_yaml(repo_name: str, run_id: str) -> str:
         file_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'dag.yaml')
         with open(file_path, 'r') as file:
             dag_yaml_str = file.read()
-        print("Successfully loaded dag.yaml")
+        logger.info("Successfully loaded dag.yaml")
         return dag_yaml_str
     except FileNotFoundError:
         raise FileNotFoundError(f"DAG YAML file not found for repo: {repo_name}, run_id: {run_id}")
@@ -240,7 +244,7 @@ def get_steps_could_start_from(repo_name: str, run_id: str, all_steps: List[str]
     """Get list of steps that workflow could start from."""
     directory_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id)
     if not os.path.isdir(directory_path):
-        print(f"Directory does not exist: {directory_path}")
+        logger.warning(f"Directory does not exist: {directory_path}")
         return []
     
     # Get list of completed steps
@@ -283,7 +287,7 @@ def get_valid_node_names_from_components(repo_name: str, run_id: str) -> set:
         component_details = get_component_details_from_verified(repo_name, run_id)
         return set(component_details.keys())
     except Exception as e:
-        print(f"Error getting valid node names: {e}")
+        logger.error(f"Error getting valid node names: {e}")
         return set()
 
 def parse_dag_edges_from_yaml(
@@ -343,7 +347,7 @@ def parse_dag_edges_from_yaml(
                 attrs = {'component_details': details}
                 nodes.append((comp_name, attrs))
                 node_names_in_dag.add(comp_name)
-                print(f"Added missing node from components: {comp_name}")
+                logger.info(f"Added missing node from components: {comp_name}")
     
     # Parse edges
     raw_edges = data.get("edges", [])
@@ -612,16 +616,16 @@ def dag_edge_editor(
                     content = json.load(file)
                     if 'verified_dag' in content:
                         edited_dag_yaml = content['verified_dag']
-                        print("Using previously verified DAG as source")
+                        logger.info("Using previously verified DAG as source")
             else:
                 # Try to use the dag.yaml file which should be up-to-date
                 dag_yaml_path = os.path.join(CHECKPOINT_BASE_PATH, repo_name, run_id, 'dag.yaml')
                 if os.path.exists(dag_yaml_path):
                     with open(dag_yaml_path, 'r') as file:
                         edited_dag_yaml = file.read()
-                        print("Using dag.yaml file as source")
+                        logger.info("Using dag.yaml file as source")
         except Exception as e:
-            print(f"Could not load saved DAG: {e}")
+            logger.error(f"Could not load saved DAG: {e}")
     
     # Initialize session state only if not already initialized
     if "edges_state" not in st.session_state or "nodes_state" not in st.session_state:
@@ -774,8 +778,8 @@ def _rename_node_in_dag(old_name: str, new_name: str) -> None:
         st.session_state.attr_rows = None
         st.session_state.prev_edge_index = -1
     
-    print(f"Renamed node: '{old_name}' -> '{new_name}'")
-    print(f"Current rename tracking: {st.session_state.node_renames}")
+    logger.info(f"Renamed node: '{old_name}' -> '{new_name}'")
+    logger.debug(f"Current rename tracking: {st.session_state.node_renames}")
 
 
 
