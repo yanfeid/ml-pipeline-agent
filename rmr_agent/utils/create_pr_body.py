@@ -8,7 +8,7 @@ import re
 from .correction_logging import format_component_corrections_for_pr, format_dag_corrections_for_pr
 from .logging_config import setup_logger
 
-# 设置模块日志记录器
+# Set up module logger
 logger = setup_logger(__name__)
 
 # Helper function to load JSON files

@@ -16,7 +16,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from dotenv import load_dotenv
 from rmr_agent.utils.logging_config import setup_logger
 
-# 设置模块日志记录器
+# Set up module logger
 logger = setup_logger(__name__)
 
 load_dotenv()
@@ -51,7 +51,7 @@ def messages_to_prompt(messages: list[dict[str, str]]) -> str:
             
     return "\n\n".join(prompt_pieces)
 
-# 使用日志记录敏感信息，仅在调试级别记录
+# Log sensitive information only at debug level
 logger.debug(f"Azure authentication configured with client ID: {os.getenv('AZURE_CLIENT_ID')}")
 if os.getenv("AZURE_CLIENT_SECRET"):
     logger.debug("Azure client secret is configured and available")

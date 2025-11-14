@@ -7,7 +7,7 @@ from rmr_agent.llms import LLMClient
 from typing import Dict, Any
 from rmr_agent.utils.logging_config import setup_logger
 
-# 设置模块日志记录器
+# Set up module logger
 logger = setup_logger(__name__)
 
 # ========== **Extract .ini Content from AI Response** ==========

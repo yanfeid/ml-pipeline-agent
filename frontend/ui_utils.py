@@ -788,7 +788,7 @@ def _render_add_edge_controls(node_names: List[str]) -> None:
     st.markdown("##### Add a New Edge")
     col1, col2 = st.columns(2)
     
-    # 使用传入的 node_names 而不是从外部获取
+    # Use passed node_names instead of retrieving from external source
     with col1:
         src = st.selectbox("Source Node", node_names, key="src_add")
     with col2:

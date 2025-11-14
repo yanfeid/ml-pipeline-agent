@@ -5,7 +5,7 @@ from rmr_agent.llms import LLMClient
 from rmr_agent.utils import convert_to_dict, preprocess_python_file
 from rmr_agent.utils.logging_config import setup_logger
 
-# 设置模块日志记录器
+# Set up module logger
 logger = setup_logger(__name__)
 
 def retry_component_identification(python_file_path, full_file_list, code_summary, model="gpt-4o", temperature=0, max_tokens=2048, 

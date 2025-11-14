@@ -7,7 +7,7 @@ import json
 import logging
 from rmr_agent.utils.logging_config import setup_logger
 
-# 设置模块日志记录器
+# Set up module logger
 logger = setup_logger(__name__)
 
 def clean_prefix(path: str) -> str:
@@ -103,7 +103,7 @@ def notebook_agent(verified_dag, cleaned_code, local_repo_path):
     os.makedirs(NOTEBOOKS_DIR, exist_ok=True)
     logger.info(f"Created notebooks directory: {NOTEBOOKS_DIR}")
 
-    # === Step 2: read environment.ini 和 solution.ini ===
+    # === Step 2: read environment.ini and solution.ini ===
     config = configparser.ConfigParser()
 
     if not os.path.exists(ENV_FILE):
@@ -268,7 +268,7 @@ print(f'username={username}, working_path={working_path}')
                 for line in research_code_lines:
                     _, _, cleaned_line = line.partition("|")
                     if cleaned_line.startswith(" "):
-                        cleaned_line = cleaned_line[1:]  # 只去掉一个空格
+                        cleaned_line = cleaned_line[1:]  # Remove only one space
                     cleaned_code_list.append(cleaned_line.rstrip("\n"))
 
                 research_code = "\n".join(cleaned_code_list)

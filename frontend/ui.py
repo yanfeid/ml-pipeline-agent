@@ -1,3 +1,5 @@
+
+
 import os
 import sys
 import streamlit as st
@@ -18,7 +20,7 @@ from rmr_agent.utils.logging_config import setup_logger
 # Set up module logger
 logger = setup_logger(__name__)
 
-BASE_URL = os.environ.get("RMR_AGENT_API_BASE_URL", "http://localhost:8000")  # Default to local server if not set
+BASE_URL = os.environ.get("RMR_AGENT_API_BASE_URL", "http://localhost:8000")
 
 sys.stdout.flush()
 # Maximize layout width
@@ -36,6 +38,12 @@ if 'run_id' not in st.session_state:
     st.session_state["run_id"] = None
 if 'input_files' not in st.session_state:
     st.session_state["input_files"] = None
+if 'detected_ml_files' not in st.session_state:
+    st.session_state["detected_ml_files"] = None
+if 'detection_confidence' not in st.session_state:
+    st.session_state["detection_confidence"] = 0.0
+if 'detection_reasoning' not in st.session_state:
+    st.session_state["detection_reasoning"] = ""
 if 'config_file_path' not in st.session_state:
     st.session_state["config_file_path"] = None
 if 'start_from' not in st.session_state:
@@ -56,53 +64,200 @@ if 'last_status' not in st.session_state:
     st.session_state["last_status"] = None
 
 
+def detect_ml_files_via_api(github_url):
+    """Call API to detect ML files"""
+    try:
+        # Call the new detection endpoint
+        with st.spinner("🔍 Analyzing repository structure and detecting ML pipeline files..."):
+            response = requests.post(
+                f"{BASE_URL}/detect-ml-files",
+                json={"github_url": github_url}
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    'ml_files': data['ml_files'],
+                    'confidence': data['confidence'],
+                    'reasoning': data['reasoning'],
+                    'repo_name': data['repo_name'],
+                    'status': data.get('status', 'success')
+                }
+            else:
+                error_msg = f"API error: {response.status_code}"
+                logger.error(error_msg)
+                return {
+                    'ml_files': [],
+                    'confidence': 0.0,
+                    'reasoning': error_msg,
+                    'repo_name': '',
+                    'status': 'error'
+                }
+                
+    except Exception as e:
+        logger.error(f"Error calling ML file detection API: {e}")
+        return {
+            'ml_files': [],
+            'confidence': 0.0,
+            'reasoning': f"Connection error: {str(e)}",
+            'repo_name': '',
+            'status': 'error'
+        }
+
 
 def display_welcome_page():
     if st.session_state.workflow_running == True:
         return
-    # st.title("RMR Agent")
+    
     col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
     with col3:  # Use the middle column
         st.image("assets/rmr_agent_image.png", use_container_width=True)
 
     st.subheader("Welcome to RMR Agent!")
     st.write("Convert your ML research code into a robust, modular, and configurable RMR pipeline.")
+    
     # Take in github url
     default_url = st.session_state["github_url"] if st.session_state["github_url"] else "https://github.paypal.com/dnaomi/bt-retry-v2"
-    st.session_state["github_url"] = st.text_input("Specify the GitHub URL for your ML code", default_url)
-    _, st.session_state["repo_name"] = parse_github_url(st.session_state["github_url"])
-    # Take in input ML files
-    default_input_files = "\n".join(st.session_state["input_files"]) if st.session_state["input_files"] else "etl/01_etl.ipynb\netl/02_bq_to_dataproc.ipynb\nmodel-dev/train.ipynb\nmodel-dev/evaluate.ipynb\ndeployment/01_export_to_ume.ipynb\ndeployment/02_pyscoring_validation.ipynb"
-    input_files = st.text_area("List the notebooks in your repo which contain the core ML logic (one per line, relative to repo root directory)", default_input_files).splitlines()
-    st.session_state["input_files"] = [file for file in input_files if file]
-    # Take in config file path - completely optional
-    default_config_file = st.session_state["config_file_path"] if st.session_state["config_file_path"] else ""
-    st.session_state["config_file_path"] = st.text_input("Config file path (optional, relative to repo root directory)",
-                                                       default_config_file,
-                                                       help="If your ML code uses a configuration file (like JSON, YAML, or INI), specify its path here to automatically replace placeholder references like 'config[\"parameter_name\"]' with actual values from your config. This ensures your DAG will be generated with proper parameter values instead of generic placeholders. Supports nested configurations and path joining expressions.")
-    # Take in run id
-    default_run_id = st.session_state["run_id"] if st.session_state["run_id"] else "1"
-    st.session_state["run_id"] = st.text_input("Run ID (optional)", default_run_id, help="Enter an existing run ID (e.g. 1, 2, 3) to resume, or leave blank for a new run")
-    # Allow starting from specific step
-    options_start_from = [""] + get_steps_could_start_from(st.session_state["repo_name"], st.session_state["run_id"], STEPS)
-    current_start_from = st.session_state["start_from"] if st.session_state["start_from"] in options_start_from else ""
-    start_from = st.selectbox(
-        "Start From (optional)",
-        options_start_from,
-        index=options_start_from.index(current_start_from) if current_start_from in options_start_from else 0,
-        help="Choose a step to start from, or leave blank to start from the beginning",
-        key="start_from_select",
-    )
-    st.session_state["start_from"] = start_from.split('.')[-1].strip().lower().replace(" ", "_")
-    logger.debug(f"Selected start_from: {st.session_state['start_from']}")
-    # allow specifying existing config file if their code leverages one
-    # TO DO: let user set config file path in their repo if they are using a configuration file already during research
-
-
+    github_url = st.text_input("Specify the GitHub URL for your ML code", default_url)
+    
+    # Detect button - triggers ML file detection
+    if github_url and github_url != st.session_state.get("github_url"):
+        st.session_state["github_url"] = github_url
+        st.session_state["detected_ml_files"] = None  # Reset detection
+        _, st.session_state["repo_name"] = parse_github_url(github_url)
+    
+    # Button to detect ML files
+    if github_url and not st.session_state.get("detected_ml_files"):
+        if st.button("🔎 Detect ML Pipeline Files", type="primary"):
+            detection_result = detect_ml_files_via_api(github_url)
+            if detection_result['status'] == 'success':
+                st.session_state["detected_ml_files"] = detection_result['ml_files']
+                st.session_state["detection_confidence"] = detection_result['confidence']
+                st.session_state["detection_reasoning"] = detection_result['reasoning']
+                st.session_state["repo_name"] = detection_result['repo_name']
+                st.rerun()
+            else:
+                st.error(f"Failed to detect files: {detection_result['reasoning']}")
+    
+    # Show detected files with selection checkboxes
+    if st.session_state.get("detected_ml_files") is not None:
+        st.write("---")
+        st.subheader("📁 Detected ML Pipeline Files")
+        
+        # Show confidence and reasoning
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            confidence = st.session_state.get("detection_confidence", 0)
+            if confidence > 0.7:
+                st.success(f"Confidence: {confidence:.0%}")
+            elif confidence > 0.4:
+                st.warning(f"Confidence: {confidence:.0%}")
+            else:
+                st.error(f"Confidence: {confidence:.0%}")
+        
+        with col2:
+            with st.expander("🤖 AI Detection Reasoning"):
+                st.write(st.session_state.get("detection_reasoning", "No reasoning available"))
+        
+        # File selection with checkboxes
+        st.write("**Select the files that contain your core ML pipeline logic:**")
+        st.write("*Note: Config files, utility scripts, and test files have been automatically excluded*")
+        
+        detected_files = st.session_state["detected_ml_files"]
+        
+        if detected_files:
+            # Create a container for better layout
+            selected_files = []
+            
+            # Group files by directory for better organization
+            files_by_dir = {}
+            for file in detected_files:
+                dir_name = os.path.dirname(file) or "root"
+                if dir_name not in files_by_dir:
+                    files_by_dir[dir_name] = []
+                files_by_dir[dir_name].append(file)
+            
+            # Display files grouped by directory
+            for dir_name in sorted(files_by_dir.keys()):
+                if dir_name != "root":
+                    st.write(f"**📂 {dir_name}/**")
+                
+                for file in files_by_dir[dir_name]:
+                    # Determine file type icon
+                    icon = "📓" if file.endswith('.ipynb') else "🐍"
+                    
+                    # Create checkbox for each file
+                    # Default to selected for high-confidence files
+                    default_selected = st.session_state.get("detection_confidence", 0) > 0.5
+                    
+                    if st.checkbox(
+                        f"{icon} {os.path.basename(file)}",
+                        value=default_selected,
+                        key=f"file_{file}",
+                        help=f"Full path: {file}"
+                    ):
+                        selected_files.append(file)
+            
+            # Store selected files
+            st.session_state["input_files"] = selected_files
+            
+            # Show selected count
+            if selected_files:
+                st.success(f"✅ {len(selected_files)} file(s) selected")
+            else:
+                st.warning("⚠️ Please select at least one file to continue")
+        
+        else:
+            st.warning("No ML files were automatically detected. You can manually specify files below.")
+            
+            # Fallback to manual input
+            st.write("**Manually specify ML files:**")
+            manual_files = st.text_area(
+                "List the notebooks/scripts in your repo (one per line, relative to repo root)",
+                height=150,
+                placeholder="examples:\netl/01_data_load.ipynb\nmodel/train.py\nevaluation/evaluate.ipynb"
+            )
+            if manual_files:
+                st.session_state["input_files"] = [f.strip() for f in manual_files.splitlines() if f.strip()]
+    
+        # Run ID
+        default_run_id = st.session_state["run_id"] if st.session_state["run_id"] else "1"
+        st.session_state["run_id"] = st.text_input(
+            "Run ID (optional)", 
+            default_run_id, 
+            help="Enter an existing run ID (e.g. 1, 2, 3) to resume, or leave blank for a new run"
+        )
+        
+        # Start from specific step
+        # Only try to get steps if repo_name and run_id are not None
+        if st.session_state["repo_name"] and st.session_state["run_id"]:
+            try:
+                options_start_from = [""] + get_steps_could_start_from(st.session_state["repo_name"], st.session_state["run_id"], STEPS)
+            except Exception as e:
+                logger.warning(f"Could not get steps to start from: {e}")
+                options_start_from = [""]
+        else:
+            options_start_from = [""]
+        
+        current_start_from = st.session_state["start_from"] if st.session_state["start_from"] in options_start_from else ""
+        start_from = st.selectbox(
+            "Start From (optional)",
+            options_start_from,
+            index=options_start_from.index(current_start_from) if current_start_from in options_start_from else 0,
+            help="Choose a step to start from, or leave blank to start from the beginning",
+            key="start_from_select",
+        )
+        st.session_state["start_from"] = start_from.split('.')[-1].strip().lower().replace(" ", "_") if start_from else ""
+        logger.debug(f"Selected start_from: {st.session_state['start_from']}")
 
 
 def start_workflow():
     """Function to start the workflow after the user presses Start Workflow button"""
+    # Validate that files are selected
+    if not st.session_state.get("input_files"):
+        st.error("Please select at least one ML pipeline file to continue")
+        return
+    
     # Clear any cached DAG YAML from previous sessions
     if "cached_dag_yaml" in st.session_state:
         del st.session_state.cached_dag_yaml
@@ -119,30 +274,31 @@ def start_workflow():
 
     if not st.session_state["repo_name"]:
         _, st.session_state["repo_name"] = parse_github_url(st.session_state["github_url"])
-    logger.info(f"Repo name: {st.session_state['repo_name']}")
+    
+    logger.info(f"Starting workflow with {len(st.session_state['input_files'])} selected files")
+    logger.info(f"Selected files: {st.session_state['input_files']}")
+    
     payload = {
         "github_url": st.session_state["github_url"],
         "input_files": st.session_state["input_files"]
     }
+    
     # Add optional fields if provided
     if st.session_state["run_id"]:
         payload["run_id"] = st.session_state["run_id"]
     if st.session_state["start_from"]:
         payload["start_from"] = st.session_state["start_from"]
     if st.session_state["config_file_path"]:
-        payload["config_file_path"] = st.session_state["config_file_path"]
+        payload["existing_config_path"] = st.session_state["config_file_path"]
     
     # Construct url with repo_name and run_id (if specified)
-    url = f"{BASE_URL}/run-workflow/?repo_name={st.session_state["repo_name"]}"
+    url = f"{BASE_URL}/run-workflow/?repo_name={st.session_state['repo_name']}"
     if st.session_state["run_id"]:
-        url += f"&run_id={st.session_state["run_id"]}"
+        url += f"&run_id={st.session_state['run_id']}"
 
     with st.spinner("Starting workflow..."):
         response = requests.post(url, json=payload)
-        # Comment out debug info to avoid displaying in the frontend
-        # st.write(f"Status code: {response.status_code}")
-        # st.write(f"Headers: {dict(response.headers)}")
-        # st.write(f"Response content: {response.content}")
+    
     if response.status_code == 200:
         try:
             data = response.json()
@@ -151,27 +307,23 @@ def start_workflow():
             st.session_state["last_status"] = "running"
             st.session_state['current_step'] = st.session_state["start_from"] if st.session_state["start_from"] else "starting"
             st.session_state.workflow_running = True if st.session_state['current_step'] not in HUMAN_STEPS else False
-            st.session_state["display_welcome_page"] = False # remove welcome page now that workflow has started
-            st.success(f"Starting workflow for run_id={data["run_id"]}")
-            time.sleep(0.5)  # Brief pause to show the success message
-            st.rerun() # update UI
+            st.session_state["display_welcome_page"] = False
+            st.success(f"Starting workflow for run_id={data['run_id']}")
+            time.sleep(0.5)
+            st.rerun()
         except Exception as e:
-            # Keep error message but simplify content for users
             st.error("Error starting workflow. Please try again.")
-            # Uncomment the line below during development to see detailed error
-            # st.error(f"Error parsing JSON: {str(e)}")
+            logger.error(f"Error parsing JSON: {str(e)}")
     else:
-        # Keep error message but simplify content for users
         st.error("Error connecting to the server. Please check if the API is running.")
-        # Uncomment the line below during development to see detailed error
-        # st.error(f"Error: {response.status_code} - {response.text}")
+        logger.error(f"Error: {response.status_code} - {response.text}")
 
 
 def check_workflow_status():
     """Function to poll for the current workflow status"""
     try:
         response = requests.get(
-            f"{BASE_URL}/workflow-status/{st.session_state["repo_name"]}?run_id={st.session_state.run_id}"
+            f"{BASE_URL}/workflow-status/{st.session_state['repo_name']}?run_id={st.session_state.run_id}"
         )
 
         logger.debug(f"Status code: {response.status_code}")
@@ -212,6 +364,7 @@ def check_workflow_status():
     except Exception as e:
         st.warning(f"Error checking workflow status: {e}")
 
+
 def submit_human_feedback(payload, repo_name, run_id):
     url = f"{BASE_URL}/run-workflow/?repo_name={repo_name}&run_id={run_id}"
     logger.info(f"Submitting human feedback to: {url}")
@@ -244,6 +397,7 @@ def submit_human_feedback(payload, repo_name, run_id):
     else:
         st.error(f"Submit Error: {response.text}")
 
+
 def display_progress_bar(current_step, write_cur_step=True):
     if current_step not in STEPS:
         return 
@@ -259,7 +413,8 @@ def display_progress_bar(current_step, write_cur_step=True):
     st.progress(completed_steps / total_steps)
     st.write(f"Progress: {completed_steps}/{total_steps} steps completed")
     if write_cur_step:
-        st.write(f"Running step {st.session_state["current_step"].replace("_", " ").title()} ...")
+        st.write(f"Running step {st.session_state['current_step'].replace('_', ' ').title()} ...")
+
 
 def display_detailed_progress(current_step):
     if current_step not in STEPS:
@@ -292,7 +447,7 @@ def cancel_workflow_button():
     if st.button("Cancel Workflow", type="primary", key="cancel_workflow"):
         st.write("Cancelling workflow...")
         # Make API call to cancel the workflow
-        cancel_url = f"{BASE_URL}/cancel-workflow/{st.session_state["repo_name"]}?run_id={st.session_state["run_id"]}"
+        cancel_url = f"{BASE_URL}/cancel-workflow/{st.session_state['repo_name']}?run_id={st.session_state['run_id']}"
         try:
             cancel_response = requests.post(cancel_url)
             
@@ -321,6 +476,7 @@ def cancel_workflow_button():
         except Exception as e:
             st.error(f"Error sending cancellation request: {str(e)}")
 
+
 def back_to_home_button(key="back_to_home"):
     if st.button("Back to Home", key=key):
         # Reset session state and return to home screen
@@ -345,8 +501,8 @@ def back_to_home_button(key="back_to_home"):
         # time.sleep(1)  # Brief delay for user feedback
         st.rerun()
 
-def human_verification_of_components_ui(repo_name, run_id):
 
+def human_verification_of_components_ui(repo_name, run_id):
     # Load available ML components with their descriptions
     with open("rmr_agent/ml_components/component_definitions.json", 'r') as file:
         ml_components = json.load(file)
@@ -358,7 +514,7 @@ def human_verification_of_components_ui(repo_name, run_id):
             st.write(description)
 
     # Load identified components
-    components = get_components(repo_name, run_id) # result["components"] # loading from checkpoint instead of from API result
+    components = get_components(repo_name, run_id)
     if not isinstance(components, list):
         st.error("Components should be a non-empty list of dictionaries")
     if not components:
@@ -387,12 +543,11 @@ def human_verification_of_components_ui(repo_name, run_id):
             # Load from the original components list
             current_components_dict = components[current_index]
         # Get the cleaned code for the current file (needed to derive file name if components are empty)
-        cleaned_code = get_cleaned_code(repo_name, run_id)  # loading from checkpoint instead of from API result
+        cleaned_code = get_cleaned_code(repo_name, run_id)
         if not cleaned_code:
             st.error("Could not recover cleaned code for current file")
-            
 
-        # Derive file name. If components exist, read from first component; otherwise use the cleaned_code order
+        # Derive file name
         if current_components_dict:
             file_name = next(iter(current_components_dict.values()))["file_name"]
         else:
@@ -412,12 +567,12 @@ def human_verification_of_components_ui(repo_name, run_id):
  
         # Code that will be displayed
         code_display = code_lines if file_name in cleaned_code else []
-        code_display = remove_line_numbers(code_display) # line numbers will already be shown by streamlit
+        code_display = remove_line_numbers(code_display)
  
         # Existing component names for this file
         existing_component_names = list(current_components_dict.keys())
 
-        # Split into two columns so we can always show cleaned code on the right for reference -> easier to identify line numbers this way
+        # Split into two columns
         col_1, col_2 = st.columns([0.4, 0.6])
 
         with col_1:
@@ -427,8 +582,7 @@ def human_verification_of_components_ui(repo_name, run_id):
 
             # Multiselect to keep/delete/add component names
             multiselect_options = list(ml_components.keys()) + ["Other"]
-            # Ensure all existing_component_names (which are the defaults) are in multiselect_options.
-            # This is crucial for when custom components were added and are now part of the defaults.
+            # Ensure all existing_component_names are in multiselect_options
             for comp_name in existing_component_names:
                 if comp_name not in multiselect_options:
                     multiselect_options.append(comp_name)
@@ -441,7 +595,7 @@ def human_verification_of_components_ui(repo_name, run_id):
                 key=f"components_{current_index}"
             )
 
-            # Allow user to enter their own ML component names if they feel the available list is insufficient
+            # Allow user to enter their own ML component names
             if "Other" in selected_components:
                 st.write("You selected 'Other' as the component type. Please ensure this is a component you want in your final RMR pipeline. Otherwise, remove it.")
                 other_components = st.text_area(
@@ -450,10 +604,7 @@ def human_verification_of_components_ui(repo_name, run_id):
                 )
                 # Process the other components
                 if other_components:
-                    # Split by newline to get individual components
                     custom_components = [comp.strip().replace('_', ' ').title() for comp in other_components.split('\n') if comp.strip()]
-                    
-                    # Remove "Other" and add the custom components
                     selected_components.remove("Other")
                     selected_components.extend(custom_components)
 
@@ -464,7 +615,7 @@ def human_verification_of_components_ui(repo_name, run_id):
                 # Base details (existing or new)
                 if component_name in current_components_dict:
                     details = current_components_dict[component_name].copy()
-                    # If user deleted some components and resulted in a single component, we can update the line range to be the entire file
+                    # If user deleted some components and resulted in a single component, update line range
                     if len(selected_components) == 1:
                         details['line_range'] = get_default_line_range(selected_components, code_display)
                 else:
@@ -500,7 +651,6 @@ def human_verification_of_components_ui(repo_name, run_id):
                                 for evidence_dict in details["evidence"]:
                                     st.write(f'- "{evidence_dict.get("quote_or_paraphrase", "Could not get evidence quote")}": {evidence_dict.get("support_reason", "Could not get support reasoning")}')
                                 if len(current_components_dict) > 1:
-                                    # Only show separation reasoning if we performed a separation in this file (idenfitied more than one component)
                                     st.write("**Why this was identified as a separate component**:")
                                     st.write(f"    - {details['why_this_is_separate']}")
                 
@@ -525,27 +675,26 @@ def human_verification_of_components_ui(repo_name, run_id):
             if current_index == total_files - 1 and st.button("Submit All Components"):
                 st.session_state["edited_components_list"][current_index] = edited_components_dict
                 payload = {"verified_components": st.session_state["edited_components_list"]}
-                st.session_state.workflow_running = True # before submit back to API, set workflow running again to continue polling
+                st.session_state.workflow_running = True
                 submit_human_feedback(payload=payload, repo_name=repo_name, run_id=run_id)
                 st.session_state["edited_components_list"] = []
 
             st.write("**Tips**:")
-            st.write("  - Please review the Descriptions for Available ML Components on the left for further details how we define each component")
-            st.write("  - Select 'Other' if you feel none of the available ML components match what your code in this file is doing.")
+            st.write("  - Please review the Descriptions for Available ML Components on the left for further details")
+            st.write("  - Select 'Other' if none of the available ML components match what your code is doing")
 
         with col_2:
-            st.subheader("") # filler space for better alignment
-            # Display the code in right column so it can always be viewed alongside the identified components
+            st.subheader("")  # filler space
+            # Display the code
             if code_display:
                 st.write(f"**Cleaned Code For This File** ({len(code_display)} lines):")
-                # Create a fixed-height container that will automatically scroll
                 container = st.container(height=600)
-                # Display the code inside the container with line numbers and syntax highlighting
                 with container:
                     numbered_code = "\n".join(f"{i+1}: {line}" for i, line in enumerate(code_display))
                     st.code(numbered_code, language="python")
             else:
                 st.error("Could not display code for this file")
+
 
 def human_verification_of_dag_ui(repo_name, run_id):
     logger.info("=== 🚧 ENTER DAG UI ===")
@@ -555,7 +704,7 @@ def human_verification_of_dag_ui(repo_name, run_id):
         logger.info("🔁 Step changed – not rendering DAG editor UI")
         return
 
-    # Check if we have a cached DAG YAML in the session state from a previous rename operation
+    # Check if we have a cached DAG YAML in the session state
     if "cached_dag_yaml" in st.session_state:
         logger.info("Using cached DAG YAML from session state")
         dag_yaml = st.session_state.cached_dag_yaml
@@ -566,8 +715,7 @@ def human_verification_of_dag_ui(repo_name, run_id):
     updated_dag_yaml = dag_edge_editor(dag_yaml, repo_name, run_id)
 
     if updated_dag_yaml:
-        # Clear cached DAG YAML to ensure we load from file next time
-        # This forces the system to use the updated file from the backend
+        # Clear cached DAG YAML
         if "cached_dag_yaml" in st.session_state:
             del st.session_state.cached_dag_yaml
             logger.debug("Cleared cached_dag_yaml from session state")
@@ -607,15 +755,19 @@ def main():
     if st.session_state["display_welcome_page"] == True:
         display_welcome_page()
 
-        # Start workflow
-        if st.button("Start Workflow"):
-            start_workflow()
+        # Start workflow button - only show if files are selected
+        if st.session_state.get("input_files"):
+            if st.button("🚀 Start Workflow", type="primary"):
+                start_workflow()
+        else:
+            if st.session_state.get("detected_ml_files") is not None:
+                st.info("👆 Please select at least one ML pipeline file to continue")
 
     # Status display while workflow is running in backend 
     elif st.session_state.workflow_running:
         cancel_workflow_button()
-        st.write(f"Run ID: **{st.session_state["run_id"]}**")
-        with st.status(f"**Running {st.session_state["current_step"].replace("_", " ").title()}** ...", expanded=True, state="running") as status:
+        st.write(f"Run ID: **{st.session_state['run_id']}**")
+        with st.status(f"**Running {st.session_state['current_step'].replace('_', ' ').title()}** ...", expanded=True, state="running") as status:
             display_detailed_progress(st.session_state["current_step"])
             while st.session_state.workflow_running:
                 step_changed = False
@@ -624,7 +776,7 @@ def main():
                     step_changed = check_workflow_status()
                     time.sleep(2)
                 # update the status with the new step
-                label_str = f"Running {st.session_state["current_step"].replace("_", " ").title()} ..."
+                label_str = f"Running {st.session_state['current_step'].replace('_', ' ').title()} ..."
                 if st.session_state["current_step"] == "code_editor_agent":
                     label_str += " This step may take a while, please be patient."
                 status.update(label=label_str, state="running")
@@ -635,7 +787,6 @@ def main():
         
         st.rerun()
 
-
     # Handle human verification steps and workflow completion
     else: 
         back_to_home_button()
@@ -644,10 +795,9 @@ def main():
             # Reset session state and return to home screen
             st.session_state.workflow_running = False
             st.session_state["display_welcome_page"] = True
-            st.error(f"Workflow failed: {st.session_state["result"].get('error', 'Unknown error')}")
-            time.sleep(10)  # Brief delay for user feedback
+            st.error(f"Workflow failed: {st.session_state['result'].get('error', 'Unknown error')}")
+            time.sleep(10)
             st.rerun()
-            
 
         result = st.session_state["result"]
         repo_name = result.get("repo_name")
@@ -663,8 +813,8 @@ def main():
         elif current_step == "human_verification_of_dag":
             human_verification_of_dag_ui(repo_name, run_id)
 
+
 if __name__ == "__main__":
     main()
-
 
 # Run: streamlit run rmr_agent/frontend/ui.py

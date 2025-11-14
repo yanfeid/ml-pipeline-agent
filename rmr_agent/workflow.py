@@ -363,7 +363,7 @@ def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
 #             logger.info("Received verified DAG from human verification")
 #             result = {"verified_dag": verification_response.json()["dag"]}
 
-#             # 检查是否有实际的修改
+#             # Check if there are actual modifications
 #             dag_corrections = verification_response.json().get("dag_corrections", {})
 #             if dag_corrections and any([
 #                 dag_corrections.get("renamed_nodes"),
@@ -374,9 +374,9 @@ def generate_dag_yaml(state: WorkflowState) -> Dict[str, Any]:
 #                 dag_corrections.get("modified_edges"),
 #                 dag_corrections.get("modified_nodes")
 #             ]):
-#                 # 如果有修改，则添加标记
+#                 # If there are modifications, add a flag
 #                 result["human_verification_of_dag_corrections"] = True
-#                 # 同时保存修改信息
+#                 # Also save modification information
 #                 result["dag_corrections"] = dag_corrections
 
 #             return result
@@ -387,16 +387,16 @@ def human_verification_of_dag(state: WorkflowState) -> Dict[str, Any]:
         logger.info("Skipping human_verification: 'verified_dag' already in state")
         return {}
     
-    # 保存发送给验证的原始DAG
+    # Save the original DAG sent for verification
     original_dag_for_verification = state["dag_yaml"]
     
-    # 添加调试：保存发送前的DAG到文件
+    # Add debug: Save pre-verification DAG to file
     debug_path = f"rmr_agent/checkpoints/{state['repo_name']}/{state['run_id']}/debug_dag_sent.yaml"
     with open(debug_path, 'w') as f:
         f.write(original_dag_for_verification)
     logger.info(f"Saved DAG sent for verification to: {debug_path}")
     
-    # 计算发送前的DAG哈希值
+    # Calculate pre-verification DAG hash
     import hashlib
     original_hash = hashlib.md5(original_dag_for_verification.encode()).hexdigest()
     logger.info(f"DAG sent for verification hash: {original_hash}")
@@ -413,53 +413,53 @@ def human_verification_of_dag(state: WorkflowState) -> Dict[str, Any]:
             logger.info("Received verified DAG from human verification")
             verified_dag = verification_response.json()["dag"]
             
-            # 保存收到的验证后DAG
+            # Save the received verified DAG
             debug_path_verified = f"rmr_agent/checkpoints/{state['repo_name']}/{state['run_id']}/debug_dag_received.yaml"
             with open(debug_path_verified, 'w') as f:
                 f.write(verified_dag)
             logger.info(f"Saved received verified DAG to: {debug_path_verified}")
             
-            # 计算验证后的DAG哈希值
+            # Calculate the post-verification DAG hash
             verified_hash = hashlib.md5(verified_dag.encode()).hexdigest()
             logger.info(f"DAG received after verification hash: {verified_hash}")
             
-            # 直接比较两个DAG字符串
+            # Direct comparison of the two DAG strings
             if original_dag_for_verification == verified_dag:
-                logger.info("✅ DAG完全未被修改（字符串完全相同）")
+                logger.info("✅ DAG completely unmodified (strings exactly the same)")
                 return {"verified_dag": verified_dag}
             else:
-                logger.warning("⚠️ 检测到DAG被修改")
+                logger.warning("⚠️ DAG modification detected")
                 
-                # 尝试比较YAML内容（忽略格式差异）
+                # Try to compare YAML content (ignoring format differences)
                 import yaml
                 try:
                     original_parsed = yaml.safe_load(original_dag_for_verification)
                     verified_parsed = yaml.safe_load(verified_dag)
                     
                     if original_parsed == verified_parsed:
-                        logger.info("📝 DAG内容相同，只是格式不同（YAML解析后相同）")
-                        # 内容相同，只是格式不同，不应该记录为修改
+                        logger.info("📝 DAG content identical, only format differs (YAML parsing matches)")
+                        # Content is the same, just format is different, shouldn't record as a modification
                         return {"verified_dag": verified_dag}
                     else:
-                        logger.warning("❌ DAG内容确实被修改了")
+                        logger.warning("❌ DAG content was actually modified")
                         
-                        # 只有在内容真正被修改时才计算corrections
+                        # Only calculate corrections when the content is actually modified
                         from rmr_agent.utils.correction_logging import log_dag_corrections
                         dag_corrections = log_dag_corrections(original_dag_for_verification, verified_dag)
                         
-                        # 打印修改的摘要
-                        logger.info(f"修改摘要: {dag_corrections.get('summary', {})}")
+                        # Print modification summary
+                        logger.info(f"Modification summary: {dag_corrections.get('summary', {})}")
                         
                         result = {"verified_dag": verified_dag}
-                        # 只有在有实际修改时才添加corrections
+                        # Only add corrections when there are actual modifications
                         if dag_corrections and dag_corrections.get('summary', {}).get('correction_ratio', 0) > 0:
                             result["dag_corrections"] = dag_corrections
                             result["human_verification_of_dag_corrections"] = True
                         
                         return result
                 except Exception as e:
-                    logger.error(f"YAML解析失败: {e}")
-                    # 如果解析失败，保守地认为有修改
+                    logger.error(f"YAML parsing failed: {e}")
+                    # If parsing fails, conservatively assume there are modifications
                     from rmr_agent.utils.correction_logging import log_dag_corrections
                     dag_corrections = log_dag_corrections(original_dag_for_verification, verified_dag)
                     return {
@@ -468,7 +468,7 @@ def human_verification_of_dag(state: WorkflowState) -> Dict[str, Any]:
                         "human_verification_of_dag_corrections": True
                     }
         time.sleep(2)
-        
+
 def run_config_agent(state: WorkflowState) -> Dict[str, Any]:
     logger.debug(f"Current state keys: {state.keys()}")
     if "config" in state and state["config"]:
@@ -729,10 +729,8 @@ def run_workflow(github_url: str, input_files: List[str], run_id: str | None = N
 
         update = step_func(state)
 
-        # 如果没有实质性更新内容，则不保存（例如，空字典返回）
         if update:
             state.update(update)
-            # 对于人工验证步骤，只有在有明确修改时才保存
             if step_name in HUMAN_STEPS and not update.get(f"{step_name}_corrections"):
                 logger.debug(f"Skipping save for {step_name} as no corrections were made")
             else:
