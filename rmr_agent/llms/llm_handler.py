@@ -6,6 +6,7 @@ import warnings
 import contextlib
 import requests
 import litellm
+import logging
 from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
 from urllib3.exceptions import InsecureRequestWarning
@@ -13,7 +14,12 @@ from typing import Dict, Any, Optional, List
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from dotenv import load_dotenv
-load_dotenv() 
+from rmr_agent.utils.logging_config import setup_logger
+
+# Set up module logger
+logger = setup_logger(__name__)
+
+load_dotenv()
 
 open_models = {
     "code-llama-7b" :  "https://aiplatform.dev51.cbf.dev.paypalinc.com/seldon/seldon/codellama-7b-in-3273d/v2/models/codellama-7b-in-3273d/infer", # 'https://aiplatform.dev51.cbf.dev.paypalinc.com/v1/chat/completions'
@@ -45,8 +51,10 @@ def messages_to_prompt(messages: list[dict[str, str]]) -> str:
             
     return "\n\n".join(prompt_pieces)
 
-print("client_id:", os.getenv("AZURE_CLIENT_ID"))
-print("client_secret starts with:", os.getenv("AZURE_CLIENT_SECRET")[:5])
+# Log sensitive information only at debug level
+logger.debug(f"Azure authentication configured with client ID: {os.getenv('AZURE_CLIENT_ID')}")
+if os.getenv("AZURE_CLIENT_SECRET"):
+    logger.debug("Azure client secret is configured and available")
 
 class TokenManager:
     def __init__(self):
@@ -365,10 +373,12 @@ if __name__ == "__main__":
         ]
     
     messages = _history_to_messages(history)
-    print(messages_to_prompt(messages))
+    prompt_text = messages_to_prompt(messages)
+    logger.debug("Generated prompt text from messages")
+    logger.debug(f"Prompt content:\n{prompt_text}")
 
     input_tokens: int = litellm.utils.token_counter(messages=messages) # defaults to tiktoken general token counter if that model name does not match
-    print("input tokens:", input_tokens)
+    logger.debug(f"Input tokens count: {input_tokens}")
     #exit()
 
     llm_client = LLMClient()
@@ -381,7 +391,9 @@ if __name__ == "__main__":
         top_p=0.3,
         input_tokens=input_tokens
     )
-    print(response)
+    logger.info("Received response from LLM")
+    logger.debug(f"Full LLM response object: {response}")
+
     choices: litellm.types.utils.Choices = response.choices
     response_text = choices[0].message.content or ""
-    print(response_text)
+    logger.info(f"LLM response text: {response_text}")

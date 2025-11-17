@@ -4,6 +4,11 @@ import configparser
 from typing import Dict, Any
 import yaml
 import json
+import logging
+from rmr_agent.utils.logging_config import setup_logger
+
+# Set up module logger
+logger = setup_logger(__name__)
 
 def clean_prefix(path: str) -> str:
     return os.path.splitext(os.path.basename(path))[0].strip().lower()
@@ -37,7 +42,7 @@ def extract_code_from_json(cleaned_code, verified_dag):
         match = re.search(r"(\d+)-(\d+)", line_range_str)
 
         if not match:
-            print(f"Warning: Invalid line range format for {node_name}: {line_range_str}")
+            logger.warning(f"Invalid line range format for {node_name}: {line_range_str}")
             continue
         start_line, end_line = int(match.group(1)), int(match.group(2))
 
@@ -54,7 +59,7 @@ def extract_code_from_json(cleaned_code, verified_dag):
             
             if json_file_prefix == dag_prefix:
                 matched_file = json_file_path
-                print(f"✅ Match found: {json_file_path}")
+                logger.debug(f"✅ Match found: {json_file_path}")
                 break
 
         if matched_file:
@@ -66,7 +71,7 @@ def extract_code_from_json(cleaned_code, verified_dag):
                 "code": "\n".join(selected_lines),
             }
         else:
-            print(f"⚠️ Warning: No match found for '{dag_prefix}' in cleaned_code.")
+            logger.warning(f"No match found for '{dag_prefix}' in cleaned_code.")
 
     return extracted_code
 
@@ -96,9 +101,9 @@ def notebook_agent(verified_dag, cleaned_code, local_repo_path):
     SOL_FILE = os.path.join(CONFIG_DIR, "solution.ini")
 
     os.makedirs(NOTEBOOKS_DIR, exist_ok=True)
-    print(f"Created notebooks directory: {NOTEBOOKS_DIR}")
+    logger.info(f"Created notebooks directory: {NOTEBOOKS_DIR}")
 
-    # === Step 2: read environment.ini 和 solution.ini ===
+    # === Step 2: read environment.ini and solution.ini ===
     config = configparser.ConfigParser()
 
     if not os.path.exists(ENV_FILE):
@@ -125,8 +130,8 @@ def notebook_agent(verified_dag, cleaned_code, local_repo_path):
             if "attributes" in edge:
                 edge_attributes.setdefault(to_section, {}).setdefault(from_section, {}).update(edge["attributes"])
 
-    print(f"\n Final dependencies mapping: {dependencies}")
-    print(f" Final edge attributes mapping: {edge_attributes}\n")
+    logger.debug(f"Final dependencies mapping: {dependencies}")
+    logger.debug(f"Final edge attributes mapping: {edge_attributes}")
 
     # === Step 4: generate Python file（based on solution.ini）===
     generated_files = {}
@@ -137,9 +142,9 @@ def notebook_agent(verified_dag, cleaned_code, local_repo_path):
         filename = f"{index}_{node_name}.py" 
         file_path = os.path.join(NOTEBOOKS_DIR, filename)
         generated_files[section_name] = file_path  # record file's path
-        print(f"\n Generating file for: {section_name} (node_name: {node_name})")
-        print(f"  Checking dependencies for {node_name}: {dependencies.get(node_name, 'None')}")
-        print(f"  Checking edge attributes for {node_name}: {edge_attributes.get(node_name, 'None')}")
+        logger.info(f"Generating file for: {section_name} (node_name: {node_name})")
+        logger.debug(f"Checking dependencies for {node_name}: {dependencies.get(node_name, 'None')}")
+        logger.debug(f"Checking edge attributes for {node_name}: {edge_attributes.get(node_name, 'None')}")
 
          # === Standard Code for RMR ===       
         with open(file_path, "w", encoding="utf-8") as f:
@@ -239,7 +244,7 @@ print(f'username={username}, working_path={working_path}')
 
                         final_key = matched_key if matched_key else dep_key
                         f.write(f"{final_key} = config.get('{from_node}', '{dep_key}')\n")
-                        print(f"Writing edge attribute: {final_key} = config.get('{from_node}', '{dep_key}')")
+                        logger.debug(f"Writing edge attribute: {final_key} = config.get('{from_node}', '{dep_key}')")
 
             f.write("\n")
 
@@ -247,7 +252,7 @@ print(f'username={username}, working_path={working_path}')
             extracted_code = extract_code_from_json(cleaned_code,verified_dag)
     
             if section_name.lower() == "general": 
-                print(f"🚀 Skipping general section: {section_name}")
+                logger.info(f"Skipping general section: {section_name}")
                 continue
 
             match_key = next(
@@ -255,7 +260,7 @@ print(f'username={username}, working_path={working_path}')
                 None
             )
             if match_key:
-                print(f"MATCH FOUND: {match_key}")
+                logger.debug(f"MATCH FOUND: {match_key}")
 
                 research_code_lines = extracted_code[match_key]["code"].split("\n")  
                 cleaned_code_list = []
@@ -263,19 +268,20 @@ print(f'username={username}, working_path={working_path}')
                 for line in research_code_lines:
                     _, _, cleaned_line = line.partition("|")
                     if cleaned_line.startswith(" "):
-                        cleaned_line = cleaned_line[1:]  # 只去掉一个空格
+                        cleaned_line = cleaned_line[1:]  # Remove only one space
                     cleaned_code_list.append(cleaned_line.rstrip("\n"))
 
                 research_code = "\n".join(cleaned_code_list)
                 # f.write("\n" + "# === Research Code ===\n")
                 f.write(research_code + "\n")
                 # f.write("\nprint('Script initialized')\n")
-                print(f"Research code inserted into {file_path}")
+                logger.info(f"Research code inserted into {file_path}")
             else:
-                print(f"⚠️ WARNING: No research code found for {section_name}")
-            print("All notebooks generated successfully!")
-        print(f" Created: {file_path}")
-    print("All sections processed. Python files are ready in notebooks/")
+                logger.warning(f"No research code found for {section_name}")
+
+        logger.debug(f"Created: {file_path}")
+
+    logger.info("All sections processed. Python files are ready in notebooks/")
     
     return  generated_files
   # might return a dict

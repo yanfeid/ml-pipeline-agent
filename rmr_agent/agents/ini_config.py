@@ -1,9 +1,14 @@
 import os
 import re
 import yaml
+import logging
 from datetime import datetime
 from rmr_agent.llms import LLMClient
 from typing import Dict, Any
+from rmr_agent.utils.logging_config import setup_logger
+
+# Set up module logger
+logger = setup_logger(__name__)
 
 # ========== **Extract .ini Content from AI Response** ==========
 def extract_ini_content(response):
@@ -307,7 +312,7 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
     and key-value pairs using the `key = value` syntax. Avoid using JSON format.
     """
 
-    print("DEBUG: Prompt I used in the second call:", prompt_solution)
+    logger.debug("Prompt used in the solution.ini generation: %s", prompt_solution)
 
     response_solution = llm_client.call_llm(
         prompt=prompt_solution,
@@ -319,7 +324,7 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
 
     try:
         env_vars = parse_env_ini(environment_ini_str)
-        print(f"verified_dag = {repr(verified_dag)}")
+        logger.debug("verified_dag = %s", repr(verified_dag))
 
         solution_ini_str = replace_with_env_vars(filter_duplicate_value_lines(extract_ini_content(response_solution),yaml.safe_load(verified_dag)),env_vars)
 
@@ -330,7 +335,7 @@ def config_agent(verified_dag: Dict[str, Any], llm_model: str = "gpt-4o") -> Dic
         return result
 
     except ValueError as e:
-        print(f"⚠️ Error extracting .ini content: {e}")
+        logger.error("Error extracting .ini content: %s", e)
         raise  
     
  # ========== **Step 3: Simple Unit Test Code** ==========

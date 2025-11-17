@@ -1,8 +1,13 @@
 import os
 import json
+import logging
 from typing import Dict, Any
 import litellm
 from rmr_agent.llms import LLMClient
+from rmr_agent.utils.logging_config import setup_logger
+
+# Set up module logger
+logger = setup_logger(__name__)
 
 
 component_specific_hints = {
@@ -105,7 +110,7 @@ def attribute_identification_agent(python_file_path: str, component_dict: Dict[s
     file_name = base_name.replace('.py', '.ipynb')
     line_count = len(clean_code.splitlines())  
     identified_components = list(component_dict.keys())
-    print(f"Running attribute identification for {file_name} which has ~{line_count} lines of code, with identified components: {identified_components} ...")
+    logger.info("Running attribute identification for %s which has ~%d lines of code, with identified components: %s ...", file_name, line_count, identified_components)
 
     attribute_identification_result = ""
 

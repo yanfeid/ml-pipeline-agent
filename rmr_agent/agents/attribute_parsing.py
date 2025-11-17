@@ -6,8 +6,13 @@ import ast
 import configparser
 from pathlib import Path
 import litellm
+import logging
 from rmr_agent.llms import LLMClient
 from rmr_agent.utils import convert_to_dict
+from rmr_agent.utils.logging_config import setup_logger
+
+# Set up module logger
+logger = setup_logger(__name__)
 
 
 def update_attributes_with_existing_config(attribute_dict, config_path):
@@ -43,10 +48,10 @@ def update_attributes_with_existing_config(attribute_dict, config_path):
                 for key, value in parser.defaults().items():
                     config[key] = value
             else:
-                print(f"Unsupported configuration file format: {config_path}")
+                logger.error(f"Unsupported configuration file format: {config_path}")
                 return attribute_dict
     except Exception as e:
-        print(f"Error reading configuration file: {e}")
+        logger.error(f"Error reading configuration file: {e}")
         return attribute_dict
 
     # Regular expression patterns for matching configuration references
@@ -274,7 +279,7 @@ def read_config_file(file_path):
         return config_content
 
     except Exception as e:
-        print(f"Error reading {file_path}: {e}")
+        logger.error(f"Error reading {file_path}: {e}")
         return None
 
 
@@ -295,7 +300,7 @@ def check_if_need_config_fill(attribute_text):
         # If no component requires config fill, return False
         return False
     except Exception as e:
-        print(f"Error in check_if_need_config_fill: {e}")
+        logger.error(f"Error in check_if_need_config_fill: {e}")
         return False
 
 
@@ -371,9 +376,9 @@ def parse_attribute_identification(component_identification_dict, attribute_text
         if config_content:
             config_fill_prompt = f"""\n### Config values to use to fill in the variable values:\n{config_content}"""
             parse_prompt += config_fill_prompt
-            print(f"Added config content from {existing_config_file_path} to the prompt")
+            logger.debug(f"Added config content from {existing_config_file_path} to the prompt")
         else:
-            print(f"Warning: Could not read config file at {existing_config_file_path}")
+            logger.warning(f"Could not read config file at {existing_config_file_path}")
     
     # Call the LLM to parse the attribute identification
     llm_client = LLMClient()
@@ -392,14 +397,14 @@ def parse_attribute_identification(component_identification_dict, attribute_text
     # Convert the LLM response into a dictionary
     parsed_attributes_dict = convert_to_dict(parsed_attributes_text)
     if not parsed_attributes_dict:
-        print("No valid JSON object found in the LLM attribute identification response")
+        logger.error("No valid JSON object found in the LLM attribute identification response")
         return parsed_attributes_text, {}
     
     # Add file name and line range to the result to bring all the node information together. Delete any extra components hallucinated by LLM. 
     components_to_delete = []
     for component in parsed_attributes_dict.keys():
         if component not in component_identification_dict:
-            print(f"Found an extra component {component} added by LLM during attribute identification parsing. Deleting it")
+            logger.debug(f"Found an extra component {component} added by LLM during attribute identification parsing. Deleting it")
             components_to_delete.append(component) # delete later so we do not edit dictionary we are iterating over
             continue
         parsed_attributes_dict[component]["file_name"] = component_identification_dict[component].get('file_name', 'None')
@@ -419,7 +424,7 @@ def parse_attribute_identification(component_identification_dict, attribute_text
                 break
 
         if needs_filling:
-            print(f"Filling attribute values from config file: {existing_config_file_path}")
+            logger.info(f"Filling attribute values from config file: {existing_config_file_path}")
             try:
                 # Update attributes with values from the config file
                 filled_attributes_dict = update_attributes_with_existing_config(
@@ -432,7 +437,7 @@ def parse_attribute_identification(component_identification_dict, attribute_text
                     # Also update the text representation for consistency
                     parsed_attributes_text = json.dumps(filled_attributes_dict, indent=2)
             except Exception as e:
-                print(f"Error filling attribute values from config: {str(e)}")
+                logger.error(f"Error filling attribute values from config: {str(e)}")
 
     return parsed_attributes_text, parsed_attributes_dict
 

@@ -5,3 +5,4 @@ lib/
 rmr_agent/repos/
 rmr_agent/checkpoints/
 rmr_agent.egg-info/
+logs/

@@ -1,7 +1,12 @@
 import os
 import litellm
+import logging
 from rmr_agent.llms import LLMClient
 from rmr_agent.utils import preprocess_python_file
+from rmr_agent.utils.logging_config import setup_logger
+
+# Set up module logger
+logger = setup_logger(__name__)
 
 def summarize_code(python_file_path, full_file_list):
     base_name = os.path.basename(python_file_path)  
@@ -9,7 +14,7 @@ def summarize_code(python_file_path, full_file_list):
 
     cleaned_code = preprocess_python_file(python_file_path)
     line_count = len(cleaned_code.splitlines())  
-    print(f"Summarizing code for file {file_name} which has ~{line_count} lines of code")
+    logger.info("Summarizing code for file %s which has ~%d lines of code", file_name, line_count)
     summarization_prompt = f"""Analyze the following machine learning Python code and provide a practical summary of each major code block. Do not include an overall summary or draw conclusions beyond what each block explicitly does. Include only MAJOR code blocks or logical sections. Ignore code which is commented out. Do not include any code in the output — provide only concise, descriptive summaries in plain English.
 
 Full File List:
