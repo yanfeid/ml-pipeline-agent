@@ -410,7 +410,67 @@ def _get_node_file_info(node_attrs: Dict) -> Tuple[str, str]:
     
     return file_name, line_range
 
+def calculate_node_positions(edges: List, nodes: List) -> Dict[str, Tuple[float, float]]:
+    """
+    Calculate optimal positions for nodes using topological sorting.
+    Returns a dict mapping node names to (x, y) positions.
+    """
+    # Build adjacency list and in-degree count
+    node_names = [normalize_node_name(n[0] if isinstance(n, tuple) else n) for n in nodes]
+    adj_list = {name: [] for name in node_names}
+    in_degree = {name: 0 for name in node_names}
+    
+    # Process edges
+    for edge_info in edges:
+        if isinstance(edge_info, tuple) and len(edge_info) >= 2:
+            src, tgt = normalize_node_name(edge_info[0]), normalize_node_name(edge_info[1])
+            if src in adj_list and tgt in in_degree:
+                adj_list[src].append(tgt)
+                in_degree[tgt] += 1
+    
+    # Topological sort to determine layers
+    layers = []
+    current_layer = [n for n in node_names if in_degree[n] == 0]
+    visited = set()
+    
+    while current_layer:
+        layers.append(sorted(current_layer))  # Sort for consistent ordering
+        next_layer = []
+        for node in current_layer:
+            visited.add(node)
+            for neighbor in adj_list[node]:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0 and neighbor not in visited:
+                    next_layer.append(neighbor)
+        current_layer = next_layer
+    
+    # Add any remaining nodes (in case of cycles)
+    remaining = [n for n in node_names if n not in visited]
+    if remaining:
+        layers.append(sorted(remaining))
+    
+    # Calculate positions with INCREASED SPACING
+    positions = {}
+    y_spacing = 150  # Increased vertical spacing between layers (was 150)
+    x_spacing = 250  # Increased horizontal spacing between nodes (was 200)
+    
+    for layer_idx, layer in enumerate(layers):
+        y_pos = layer_idx * y_spacing
+        
+        # Calculate x positions to center the layer
+        layer_width = (len(layer) - 1) * x_spacing
+        start_x = -layer_width / 2
+        
+        for node_idx, node_name in enumerate(layer):
+            x_pos = start_x + node_idx * x_spacing
+            positions[node_name] = (x_pos, y_pos)
+    
+    return positions
+# Find the render_dag_graph function in ui_utils.py (around line 330)
+# Replace the "Add edges" section with this code:
 
+# Modified render_dag_graph with auto-fit view
+# Modified render_dag_graph with better auto-fit
 def render_dag_graph(edges: List, nodes: List) -> str:
     """
     Render DAG graph with file and line info in tooltips.
@@ -418,8 +478,12 @@ def render_dag_graph(edges: List, nodes: List) -> str:
     Returns:
         Path to the generated HTML file
     """
-    net = Network(height="450px", directed=True)
+    # Use larger canvas for better initial view
+    net = Network(height="450px", width="100%", directed=True, notebook=False, cdn_resources='in_line')
     valid_nodes = set()
+    
+    # Calculate positions first
+    positions = calculate_node_positions(edges, nodes)
     
     # Color palette for different files
     file_colors = {}
@@ -429,7 +493,11 @@ def render_dag_graph(edges: List, nodes: List) -> str:
     ]
     color_index = 0
     
-    # Add nodes
+    # Track min/max positions for setting initial view
+    min_x, max_x = float('inf'), float('-inf')
+    min_y, max_y = float('inf'), float('-inf')
+    
+    # Add nodes with fixed positions
     for node in nodes:
         if isinstance(node, tuple):
             node_name = node[0]
@@ -455,15 +523,28 @@ def render_dag_graph(edges: List, nodes: List) -> str:
                 
                 node_color = file_colors.get(file_name, "#F0F8FF")
                 
-                # Add node to network
+                # Get position
+                pos = positions.get(node_name, (0, 0))
+                
+                # Track bounds
+                min_x = min(min_x, pos[0])
+                max_x = max(max_x, pos[0])
+                min_y = min(min_y, pos[1])
+                max_y = max(max_y, pos[1])
+                
+                # Add node to network with fixed position
                 net.add_node(
                     node_name,
                     label=node_name,
                     title=tooltip,
                     shape="box",
-                    size=20,
-                    font={"size": 16},
+                    size=30,
+                    font={"size": 14, "bold": True},
                     borderWidth=2,
+                    x=pos[0],
+                    y=pos[1],
+                    physics=False,
+                    margin=15,
                     color={
                         "background": node_color,
                         "border": "#2B7CE9",
@@ -477,8 +558,24 @@ def render_dag_graph(edges: List, nodes: List) -> str:
             except Exception as e:
                 st.warning(f"Could not add node '{node_name}': {e}")
     
-    # Add edges
+    # Process edges (keep your existing edge code)
+    target_count = {}
+    for edge_info in edges:
+        if isinstance(edge_info, tuple) and len(edge_info) >= 2:
+            src, tgt = edge_info[0], edge_info[1]
+        else:
+            src, tgt = edge_info, None
+        
+        if not tgt:
+            continue
+        
+        tgt = normalize_node_name(tgt)
+        target_count[tgt] = target_count.get(tgt, 0) + 1
+    
+    # Add edges with curve adjustments
+    target_index = {}
     failed_edges = []
+    
     for edge_info in edges:
         if isinstance(edge_info, tuple) and len(edge_info) >= 2:
             src, tgt = edge_info[0], edge_info[1]
@@ -499,7 +596,27 @@ def render_dag_graph(edges: List, nodes: List) -> str:
             continue
         
         try:
-            net.add_edge(src, tgt)
+            if tgt not in target_index:
+                target_index[tgt] = 0
+            target_index[tgt] += 1
+            
+            if target_count[tgt] > 1:
+                edge_idx = target_index[tgt]
+                
+                if edge_idx == 1:
+                    net.add_edge(src, tgt, smooth={"type": "curvedCW", "roundness": 0.2})
+                elif edge_idx == 2:
+                    net.add_edge(src, tgt, smooth={"type": "curvedCCW", "roundness": 0.2})
+                elif edge_idx == 3:
+                    net.add_edge(src, tgt, smooth={"type": "curvedCW", "roundness": 0.4})
+                else:
+                    if edge_idx % 2 == 0:
+                        net.add_edge(src, tgt, smooth={"type": "curvedCCW", "roundness": min(0.6, 0.2 + edge_idx * 0.1)})
+                    else:
+                        net.add_edge(src, tgt, smooth={"type": "curvedCW", "roundness": min(0.6, 0.2 + edge_idx * 0.1)})
+            else:
+                net.add_edge(src, tgt)
+                
         except Exception as e:
             failed_edges.append(f"{src} → {tgt} ({str(e)})")
     
@@ -508,60 +625,167 @@ def render_dag_graph(edges: List, nodes: List) -> str:
             for failed in failed_edges:
                 st.text(f"• {failed}")
     
-    # Set network options
-    net.set_options("""
-    {
-        "physics": {
-            "enabled": true,
-            "stabilization": {
+    # Calculate appropriate scale for initial view
+    if min_x != float('inf'):
+        x_range = max_x - min_x + 400  # Add padding
+        y_range = max_y - min_y + 400
+        # Calculate scale to fit all nodes
+        scale = min(0.7, 700 / max(x_range, y_range))
+    else:
+        scale = 0.5
+    
+    # Set options with initial scale and position
+    net.set_options(f"""
+    {{
+        "physics": {{
+            "enabled": false
+        }},
+        "edges": {{
+            "arrows": {{
+                "to": {{"enabled": true, "scaleFactor": 1}}
+            }},
+            "smooth": {{
                 "enabled": true,
-                "iterations": 100
-            }
-        },
-        "layout": {
-            "hierarchical": {
-                "enabled": true,
-                "direction": "UD",
-                "sortMethod": "directed",
-                "nodeSpacing": 150,
-                "levelSeparation": 180
-            }
-        },
-        "edges": {
-            "arrows": {
-                "to": {"enabled": true, "scaleFactor": 1}
-            },
-            "smooth": {
-                "enabled": true,
-                "type": "cubicBezier",
-                "forceDirection": "vertical",
-                "roundness": 0.4
-            },
-            "color": {"color": "#848484", "inherit": false}
-        },
-        "nodes": {
-            "shape": "box",
-            "margin": 10,
-            "borderWidth": 2,
-            "font": {"color": "#000000", "size": 16, "face": "Arial"}
-        },
-        "interaction": {
+                "type": "cubicBezier"
+            }},
+            "color": {{"color": "#848484", "inherit": false}},
+            "width": 2
+        }},
+        "interaction": {{
             "hover": true,
             "tooltipDelay": 100,
-            "hideEdgesOnDrag": true
-        }
-    }
+            "zoomView": true,
+            "dragView": true,
+            "navigationButtons": true,
+            "keyboard": true
+        }},
+        "manipulation": {{
+            "enabled": false
+        }}
+    }}
     """)
     
-    # Save to temporary file
+    # Generate HTML and modify it
     temp_path = tempfile.NamedTemporaryFile(suffix=".html", delete=False)
     net.save_graph(temp_path.name)
+    
+    # Read the HTML and add custom JavaScript
+    with open(temp_path.name, 'r', encoding='utf-8') as f:
+        html_content = f.read()
+    
+    # Add custom JavaScript for auto-fit
+    custom_js = """
+    <script type="text/javascript">
+        // Wait for the network to be fully loaded
+        var checkExist = setInterval(function() {
+            if (typeof network !== 'undefined') {
+                clearInterval(checkExist);
+                
+                // Fit all nodes with animation
+                setTimeout(function() {
+                    network.fit({
+                        nodes: network.body.nodeIndices,
+                        animation: {
+                            duration: 1000,
+                            easingFunction: "easeInOutQuad"
+                        }
+                    });
+                }, 100);
+                
+                // Add a fit button for user convenience
+                var fitButton = document.createElement('button');
+                fitButton.innerHTML = 'Fit All';
+                fitButton.style.position = 'absolute';
+                fitButton.style.top = '10px';
+                fitButton.style.right = '10px';
+                fitButton.style.zIndex = '1000';
+                fitButton.style.padding = '5px 10px';
+                fitButton.style.backgroundColor = '#4CAF50';
+                fitButton.style.color = 'white';
+                fitButton.style.border = 'none';
+                fitButton.style.borderRadius = '4px';
+                fitButton.style.cursor = 'pointer';
+                fitButton.onclick = function() {
+                    network.fit({
+                        animation: {
+                            duration: 500,
+                            easingFunction: "easeInOutQuad"
+                        }
+                    });
+                };
+                document.querySelector('#mynetwork').parentElement.appendChild(fitButton);
+            }
+        }, 100);
+    </script>
+    """
+    
+    # Insert the custom JavaScript before closing body tag
+    html_content = html_content.replace('</body>', custom_js + '</body>')
+    
+    # Write modified HTML back
+    with open(temp_path.name, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    
     return temp_path.name
 
 
-# ============================================================================
-# DAG EDGE UTILITIES
-# ============================================================================
+# Also ensure calculate_node_positions has good spacing
+def calculate_node_positions(edges: List, nodes: List) -> Dict[str, Tuple[float, float]]:
+    """
+    Calculate optimal positions for nodes using topological sorting.
+    Returns a dict mapping node names to (x, y) positions.
+    """
+    # Build adjacency list and in-degree count
+    node_names = [normalize_node_name(n[0] if isinstance(n, tuple) else n) for n in nodes]
+    adj_list = {name: [] for name in node_names}
+    in_degree = {name: 0 for name in node_names}
+    
+    # Process edges
+    for edge_info in edges:
+        if isinstance(edge_info, tuple) and len(edge_info) >= 2:
+            src, tgt = normalize_node_name(edge_info[0]), normalize_node_name(edge_info[1])
+            if src in adj_list and tgt in in_degree:
+                adj_list[src].append(tgt)
+                in_degree[tgt] += 1
+    
+    # Topological sort to determine layers
+    layers = []
+    current_layer = [n for n in node_names if in_degree[n] == 0]
+    visited = set()
+    
+    while current_layer:
+        layers.append(sorted(current_layer))
+        next_layer = []
+        for node in current_layer:
+            visited.add(node)
+            for neighbor in adj_list[node]:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0 and neighbor not in visited:
+                    next_layer.append(neighbor)
+        current_layer = next_layer
+    
+    # Add any remaining nodes
+    remaining = [n for n in node_names if n not in visited]
+    if remaining:
+        layers.append(sorted(remaining))
+    
+    # Calculate positions with good spacing
+    positions = {}
+    y_spacing = 150  # Vertical spacing between layers
+    x_spacing = 250  # Horizontal spacing between nodes
+    
+    for layer_idx, layer in enumerate(layers):
+        y_pos = layer_idx * y_spacing
+        
+        # Calculate x positions to center the layer
+        layer_width = (len(layer) - 1) * x_spacing
+        start_x = -layer_width / 2
+        
+        for node_idx, node_name in enumerate(layer):
+            x_pos = start_x + node_idx * x_spacing
+            positions[node_name] = (x_pos, y_pos)
+    
+    return positions
 
 def get_node_order(nodes: List) -> Dict[str, int]:
     """Create a mapping of node names to their order for sorting."""
@@ -778,8 +1002,8 @@ def _rename_node_in_dag(old_name: str, new_name: str) -> None:
         st.session_state.attr_rows = None
         st.session_state.prev_edge_index = -1
     
-    logger.info(f"Renamed node: '{old_name}' -> '{new_name}'")
-    logger.debug(f"Current rename tracking: {st.session_state.node_renames}")
+    print(f"Renamed node: '{old_name}' -> '{new_name}'")
+    print(f"Current rename tracking: {st.session_state.node_renames}")
 
 
 
@@ -788,7 +1012,7 @@ def _render_add_edge_controls(node_names: List[str]) -> None:
     st.markdown("##### Add a New Edge")
     col1, col2 = st.columns(2)
     
-    # Use passed node_names instead of retrieving from external source
+    # 使用传入的 node_names 而不是从外部获取
     with col1:
         src = st.selectbox("Source Node", node_names, key="src_add")
     with col2:
