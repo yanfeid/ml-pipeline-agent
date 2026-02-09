@@ -88,4 +88,4 @@ The UI opens at http://localhost:8501
 
 ## License
 
-MIT License
+This project is patent-pending. Commercial use is prohibited.
